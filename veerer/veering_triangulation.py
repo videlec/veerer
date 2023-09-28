@@ -755,6 +755,9 @@ class VeeringTriangulation(Triangulation):
 
             return T
 
+    def veering_triangulation(self, mutable=False):
+        return self.copy(mutable)
+
     def triangulation(self, mutable=False):
         r"""
         Return the underlying triangulation.
