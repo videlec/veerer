@@ -737,8 +737,8 @@ class VeeringTriangulationLinearFamily(VeeringTriangulation):
         return cs.cone(backend)
 
     def geometric_automaton(self, run=True, backend=None):
-        from .automaton import GeometricAutomatonSubspace
-        A = GeometricAutomatonSubspace(backend=backend)
+        from .automaton import GeometricAutomaton
+        A = GeometricAutomaton(backend=backend)
         A.set_seed(self)
         if run:
             A.run()
@@ -862,14 +862,14 @@ class VeeringTriangulationLinearFamilies:
         EXAMPLES::
 
             sage: from veerer.linear_family import VeeringTriangulationLinearFamilies
-            sage: from veerer.automaton import GeometricAutomatonSubspace
+            sage: from veerer.automaton import GeometricAutomaton
 
             sage: X9 = VeeringTriangulationLinearFamilies.prototype_H2(0, 2, 1, -1)
             sage: X9.base_ring()
             Rational Field
             sage: X9.is_geometric()
             True
-            sage: GeometricAutomatonSubspace(X9)
+            sage: GeometricAutomaton(X9)
             Geometric veering linear constraint automaton with 6 vertices
 
             sage: X17 = VeeringTriangulationLinearFamilies.prototype_H2(0, 2, 2, -1)
@@ -877,21 +877,21 @@ class VeeringTriangulationLinearFamilies:
             Number Field in sqrt17 with defining polynomial x^2 - 17 with sqrt17 = 4.123105625617660?
             sage: X17.is_geometric()
             True
-            sage: GeometricAutomatonSubspace(X17)  # long time
+            sage: GeometricAutomaton(X17)  # long time
             Geometric veering linear constraint automaton with 210 vertices
 
         We check below part of McMullen theorem about connectedness::
 
             sage: a0, b0, c0, e0 = next(VeeringTriangulationLinearFamilies.H2_prototype_parameters(17, spin=0))
             sage: X17_0 = VeeringTriangulationLinearFamilies.prototype_H2(a0, b0, c0, e0)
-            sage: A0 = GeometricAutomatonSubspace(X17_0, backend='sage')  # long time
+            sage: A0 = GeometricAutomaton(X17_0, backend='sage')  # long time
             sage: for a, b, c, e in VeeringTriangulationLinearFamilies.H2_prototype_parameters(17, spin=0):  # long time
             ....:     X = VeeringTriangulationLinearFamilies.prototype_H2(a, b, c, e, mutable=True)
             ....:     X.set_canonical_labels()
             ....:     assert X in A0
             sage: a1, b1, c1, e1 = next(VeeringTriangulationLinearFamilies.H2_prototype_parameters(17, spin=1))
             sage: X17_1 = VeeringTriangulationLinearFamilies.prototype_H2(a1, b1, c1, e1)
-            sage: A1 = GeometricAutomatonSubspace(X17_1, backend='sage')  # long time
+            sage: A1 = GeometricAutomaton(X17_1, backend='sage')  # long time
             sage: for a, b, c, e in VeeringTriangulationLinearFamilies.H2_prototype_parameters(17, spin=1):  # long time
             ....:     X = VeeringTriangulationLinearFamilies.prototype_H2(a, b, c, e, mutable=True)
             ....:     X.set_canonical_labels()
@@ -949,7 +949,7 @@ class VeeringTriangulationLinearFamilies:
         EXAMPLES::
 
             sage: from veerer.linear_family import VeeringTriangulationLinearFamilies
-            sage: from veerer.automaton import GeometricAutomatonSubspace
+            sage: from veerer.automaton import GeometricAutomaton
 
             sage: X9 = VeeringTriangulationLinearFamilies.prototype_H1_1(0, 2, 1, -1)
             sage: X9.base_ring()
