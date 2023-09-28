@@ -5,7 +5,22 @@ Utility functions.
 from .env import ppl
 
 def det2(u, v):
+    r"""
+
+    EXAMPLES::
+
+        sage: from veerer.misc import det2
+        sage: det2((1, 0), (0, 1))
+        1
+        sage: det2((1, 0), (-1, 0))
+        0
+        sage: det2((1, 0), (0, -1))
+        -1
+        sage: det2((1, 0), (1, 0))
+        0
+    """
     return u[0]*v[1] - u[1]*v[0]
+
 
 def flipper_edge(T, e):
     r"""
