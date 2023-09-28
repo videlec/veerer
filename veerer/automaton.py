@@ -130,8 +130,11 @@ class Automaton(object):
     def __len__(self):
         return len(self._graph)
 
-    def one_triangulation(self):
+    def an_element(self):
         return next(iter(self))
+
+    # NOTE: kept for backward compatibility
+    one_triangulation = an_element
 
     def __iter__(self):
         r"""
@@ -874,67 +877,8 @@ class GeometricAutomaton(Automaton):
 
         sage: sum(x.is_geometric() for x in CoreAutomaton(vt))
         54
-    """
-    _name = 'geometric veering'
 
-    def _setup(self, backend=None):
-        self._backend = backend
-
-    def _seed_setup(self, state):
-        if not isinstance(state, VeeringTriangulation) or not state.is_geometric(backend=self._backend):
-            raise ValueError('invalid seed')
-        if self._backend is None:
-            from .polyhedron.cone import default_backend
-            self._backend = default_backend(state.base_ring())
-        state = state.copy(mutable=True)
-        state.set_canonical_labels()
-        return state
-
-    def _forward_flips(self, state):
-        r"""
-        Return the list of forward flippable edges from ``state``
-        """
-        return state.geometric_flips(backend=self._backend)
-
-    def _flip(self, flip_data):
-        edges, col = flip_data
-        assert all(self._state.colour(e) == self._state.colour(edges[0]) for e in edges)
-        flip_back_data = (edges, self._state.colour(edges[0]))
-        for e in edges:
-            self._state.flip(e, col, check=env.CHECK)
-        if env.CHECK and not self._state.is_geometric(backend=self._backend):
-            raise RuntimeError('that was indeed possible!')
-        return True, flip_back_data
-
-    def _flip_back(self, flip_back_data):
-        edges, old_col = flip_back_data
-        for e in edges:
-            self._state.flip_back(e, old_col, check=env.CHECK)
-
-
-class GeometricAutomatonSubspace(Automaton):
-    r"""
-    Automaton of geometric veering triangulations with a linear subspace constraint.
-
-    A veering triangulation is called geometric, if the set of
-    associated L^oo-vector data is full dimensional in the
-    ambient stratum.
-
-    EXAMPLES::
-
-        sage: from veerer import *
-
-        sage: vt, s, t = VeeringTriangulations.L_shaped_surface(1, 1, 1, 1)
-        sage: f = VeeringTriangulationLinearFamily(vt, [s, t])
-        sage: GeometricAutomatonSubspace(f)
-        Geometric veering linear constraint automaton with 6 vertices
-
-    One can check that the cardinality is indeed correct::
-
-        sage: sum(x.is_geometric() for x in CoreAutomaton(vt))
-        54
-
-    Some L-shape surfaces::
+    Some L-shape surfaces in H(2)::
 
         sage: for n in range(3, 7):
         ....:     vt, s, t = VeeringTriangulations.L_shaped_surface(1, n-2, 1, 1)
@@ -945,13 +889,13 @@ class GeometricAutomatonSubspace(Automaton):
         n=5: Geometric veering linear constraint automaton with 276 vertices
         n=6: Geometric veering linear constraint automaton with 800 vertices
     """
-    _name = 'geometric veering linear constraint'
-    
+    _name = 'geometric veering'
+
     def _setup(self, backend=None):
         self._backend = backend
 
     def _seed_setup(self, state):
-        if not isinstance(state, VeeringTriangulationLinearFamily) or not state.is_geometric(backend=self._backend):
+        if not isinstance(state, (VeeringTriangulation, VeeringTriangulationLinearFamily)) or not state.is_geometric(backend=self._backend):
             raise ValueError('invalid seed')
         if self._backend is None:
             from .polyhedron.cone import default_backend
