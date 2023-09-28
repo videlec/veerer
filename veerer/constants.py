@@ -100,6 +100,9 @@ def properties_to_string(p):
     else:
         return 'none'
 
+# rotation
+CLOCKWISE = 1
+COUNTERCLOCKWISE = 2
 
 # slopes and directions
 HORIZONTAL = 1

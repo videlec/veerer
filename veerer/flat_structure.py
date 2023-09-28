@@ -9,7 +9,7 @@ from sage.rings.polynomial.polynomial_ring_constructor import PolynomialRing
 from sage.modules.free_module import VectorSpace
 from sage.modules.free_module_element import vector
 
-from .constants import BLUE, RED, PURPLE, GREEN, LEFT, RIGHT
+from .constants import BLUE, RED, PURPLE, GREEN, LEFT, RIGHT, COUNTERCLOCKWISE, CLOCKWISE
 from .permutation import perm_cycles, perm_check, perm_init, perm_conjugate, perm_on_list
 from .triangulation import Triangulation
 from .veering_triangulation import VeeringTriangulation
@@ -17,34 +17,286 @@ from .misc import flipper_edge, flipper_edge_perm, flipper_nf_to_sage, flipper_n
 
 _Fields = Fields()
 
-def vec_slope(v):
+def vec_slope(v, deformation=None):
     r"""
     Return the slope of a 2d vector ``v``.
 
     EXAMPLES::
 
-        sage: from veerer.constants import RED, BLUE, PURPLE, GREEN
+        sage: from veerer.constants import RED, BLUE, PURPLE, GREEN, COUNTERCLOCKWISE, CLOCKWISE
         sage: from veerer.flat_structure import vec_slope
 
-        sage: vec_slope((1,0)) == PURPLE
-        True
-        sage: vec_slope((0,1)) == GREEN
-        True
-        sage: vec_slope((1,1)) == vec_slope((-1,-1)) == RED
-        True
-        sage: vec_slope((1,-1)) == vec_slope((1,-1)) == BLUE
-        True
+        sage: assert vec_slope((1,0)) == PURPLE
+        sage: assert vec_slope((1,0), COUNTERCLOCKWISE) == RED
+        sage: assert vec_slope((1,0), CLOCKWISE) == BLUE
+
+        sage: assert vec_slope((0,1)) == GREEN
+        sage: assert vec_slope((0, 1), COUNTERCLOCKWISE) == BLUE
+        sage: assert vec_slope((0, 1), CLOCKWISE) == RED
+
+        sage: for deformation in [None, COUNTERCLOCKWISE, CLOCKWISE]:
+        ....:     assert vec_slope((1,1), deformation) == RED
+        ....:     assert vec_slope((-1,-1), deformation) == RED
+        ....:     assert vec_slope((1,-1), deformation) == BLUE
+        ....:     assert vec_slope((1,-1), deformation) == BLUE
     """
     if v[0].is_zero():
-        return GREEN
+        # vertical
+        if deformation is None:
+            return GREEN
+        elif deformation == COUNTERCLOCKWISE:
+            return BLUE
+        elif deformation == CLOCKWISE:
+            return RED
     elif v[1].is_zero():
-        return PURPLE
+        # horizontal
+        if deformation is None:
+            return PURPLE
+        elif deformation == COUNTERCLOCKWISE:
+            return RED
+        elif deformation == CLOCKWISE:
+            return BLUE
     elif v[0] * v[1] > 0:
         return RED
     else:
         return BLUE
 
-class FlatVeeringTriangulation(Triangulation):
+class FlatTriangulation(Triangulation):
+    r"""
+    A triangulation with flat structure.
+
+    The vectors are kept coherently within triangles (ie a+b+c = 0). A pair of
+    edges (e, E) can either be glued via translation or point symmetry.
+    """
+    def __init__(self, triangulation, holonomies=None, base_ring=None, mutable=False, check=True):
+        Triangulation.__init__(self, triangulation, mutable=mutable, check=False)
+        if isinstance(triangulation, FlatVeeringTriangulation):
+            self._holonomies = triangulation._holonomies[:]
+            self._base_ring = triangulation._K
+            self._V = triangulation._V
+            self._K = triangulation._K
+            self._translation = triangulation._translation
+            return
+
+        if base_ring is None:
+            S = Sequence([vector(v) for v in holonomies])
+            self._V = S.universe()
+            self._K = self._V.base_ring()
+            holonomies = list(S)
+        else:
+            self._K = base_ring
+            self._V = VectorSpace(self._K, 2)
+            holonomies = [self._V(v) for v in holonomies]
+
+        if self._K not in _Fields:
+            self._K = self._K.fraction_field()
+            self._V = self._V.change_ring(self._K)
+            holonomies = [v.change_ring(self._K) for v in holonomies]
+
+        n = self._n
+        m = self.num_edges()
+        ep = self._ep
+
+        if len(holonomies) == m:
+            for e in range(m):
+                E = ep[e]
+                if e != E and E < m:
+                    raise ValueError("edge perm not in standard form")
+            # TODO: putting a minus sign in front of every single edge would
+            # mostly be valid for translation surfaces
+            holonomies.extend([-holonomies[ep[e]] for e in range(m,n)])
+        if len(holonomies) != n:
+            raise ValueError('wrong number of vectors')
+        self._holonomies = holonomies
+
+        cols = [vec_slope(self._holonomies[e]) for e in range(n)]
+        if isinstance(triangulation, VeeringTriangulation):
+            # check that colours are compatible
+            for e in range(triangulation.num_edges()):
+                tcol = triangulation.edge_colour(e)
+                scol = self.edge_colour(e)
+                if scol == PURPLE or scol == GREEN:
+                    continue
+                if tcol != scol:
+                    raise ValueError("incompatible colours")
+
+        # TODO: abelian check?
+        if check:
+            self._check()
+
+    def _check(self):
+        Triangulation._check(self)
+
+        n = self.num_half_edges()
+        ep = self.edge_permutation(copy=False)
+        vectors = self._holonomies
+        if len(vectors) != n:
+            raise ValueError("invalid list of vectors")
+
+        for a in range(n):
+            A = ep[a]
+            u = vectors[a]
+            v = vectors[A]
+            if u != v and u != -v:
+                raise ValueError('ep[%s] = %s but vec[%s] = %s' % (a, u, A, v))
+
+        for a,b,c in self.faces():
+            va = vectors[a]
+            vb = vectors[b]
+            vc = vectors[c]
+            if va + vb + vc:
+                raise ValueError('vec[%s] = %s, vec[%s] = %s and vec[%s] = %s do not sum to zero' % (a, va, b, vb, c, vc))
+
+            if det2(va, vb) <= 0 or det2(vb, vc) <= 0 or det2(vc, va) <= 0:
+                raise ValueError('(%s, %s, %s) is a clockwise triangle' %
+                        (a, b, c))
+
+        # TODO: abelian check
+
+    def __str__(self):
+        return "FaltTriangulation({}, {})".format(Triangulation.__str__(self), self._holonomies)
+
+    def __repr__(self):
+        return str(self)
+
+    def edge_colour(self, e, degeneration=None):
+        r"""
+        Return the edge colour.
+
+        INPUT:
+
+        - ``deformation`` - optional ``None``, or ``COUNTERCLOCKWISE`` or
+          ``CLOCKWISE`` -- whether horizontal and vertical edges have to be
+          considered under an infinitesimal counter-clockwise or clockwise
+          rotation.
+        """
+        return vec_slope(self._holonomies[e], degeneration)
+
+    def swap(self, e):
+        r"""
+        Swap the orientation of the edge ``e``.
+        """
+        if not self._mutable:
+            raise ValueError("immutable flat veering triangulation; use a mutable copy instead")
+        E = self._ep[e]
+        if e != E:
+            Triangulation.swap(e)
+            self._holonomies[e], self._holonomies[E] = self._holonomies[E], self._holonomies[e]
+
+    def triangle_upside_down(self, e):
+        r"""
+        Apply a 180 degree rotation to the triangle containing the edge ``e``.
+        """
+        if not self._mutable:
+            raise ValueError("immutable flat veering triangulation; use a mutable copy instead")
+
+        e = self._check_half_edge(e)
+        f = self._fp[e]
+        g = self._fp[f]
+        self._holonomies[e] = -self._holonomies[e]
+        self._holonomies[f] = -self._holonomies[f]
+        self._holonomies[g] = -self._holonomies[g]
+
+        self._check()
+
+    def colours_about_edge(self, e, deformation=COUNTERCLOCKWISE):
+        e = self._check_half_edge(e)
+        return [self.edge_colour(f, deformation) for f in self.square_about_edge(e)]
+
+    def alternating_square(self, e):
+        r"""
+        Return whether there is an alternating square around the edge ``e``.
+        """
+        e = self._check_half_edge(e)
+        colours = self.colours_about_edge(e, deformation)
+        if any(colours[f] == GREEN or colours[f] == PURPLE for f in range(4)):
+            return False
+        return all(colours[f] != colours[(f+1) % 4] for f in range(4))
+
+    def is_veering(self, deformation=COUNTERCLOCKWISE):
+        r"""
+        Return whether this flat triangulation is veering.
+
+        INPUT:
+
+        - ``deformation`` - optional ``None``, or ``COUNTERCLOCKWISE`` or
+          ``CLOCKWISE`` -- whether horizontal and vertical edges have to be
+          considered under an infinitesimal counter-clockwise or clockwise
+          rotation.
+        """
+        colouring = [rotate[self.edge_colour(e, deformation)] for e in range(self._n)]
+        return self.is_colouring_veering(colouring)
+
+    def is_flippable(self, e):
+        r"""
+        Return whether the edge ``e`` can be flipped (ie whether the surounding
+        square is strictly convex).
+
+        EXAMPLES:
+
+        A triangulated pillowcase where one of the vertical and one of the
+        horizontal can not be flipped::
+
+            sage: from veerer import Triangulation, FlatTriangulation
+            sage: t = Triangulation("(0,1,2)(~0,4,3)(~5,~2,~1)(5,~3,~4)")
+            sage: f = FlatTriangulation(T, [(1,0),
+        """
+        e = self._check_half_edge(e)
+        if not Triangulation.is_flippable(self, e):
+            return False
+        a, b, c, d = self.square_about_edge(e)
+        return det2(a, b) > 0 and det2(b, c) > 0 and det2(c, d) > 0 and det2(d, a) > 0
+
+    def relabel(self, p):
+        r"""
+        Relabel the flat structure with the permutation `p`.
+
+        EXAMPLES::
+
+            sage: from veerer import Triangulation, FlatVeeringTriangulation
+            sage: T = Triangulation("(0,1,2)(3,4,~0)(5,6,~1)")
+            sage: fl = FlatVeeringTriangulation(T, [(-47, 51), (-27, -67), (74, 16), (22, 79), (-69, -28), (-61, -31), (34, -36)], mutable=True)
+            sage: fl.relabel('(1,0)(3,5,4,6)')
+            sage: fl
+            FlatVeeringTriangulation(Triangulation("(0,2,1)(3,~0,4)(5,6,~1)"), [(-27, -67), (-47, 51), (74, 16), (34, -36), (-61, -31), (22, 79), (-69, -28), (47, -51), (27, 67)])
+        """
+        if not self._mutable:
+            raise ValueError("immutable flat veering triangulation; use a mutable copy instead")
+
+        n = self._n
+        if not perm_check(p, n):
+            p = perm_init(p, n, self._ep)
+            if not perm_check(p, n, self._ep):
+                raise ValueError('invalid relabeling permutation')
+
+        self._vp = perm_conjugate(self._vp, p)
+        self._ep = perm_conjugate(self._ep, p)
+        self._fp = perm_conjugate(self._fp, p)
+
+        perm_on_list(p, self._holonomies)
+
+        self._check()
+
+    def xy_scaling(self, a, b):
+        r"""
+        Rescale the horizontal direction by `a` and the vertical one by `b`.
+
+        EXAMPLES::
+
+            sage: from veerer import Triangulation, FlatVeeringTriangulation
+            sage: T = Triangulation("(0,1,2)(3,4,~0)(5,6,~1)")
+            sage: fl = FlatVeeringTriangulation(T, [(-47, 51), (-27, -67), (74, 16), (22, 79), (-69, -28), (-61, -31), (34, -36)], mutable=True)
+            sage: fl.xy_scaling(2, 1/3)
+            sage: fl
+            FlatVeeringTriangulation(Triangulation("(0,1,2)(3,4,~0)(5,6,~1)"), [(-94, 17), (-54, -67/3), (148, 16/3), (44, 79/3), (-138, -28/3), (-122, -31/3), (68, -12), (54, 67/3), (94, -17)])
+        """
+        if not self._mutable:
+            raise ValueError("immutable flat veering triangulation; use a mutable copy instead")
+
+        self._holonomies = [self._V((a*x, b*y)) for x,y in self._holonomies]
+
+
+class FlatVeeringTriangulation(FlatTriangulation):
     r"""
     A triangulation with flat structures with veering compatible slopes.
 
@@ -162,35 +414,6 @@ class FlatVeeringTriangulation(Triangulation):
         """
         return T.flat_structure_min()
 
-    def triangle_upside_down(self, e):
-        r"""
-        Apply a 180 degree rotation to the triangle containing the edge ``e``.
-        """
-        if not self._mutable:
-            raise ValueError("immutable flat veering triangulation; use a mutable copy instead")
-
-        f = self._fp[e]
-        g = self._fp[f]
-        self._holonomies[e] = -self._holonomies[e]
-        self._holonomies[f] = -self._holonomies[f]
-        self._holonomies[g] = -self._holonomies[g]
-
-        self._check()
-
-    def colours_about_edge(self, e):
-        e = int(e)
-        return [self.edge_colour(f) for f in self.square_about_edge(e)]
-
-    def alternating_square(self, e):
-        r"""
-        Return whether there is an alternating square around the edge ``e``.
-        """
-        e = int(e)
-        colours = self.colours_about_edge(e)
-        if any(colours[f] == GREEN or colours[f] == PURPLE for f in range(4)):
-            return False
-        return all(colours[f] != colours[(f+1) % 4] for f in range(4))
-
     def is_flippable(self, e):
         return Triangulation.is_flippable(self, e) and self.alternating_square(e)
 
@@ -223,17 +446,6 @@ class FlatVeeringTriangulation(Triangulation):
         ep = self._ep
         n = self._n
         return [e for e in range(n) if e <= ep[e] and self.is_backward_flippable(e)]
-
-    def swap(self, e):
-        r"""
-        Swap the orientation of the edge ``e``.
-        """
-        if not self._mutable:
-            raise ValueError("immutable flat veering triangulation; use a mutable copy instead")
-        E = self._ep[e]
-        if e != E:
-            Triangulation.swap(e)
-            self._holonomies[e], self._holonomies[E] = self._holonomies[E], self._holonomies[e]
 
     def boshernitzan_criterion(self):
         r"""
@@ -322,9 +534,6 @@ class FlatVeeringTriangulation(Triangulation):
         return "FlatVeeringTriangulation({}, {})".format(Triangulation.__str__(self),
                   self._holonomies)
 
-    def __repr__(self):
-        return str(self)
-
     def _check(self):
         r"""
         EXAMPLES::
@@ -336,35 +545,11 @@ class FlatVeeringTriangulation(Triangulation):
             sage: F._check()
         """
         Triangulation._check(self)
+        FlatStructure._check(self)
 
-        n = self.num_half_edges()
-        ep = self.edge_permutation(copy=False)
-        vectors = self._holonomies
-        if len(vectors) != n:
-            raise ValueError("invalid list of vectors")
-
-        for a in range(n):
-            A = ep[a]
-            u = vectors[a]
-            v = vectors[A]
-            if u != v and u != -v:
-                raise ValueError('ep[%s] = %s but vec[%s] = %s' % (a, u, A, v))
-
-        for a,b,c in self.faces():
-            va = vectors[a]
-            vb = vectors[b]
-            vc = vectors[c]
-            if va + vb + vc:
-                raise ValueError('vec[%s] = %s, vec[%s] = %s and vec[%s] = %s do not sum to zero' % (a, va, b, vb, c, vc))
-
-            if det2(va, vb) <= 0 or det2(vb, vc) <= 0 or det2(vc, va) <= 0:
-                raise ValueError('(%s, %s, %s) is a clockwise triangle' %
-                        (a, b, c))
-
-        if self._translation:
-            for e in range(self.num_edges()):
-                E = ep[e]
-                assert self._holonomies[e] == -self._holonomies[E]
+        # TODO: check veering condition
+        # - no monochromatic triangle
+        # - no monochromatic vertex
 
     def copy(self, mutable=None):
         if mutable is None:
@@ -385,9 +570,6 @@ class FlatVeeringTriangulation(Triangulation):
         res._holonomies = [v.__copy__() for v in self._holonomies]
         res._translation = self._translation
         return res
-
-    def edge_colour(self, e):
-        return vec_slope(self._holonomies[e])
 
     def layout(self):
         r"""
@@ -498,51 +680,3 @@ class FlatVeeringTriangulation(Triangulation):
             self._holonomies[E] = -self._holonomies[e]
 
         self._check()
-
-    def relabel(self, p):
-        r"""
-        Relabel the flat structure with the permutation `p`.
-
-        EXAMPLES::
-
-            sage: from veerer import Triangulation, FlatVeeringTriangulation
-            sage: T = Triangulation("(0,1,2)(3,4,~0)(5,6,~1)")
-            sage: fl = FlatVeeringTriangulation(T, [(-47, 51), (-27, -67), (74, 16), (22, 79), (-69, -28), (-61, -31), (34, -36)], mutable=True)
-            sage: fl.relabel('(1,0)(3,5,4,6)')
-            sage: fl
-            FlatVeeringTriangulation(Triangulation("(0,2,1)(3,~0,4)(5,6,~1)"), [(-27, -67), (-47, 51), (74, 16), (34, -36), (-61, -31), (22, 79), (-69, -28), (47, -51), (27, 67)])
-        """
-        if not self._mutable:
-            raise ValueError("immutable flat veering triangulation; use a mutable copy instead")
-
-        n = self._n
-        if not perm_check(p, n):
-            p = perm_init(p, n, self._ep)
-            if not perm_check(p, n, self._ep):
-                raise ValueError('invalid relabeling permutation')
-
-        self._vp = perm_conjugate(self._vp, p)
-        self._ep = perm_conjugate(self._ep, p)
-        self._fp = perm_conjugate(self._fp, p)
-
-        perm_on_list(p, self._holonomies)
-
-        self._check()
-
-    def xy_scaling(self, a, b):
-        r"""
-        Rescale the horizontal direction by `a` and the vertical one by `b`.
-
-        EXAMPLES::
-
-            sage: from veerer import Triangulation, FlatVeeringTriangulation
-            sage: T = Triangulation("(0,1,2)(3,4,~0)(5,6,~1)")
-            sage: fl = FlatVeeringTriangulation(T, [(-47, 51), (-27, -67), (74, 16), (22, 79), (-69, -28), (-61, -31), (34, -36)], mutable=True)
-            sage: fl.xy_scaling(2, 1/3)
-            sage: fl
-            FlatVeeringTriangulation(Triangulation("(0,1,2)(3,4,~0)(5,6,~1)"), [(-94, 17), (-54, -67/3), (148, 16/3), (44, 79/3), (-138, -28/3), (-122, -31/3), (68, -12), (54, 67/3), (94, -17)])
-        """
-        if not self._mutable:
-            raise ValueError("immutable flat veering triangulation; use a mutable copy instead")
-
-        self._holonomies = [self._V((a*x, b*y)) for x,y in self._holonomies]
