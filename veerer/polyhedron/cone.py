@@ -161,6 +161,38 @@ class Cone:
     def add_constraints(self, constraints):
         raise NotImplementedError
 
+    def intersection(self, other):
+        r"""
+        EXAMPLES::
+
+            sage: from veerer.polyhedron.linear_expression import LinearExpressions, ConstraintSystem
+
+            sage: L = LinearExpressions(QQ)
+
+            sage: cs1 = ConstraintSystem()
+            sage: cs1.insert(L.variable(0) + L.variable(1) >= 0)
+            sage: cs1.insert(L.variable(2) + L.variable(3) == 0)
+            sage: cs2 = ConstraintSystem()
+            sage: cs2.insert(L.variable(0) + L.variable(1) == 0)
+            sage: cs2.insert(L.variable(2) + L.variable(3) >= 0)
+            sage: backends = ['ppl', 'sage']
+            sage: backends.append('normaliz-QQ')  # optional - pynormaliz
+            sage: for backend in backends:
+            ....:     C1 = cs1.cone(backend)
+            ....:     C2 = cs2.cone(backend)
+            ....:     print(C1.intersection(C2))
+        """
+        if not isinstance(other, Cone):
+            raise TypeError('other must be a cone')
+        from .linear_expression import LinearExpressions, ConstraintSystem
+        L = LinearExpressions(self._base_ring)
+        cs = ConstraintSystem()
+        for ieq in self.ieqs() + other.ieqs():
+            cs.insert(L(ieq) >= 0)
+        for eqn in self.eqns() + other.eqns():
+            cs.insert(L(eqn) == 0)
+        return self.add_constraints(cs)
+
 
 class Cone_ppl(Cone):
     r"""
@@ -240,6 +272,12 @@ class Cone_ppl(Cone):
             cone.add_constraint(constraint.ppl())
         return Cone_ppl(ZZ, cone)
 
+    def intersection(self, other):
+        import ppl
+        cone = ppl.C_Polyhedron(self._cone)
+        cone.intersection_assign(other._cone)
+        return Cone_ppl(ZZ, cone)
+
 
 class Cone_sage(Cone):
     r"""
@@ -278,6 +316,10 @@ class Cone_sage(Cone):
         from sage.geometry.polyhedron.constructor import Polyhedron
         ieqs, eqns = cs.ieqs_eqns(self._cone.ambient_dim())
         new_cone = self._cone.intersection(Polyhedron(ieqs=ieqs, eqns=eqns))
+        return Cone_sage(new_cone.base_ring(), new_cone)
+
+    def intersection(self, other):
+        new_cone = self._cone.intersection(other._cone)
         return Cone_sage(new_cone.base_ring(), new_cone)
 
 

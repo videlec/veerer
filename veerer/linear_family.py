@@ -391,6 +391,26 @@ class VeeringTriangulationLinearFamily(VeeringTriangulation):
             L._subspace.set_immutable()
         return L
 
+    def intersection(self, other):
+        r"""
+        Make the intersection of ``self`` with ``other``.
+        """
+        if not isinstance(other, VeeringTriangulationLinearFamily):
+            raise TypeError('other must be a linear family')
+        if not VeeringTriangulation.__eq__(self, other):
+            raise ValueError('underlying triangulations must be identical')
+        k1 = self._subspace.right_kernel_matrix()
+        k2 = other._subspace.right_kernel_matrix()
+        new_kernel = matrix(self._subspace.base_ring(),
+                k1.nrows() + k2.nrows(),
+                k1.ncols())
+        new_kernel[:k1.nrows(), :] = k1
+        new_kernel[k1.nrows():, :] = k2
+        new_subspace = new_kernel.right_kernel_matrix()
+        new_subspace.echelonize()
+        new_subspace = new_subspace[:new_subspace.rank(), :]
+        return VeeringTriangulationLinearFamily(self.veering_triangulation(), new_subspace)
+
     def base_ring(self):
         return self._subspace.base_ring()
 
