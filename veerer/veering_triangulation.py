@@ -98,9 +98,7 @@ class VeeringTriangulation(Triangulation):
         # set _colouring: half edge index --> {RED, BLUE}
         if len(colouring) == self.num_edges():
             colouring = [colouring[self._norm(i)] for i in range(n)]
-        elif len(colouring) == n:
-            colouring = colouring
-        else:
+        elif len(colouring) != n:
             raise ValueError("'colouring' argument of invalid length")
 
         self._colouring = array('i', colouring)
@@ -129,37 +127,9 @@ class VeeringTriangulation(Triangulation):
            any(cols[e] != cols[ep[e]] for e in range(self._n)):
             raise error('bad colouring attribute')
 
-        # faces must be of one of the following type (up to cyclic ordering)
-        # non-dgenerate: BBR (BLUE), RRB (RED)
-        # 1-degenerate: PBR (PURPLE), GRB (GREEN)
-        # 2-degenerate: BPG (BLUE|PURPLE|GREEN), RGP (RED|GREEN|PURPLE)
-        for a in range(n):
-            col, a, b, c = self.triangle(a)
-            good = False
-            if col == BLUE:
-                good = cols[a] == BLUE and cols[b] == BLUE and cols[c] == RED
-            elif col == RED:
-                good = cols[a] == RED and cols[b] == RED and cols[c] == BLUE
-            elif col == PURPLE:
-                good = cols[a] == PURPLE and cols[b] == BLUE and cols[c] == RED
-            elif col == GREEN:
-                good = cols[a] == GREEN and cols[b] == RED and cols[c] == BLUE
-            elif col == BLUE | PURPLE | GREEN:
-                good = cols[a] == BLUE and cols[b] == GREEN and cols[c] == PURPLE
-            elif col == RED | PURPLE | GREEN:
-                good = cols[a] == RED and cols[b] == PURPLE and cols[c] == GREEN
-            if not good:
-                raise error('invalid triangle ({}, {}, {}) with colours ({}, {}, {})'.format(a, b, c,
-                    colour_to_string(cols[a]), colour_to_string(cols[b]), colour_to_string(cols[c])))
-
-        # no monochromatic vertex
-        for v in self.vertices():
-            col = cols[v[0]]
-            i = 1
-            while i < len(v) and cols[v[i]] == col:
-                i += 1
-            if i == len(v):
-                raise error('monochromatic vertex {} of colour {}'.format(v, colour_to_string(cols[v[0]])))
+        ans, reason = Triangulation.is_colouring_veering(cols, certificate=True)
+        if not ans:
+            raise error(reason)
 
     def __getstate__(self):
         r"""
