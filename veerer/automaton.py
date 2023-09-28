@@ -926,3 +926,38 @@ class GeometricAutomaton(Automaton):
         edges, old_col = flip_back_data
         for e in edges:
             self._state.flip_back(e, old_col, check=env.CHECK)
+
+    def intersection(self, other):
+        r"""
+        Return the intersection as a list of geometric automata.
+
+        If ``other`` is ``self`` then the self-intersection is computed.
+        """
+        if type(self) is not type(other):
+            raise TypeError
+        vts = self.an_element()
+        vto = other.an_element()
+        if vts.stratum() != vto.stratum():
+            return []
+
+        # 1. sort by topology
+        from collections import defaultdict
+        s_by_top = defaultdict(list)
+        o_by_top = defaultdict(list)
+        for f in self:
+            s_by_top[f.veering_triangulation()].append(f)
+        for f in other:
+            o_by_top[f.veering_triangulation()].append(f)
+
+        topological_cells = set(s_by_top)
+        topological_cells.intersection_update(o_by_top)
+        output = []
+        for cell in topological_cells:
+            for fs, fo in itertools.product(s_by_top[cell], o_by_top[cell]):
+                if fs == fo:
+                    continue
+                f = fs.intersection(fo)
+                if f.is_geometric() and not any(f in A for A in output):
+                    output.append(f.geometric_automaton())
+
+        return output
