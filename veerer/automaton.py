@@ -1518,11 +1518,11 @@ class DelaunayStrebelAutomaton(Automaton):
 
     def codimension_one_horizontal_degenerations(self):
         r"""
-        Return the list of codimension one horizontal degenerations.
+        Return the list of codimension one horizontal degenerations as a list of Delaunay-Strebel automata.
 
         EXAMPLES::
 
-            sage: from veerer import VeeringTriangulation, DelaunayStrebelAutomaton
+            sage: from veerer import VeeringTriangulation, VeeringTriangulationLinearFamilies, DelaunayStrebelAutomaton
 
         The example of the stratum H(2)::
 
@@ -1537,6 +1537,22 @@ class DelaunayStrebelAutomaton(Automaton):
             [Delaunay-Strebel automaton with 46 vertices]
             sage: next(iter(degenerations[0]))[1].stratum()
             H_1(2, -1^2)
+
+        Degenerations of the eigenform loci of discriminant 17 in the stratum H(1,1)::
+
+            sage: a0, b0, c0, e0 = next(VeeringTriangulationLinearFamilies.H2_prototype_parameters(17, spin=0))
+            sage: X17_0 = VeeringTriangulationLinearFamilies.prototype_H2(a0, b0, c0, e0)
+            sage: A0 = X17_0.delaunay_strebel_automaton()  # long time ~5secs
+            sage: D0 = A0.codimension_one_horizontal_degenerations()  # long time
+            sage: len(D0)  # long time`
+            3
+
+            sage: a1, b1, c1, e1 = next(VeeringTriangulationLinearFamilies.H2_prototype_parameters(17, spin=1))
+            sage: X17_1 = VeeringTriangulationLinearFamilies.prototype_H2(a1, b1, c1, e1)
+            sage: A1 = X17_1.delaunay_strebel_automaton()  # long time ~5secs
+            sage: A1.codimension_one_horizontal_degenerations()  # long time
+            sage: len(D1)  # long time
+            3
         """
         # TODO: one can do a little bit of optimization as the Delaunay flip inside cylinders
         # do not affect the degenerations

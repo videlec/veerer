@@ -940,12 +940,28 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
             sage: f1.strebel_graph().residue_constraints().echelon_form()
             [1 1 1 0]
             [0 0 0 1]
+
+        An example with folded edges::
+
+
+            sage: x = polygen(QQ)
+            sage: K.<sqrt17> = NumberField(x^2 - 17, embedding=AA(17).sqrt())
+            sage: vt = VeeringTriangulation("", boundary="(0:1)(1:1,~0:1)", colouring="RR")
+            sage: f = VeeringTriangulationLinearFamily(vt, [(1, 1/4*sqrt17 - 3/4)])
+            sage: f.strebel_graph()
+            StrebelGraphLinearFamily("(0)(1,~0)", [(1, 1/4*sqrt17 - 3/4)])
         """
-        indices = [e for e in range(self._n // 2) if self.is_half_edge_strebel(e, slope) and self.is_half_edge_strebel(self._ep[e], slope)]
+        indices = []
+        m = self.num_edges()
+        for e in range(self.num_edges()):
+            if self._ep[e] != e and self._ep[e] < m:
+                raise RuntimeError('ep permutation not in standard form')
+            if self.is_half_edge_strebel(e, slope) and self.is_half_edge_strebel(self._ep[e], slope):
+                indices.append(e)
+
         G = VeeringTriangulation.strebel_graph(self, slope, mutable=False)
         subspace = self.generators_matrix(slope).matrix_from_columns(indices)
         return StrebelGraphLinearFamily(G, subspace, mutable=mutable)
-
 
 
 class StrebelGraphLinearFamily(LinearFamily, StrebelGraph):
