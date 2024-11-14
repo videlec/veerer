@@ -29,6 +29,7 @@ import numbers
 from random import choice, shuffle
 
 from sage.structure.element import get_coercion_model, Matrix
+from sage.structure.richcmp import op_EQ
 from sage.rings.integer_ring import ZZ
 from sage.rings.rational_field import QQ
 from sage.matrix.constructor import matrix
@@ -40,6 +41,7 @@ from sage.categories.number_fields import NumberFields
 from .constants import VERTICAL, HORIZONTAL, BLUE, RED
 from .permutation import perm_cycle_string, perm_cycles, perm_check, perm_conjugate, perm_on_list, perm_relabel_on_edges
 from .polyhedron import LinearExpressions, ConstraintSystem
+from .polyhedron.linear_expression import LinearConstraint
 from .strebel_graph import StrebelGraph
 from .veering_triangulation import VeeringTriangulation
 
@@ -743,12 +745,12 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
         if slope == VERTICAL:
             subspace = self._subspace
             for row in subspace.right_kernel_matrix():
-                cs.insert(L.element_class(L, row.dict(), zero) == zero, check=False)
+                cs.insert(LinearConstraint(op_EQ, L.element_class(L, row.dict(), zero)), check=False)
         elif slope == HORIZONTAL:
             subspace = self._horizontal_subspace()
             shift = self.num_edges()
             for row in subspace.right_kernel_matrix():
-                cs.insert(L.element_class(L, {key + shift: value for key, value in row.dict().items()}, zero) == zero, check=False)
+                cs.insert(LinearConstraint(op_EQ, L.element_class(L, {key + shift: value for key, value in row.dict().items()}, zero)), check=False)
 
     def _check(self, error=ValueError):
         LinearFamily._check(self, error)

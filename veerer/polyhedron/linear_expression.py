@@ -287,8 +287,10 @@ class LinearConstraint:
         sage: 3 * L.variable(0) - 5 * L.variable(2) == 7
         3*x0 - 5*x2 - 7 == 0
     """
-    def __init__(self, op, left, right):
-        self._expression = left - right
+    def __init__(self, op, left, right=None):
+        self._expression = left
+        if right is not None:
+            self._expression -= right
         self._op = op
 
     @staticmethod

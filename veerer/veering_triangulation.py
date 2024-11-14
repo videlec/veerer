@@ -46,6 +46,7 @@ from .permutation import *
 from .misc import det2
 from .triangulation import face_edge_perms_init, boundary_init, Triangulation
 from .polyhedron import LinearExpressions, ConstraintSystem
+from .polyhedron.linear_expression import LinearConstraint
 from .polyhedron.linear_algebra import linear_form_project, vector_normalize
 
 cm = get_coercion_model()
@@ -2855,7 +2856,7 @@ class VeeringTriangulation(Triangulation):
             e = self._norm(e)
             # y[a] + y[d] - x[e] >= 0
             l = L.element_class(L, {ne + a: one, ne + d: one, e: minus_one}, zero)
-            cs.insert(l >= 0, check=False)
+            cs.insert(LinearConstraint(op_GE, l), check=False)
         for e in self.backward_flippable_edges():
             a, _, _, d = self.square_about_edge(e, check=False)
             a = self._norm(a)
@@ -2863,7 +2864,7 @@ class VeeringTriangulation(Triangulation):
             e = self._norm(e)
             # x[a] + x[d] - y[e] >= 0
             l = L.element_class(L, {a: one, d: one, ne + e: minus_one}, zero)
-            cs.insert(l >= 0, check=False)
+            cs.insert(LinearConstraint(op_GE, l), check=False)
 
     def _set_delaunay_constraints(self, insert, x, y, hw_bound=0):
         r"""
@@ -3103,7 +3104,7 @@ class VeeringTriangulation(Triangulation):
         ne = self.num_edges()
         cs = ConstraintSystem()
         for i in range(2 * ne):
-            cs.insert(L.element_class(L, {i : one}, zero) >= zero, check=False)
+            cs.insert(LinearConstraint(op_GE, L.element_class(L, {i : one}, zero)), check=False)
         self._set_delaunay_constraints_fast(cs, L)
         self._set_subspace_constraints_fast(cs, L, VERTICAL)
         self._set_subspace_constraints_fast(cs, L, HORIZONTAL)
