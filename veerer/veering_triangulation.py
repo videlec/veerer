@@ -4425,6 +4425,12 @@ class VeeringTriangulation(Triangulation):
             H_1(0)
             sage: f_low.stratum()  # optional - surface_dynamics
             H_0(0^2, -2)
+
+        An example related to parallel cylinder degeneration in the gothic locus::
+
+            sage: vt = VeeringTriangulation("(0,13,~21)(1,3,~2)(2,9,~3)(4,20,~5)(5,~26,~6)(6,~19,~7)(7,~16,~8)(8,~10,~9)(10,15,~11)(11,24,~12)(12,~14,~13)(14,~25,~15)(16,18,~17)(17,26,~18)(19,25,~20)(21,23,~22)(22,~24,~23)(~4,~1,~0)", "RBBRBRBBRBBRBBRBBBRRBBBRBBB")
+            sage: _, f_low = vt.degeneration(edges_up=[1, 2, 4, 6, 7, 9, 10, 12, 13, 15, 16, 17, 20, 21, 22, 24, 25, 26], mutable=True)
+            sage: f_low.set_canonical_labels()
         """
         # We distinguish three kinds of triangles
         # - up triangles: when the three edges are in the up partition
@@ -4544,7 +4550,7 @@ class VeeringTriangulation(Triangulation):
             vt_up = None
 
         # build the lower level
-        relabelling_low = {e: j for j, e in enumerate(half_edges_low)}
+        relabelling_low = {e: j for j, e in enumerate(sorted(half_edges_low))}
 
         vp_low = array('i', [0] * n_low)
         ep_low = array('i', [0] * n_low)
@@ -4602,10 +4608,10 @@ class VeeringTriangulation(Triangulation):
             half_edges_up_to_edge_index = {e: i for i, e in enumerate(sorted(edges_up))}
             half_edges_up_to_edge_index.update({ep[e]: i for i, e in half_edges_up_to_edge_index.items()})
             representatives = [half_edges_up_to_edge_index[e] for e, e_up in relabelling_up.items() if e_up <= ep_up[e_up]]
-            f_up = VeeringTriangulationLinearFamily(vt_up, generators_up.matrix_from_columns(representatives))
+            f_up = VeeringTriangulationLinearFamily(vt_up, generators_up.matrix_from_columns(representatives), mutable=mutable)
         else:
             f_up = vt_up
-        f_low = VeeringTriangulationLinearFamily(vt_low, constraints_low.right_kernel_matrix().__copy__())
+        f_low = VeeringTriangulationLinearFamily(vt_low, constraints_low.right_kernel_matrix().__copy__(), mutable=mutable)
 
         return (f_up, relabelling_up, f_low, relabelling_low) if mapping else (f_up, f_low)
 
