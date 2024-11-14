@@ -596,7 +596,7 @@ class LinearFamily:
                 elif all and t_new == t_best and subspace_new == subspace_best:
                     relabellings.append(relabelling)
 
-        return (relabellings, best) if all else (best_relabelling, t_best + (subspace_best,))
+        return (relabellings, t_best + (subspace_best,)) if all else (best_relabelling, t_best + (subspace_best,))
 
     def _non_isom_easy(self, other):
         return (self._constellation_class._non_isom_easy(self, other) or

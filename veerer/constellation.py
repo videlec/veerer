@@ -1160,6 +1160,13 @@ class Constellation:
             sage: t = Triangulation("(0,1,2)", boundary="(~0:1,~1:1,~2:2)")
             sage: len(t.automorphisms())
             1
+
+        Linear families::
+
+            sage: s = StrebelGraph("(0,3,7,~6,~2,1)(2,5,~4,~3,~1,~0)(4,8,~5)(6,~8,~7)")
+            sage: f = StrebelGraphLinearFamily(s, [(2, 0, 0, 0, 1, 0, 1, 0, 2), (0, 2, 0, 0, 0, 1, 0, 1, 2), (0, 0, 1, 1, 0, 0, 0, 0, 2)])
+            sage: len(f.automorphisms())
+            2
         """
         if self.is_connected():
             best_relabellings = self.best_relabelling(all=True)[0]
