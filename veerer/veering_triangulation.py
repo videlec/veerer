@@ -3141,7 +3141,7 @@ class VeeringTriangulation(Triangulation):
             sage: cols = "RBRBRBBBB"
             sage: vt = VeeringTriangulation(fp, cols)
             sage: vt.delaunay_automaton()
-            Delaunay automaton with 54 vertices
+            Delaunay automaton with 54 states
 
         Meromorphic example (with a non strongly connected automaton)::
 
@@ -3150,9 +3150,9 @@ class VeeringTriangulation(Triangulation):
             sage: cols = "RBRR"
             sage: vt = VeeringTriangulation(fp, bdry, cols)
             sage: vt.delaunay_automaton()
-            Delaunay automaton with 3 vertices
+            Delaunay automaton with 3 states
             sage: vt.delaunay_automaton(backward=False)
-            Delaunay automaton with 1 vertex
+            Delaunay automaton with 1 state
         """
         from .automaton import DelaunayAutomaton
         if backward is None:
@@ -3197,7 +3197,7 @@ class VeeringTriangulation(Triangulation):
             sage: cols = "RBRR"
             sage: vt = VeeringTriangulation(fp, bdry, cols)
             sage: vt.delaunay_strebel_automaton()
-            Delaunay-Strebel automaton with 11 vertices
+            Delaunay-Strebel automaton with 11 states
         """
         from .automaton import DelaunayStrebelAutomaton
         if backward is None:

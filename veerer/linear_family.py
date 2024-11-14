@@ -1179,7 +1179,7 @@ class VeeringTriangulationLinearFamilies:
             sage: X9.is_delaunay()
             True
             sage: X9.delaunay_automaton()
-            Delaunay automaton with 6 vertices
+            Delaunay automaton with 6 states
 
             sage: X17 = VeeringTriangulationLinearFamilies.prototype_H2(0, 2, 2, -1)
             sage: X17.base_ring()
@@ -1187,7 +1187,7 @@ class VeeringTriangulationLinearFamilies:
             sage: X17.is_delaunay()
             True
             sage: X17.delaunay_automaton() # long time
-            Delaunay automaton with 210 vertices
+            Delaunay automaton with 210 states
 
         We check below part of McMullen theorem about connectedness::
 
@@ -1265,8 +1265,8 @@ class VeeringTriangulationLinearFamilies:
             sage: X9 = VeeringTriangulationLinearFamilies.prototype_H1_1(0, 2, 1, -1)
             sage: X9.base_ring()
             Rational Field
-            sage: X9.delaunay_automaton()  # long time
-            Delaunay automaton with 1244 vertices
+            sage: X9.delaunay_automaton()  # long time ~3.5secs
+            Delaunay automaton with 1244 states
         """
         #         (a+r,c)         (a+b,c)
         #           x-------x------o--x  (a+b+r,c)

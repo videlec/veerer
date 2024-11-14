@@ -45,7 +45,7 @@ The examples below is Q(1^2, -1^2) with two folded edges::
     sage: C.run()
     0
     sage: C
-    Core veering automaton with 1074 vertices
+    Core veering automaton with 1074 states
 
     sage: R = ReducedCoreAutomaton()
     sage: R.add_seed(vt)
@@ -53,7 +53,7 @@ The examples below is Q(1^2, -1^2) with two folded edges::
     sage: R.run()
     0
     sage: R
-    Reduced core veering automaton with 356 vertices
+    Reduced core veering automaton with 356 states
 
 Exploring strata::
 
@@ -72,17 +72,17 @@ Exploring strata::
     ....:     print(C)
     ....:     print(R)
     H_2(2)
-    Core veering automaton with 86 vertices
-    Reduced core veering automaton with 28 vertices
+    Core veering automaton with 86 states
+    Reduced core veering automaton with 28 states
     Q_1(2, -1^2)
-    Core veering automaton with 160 vertices
-    Reduced core veering automaton with 68 vertices
+    Core veering automaton with 160 states
+    Reduced core veering automaton with 68 states
     Q_2(2^2)
-    Core veering automaton with 846 vertices
-    Reduced core veering automaton with 305 vertices
+    Core veering automaton with 846 states
+    Reduced core veering automaton with 305 states
     H_2(1^2)
-    Core veering automaton with 876 vertices
-    Reduced core veering automaton with 234 vertices
+    Core veering automaton with 876 states
+    Reduced core veering automaton with 234 states
 """
 # ****************************************************************************
 #  This file is part of veerer
@@ -209,7 +209,7 @@ class Automaton:
         else:
             status = ''
             name = self._name[0].upper() + self._name[1:]
-        return ("%s%s automaton with %s %s" % (status, name, len(self._forward_neighbors), 'vertex' if len(self._forward_neighbors) <= 1 else 'vertices'))
+        return ("%s%s automaton with %s %s" % (status, name, len(self._forward_neighbors), 'state' if len(self._forward_neighbors) <= 1 else 'states'))
 
     def __repr__(self):
         return str(self)
@@ -408,7 +408,7 @@ class Automaton:
             sage: A.run()
             0
             sage: A
-            Core veering automaton with 86 vertices
+            Core veering automaton with 86 states
 
             sage: A.to_graph()
             Looped multi-digraph on 86 vertices
@@ -432,7 +432,7 @@ class Automaton:
     # TODO: move or deprecate (not a generic method)
     def rotation_automorphism(self):
         r"""
-        Return the automorphism of the vertices that corresponds to rotation.
+        Return the automorphism of the states that corresponds to rotation.
 
         Note that this automorphism reverses the edge direction.
 
@@ -464,7 +464,7 @@ class Automaton:
     # TODO: move or deprecate (not a generic method)
     def conjugation_automorphism(self):
         """
-        Return the automorphism of the vertices that corresponds to complex conjugation.
+        Return the automorphism of the states that corresponds to complex conjugation.
 
         EXAMPLES::
 
@@ -672,14 +672,14 @@ class Automaton:
             sage: from veerer import *
             sage: from surface_dynamics import Stratum         # optional - surface_dynamics
             sage: CoreAutomaton.from_stratum(Stratum([2], 1))  # optional - surface_dynamics
-            Core veering automaton with 86 vertices
+            Core veering automaton with 86 states
             sage: DelaunayAutomaton.from_stratum(Stratum([2], 1))  # optional - surface_dynamics
-            Delaunay automaton with 54 vertices
+            Delaunay automaton with 54 states
 
             sage: Q = Stratum([8], 2)                             # optional - surface_dynamics
             sage: A = CoreAutomaton.from_stratum(Q, max_size=100) # optional - surface_dynamics
             sage: A                                               # optional - surface_dynamics
-            Partial core veering automaton with 101 vertices
+            Partial core veering automaton with 101 states
         """
         return self.from_triangulation(VeeringTriangulation.from_stratum(stratum), **kwds)
 
@@ -763,7 +763,7 @@ class Automaton:
             sage: A.run()
             0
             sage: A
-            Core veering automaton with 2 vertices
+            Core veering automaton with 2 states
 
             sage: A = ReducedCoreAutomaton()
             sage: A.add_seed(T)
@@ -771,7 +771,7 @@ class Automaton:
             sage: A.run()
             0
             sage: A
-            Reduced core veering automaton with 1 vertex
+            Reduced core veering automaton with 1 state
 
         A more complicated surface in Q_1(1^2, -1^2)::
 
@@ -785,11 +785,11 @@ class Automaton:
             sage: C.run(10)
             1
             sage: C
-            Partial core veering automaton with 10 vertices
+            Partial core veering automaton with 10 states
             sage: C.run()
             0
             sage: C
-            Core veering automaton with 1074 vertices
+            Core veering automaton with 1074 states
 
             sage: C = ReducedCoreAutomaton()
             sage: C.add_seed(T)
@@ -797,11 +797,11 @@ class Automaton:
             sage: C.run(10)
             1
             sage: C
-            Partial reduced core veering automaton with 10 vertices
+            Partial reduced core veering automaton with 10 states
             sage: C.run()
             0
             sage: C
-            Reduced core veering automaton with 356 vertices
+            Reduced core veering automaton with 356 states
 
         TESTS::
 
@@ -811,19 +811,19 @@ class Automaton:
             sage: A.add_seed(T)
             1
             sage: A
-            Partial core veering automaton with 0 vertex
+            Partial core veering automaton with 0 state
             sage: A.run(1)
             1
             sage: A
-            Partial core veering automaton with 1 vertex
+            Partial core veering automaton with 1 state
             sage: A.run(1)
             1
             sage: A
-            Partial core veering automaton with 2 vertices
+            Partial core veering automaton with 2 states
             sage: A.run(1)
             0
             sage: A
-            Core veering automaton with 2 vertices
+            Core veering automaton with 2 states
         """
         forward_neighbors = self._forward_neighbors
         backward_neighbors = self._backward_neighbors
@@ -942,7 +942,7 @@ class FlipGraph(Automaton):
             sage: A.run()
             0
             sage: A
-            Triangulation automaton with 1 vertex
+            Triangulation automaton with 1 state
 
             sage: fp = '(0,1,2)(~0,~3,~8)(3,5,4)(~4,~1,~5)(6,7,8)(~6,9,~2)'
             sage: T = Triangulation(fp)
@@ -952,7 +952,7 @@ class FlipGraph(Automaton):
             sage: A.run()
             0
             sage: A
-            Triangulation automaton with 236 vertices
+            Triangulation automaton with 236 states
     """
     _name = 'triangulation'
 
@@ -1030,7 +1030,7 @@ class ReducedCoreAutomaton(Automaton):
             sage: A.run()
             0
             sage: A
-            Reduced core veering automaton with 1 vertex
+            Reduced core veering automaton with 1 state
 
         A more complicated surface in Q_1(1^2, -1^2)::
 
@@ -1044,7 +1044,7 @@ class ReducedCoreAutomaton(Automaton):
             sage: C_BFS.run()
             0
             sage: C_BFS
-            Reduced core veering automaton with 356 vertices
+            Reduced core veering automaton with 356 states
 
             sage: C_DFS = ReducedCoreAutomaton(method='DFS')
             sage: C_DFS.add_seed(T)
@@ -1052,7 +1052,7 @@ class ReducedCoreAutomaton(Automaton):
             sage: C_DFS.run()
             0
             sage: C_DFS
-            Reduced core veering automaton with 356 vertices
+            Reduced core veering automaton with 356 states
     """
     _name = 'reduced core veering'
 
@@ -1165,7 +1165,7 @@ class DelaunayAutomaton(Automaton):
         sage: A.run()
         0
         sage: A
-        Delaunay automaton with 54 vertices
+        Delaunay automaton with 54 states
 
     One can check that the cardinality is indeed correct::
 
@@ -1197,7 +1197,7 @@ class DelaunayAutomaton(Automaton):
         sage: A0.run()
         0
         sage: A0
-        Delaunay automaton with 3 vertices
+        Delaunay automaton with 3 states
 
         sage: A1 = DelaunayAutomaton()
         sage: A1.add_seed(vt1)
@@ -1205,7 +1205,7 @@ class DelaunayAutomaton(Automaton):
         sage: A1.run()
         0
         sage: A1
-        Delaunay automaton with 2 vertices
+        Delaunay automaton with 2 states
 
         sage: A2 = DelaunayAutomaton()
         sage: A2.add_seed(vt2)
@@ -1213,7 +1213,7 @@ class DelaunayAutomaton(Automaton):
         sage: A2.run()
         0
         sage: A2
-        Delaunay automaton with 1 vertex
+        Delaunay automaton with 1 state
 
         sage: B0 = DelaunayAutomaton(backward=True)
         sage: B0.add_seed(vt0)
@@ -1221,7 +1221,7 @@ class DelaunayAutomaton(Automaton):
         sage: B0.run()
         0
         sage: B0
-        Delaunay automaton with 3 vertices
+        Delaunay automaton with 3 states
 
         sage: B1 = DelaunayAutomaton(backward=True)
         sage: B1.add_seed(vt1)
@@ -1229,7 +1229,7 @@ class DelaunayAutomaton(Automaton):
         sage: B1.run()
         0
         sage: B1
-        Delaunay automaton with 3 vertices
+        Delaunay automaton with 3 states
 
         sage: B2 = DelaunayAutomaton(backward=True)
         sage: B2.add_seed(vt2)
@@ -1237,7 +1237,7 @@ class DelaunayAutomaton(Automaton):
         sage: B2.run()
         0
         sage: B2
-        Delaunay automaton with 3 vertices
+        Delaunay automaton with 3 states
 
     An example with linear constraint : the L-shape surface in the stratum H(2)
     made of three squares::
@@ -1250,7 +1250,7 @@ class DelaunayAutomaton(Automaton):
         sage: A.run()
         0
         sage: A
-        Delaunay automaton with 6 vertices
+        Delaunay automaton with 6 states
 
     Some more L-shape surfaces::
 
@@ -1261,10 +1261,10 @@ class DelaunayAutomaton(Automaton):
         ....:     _ = A.add_seed(f)
         ....:     _ = A.run()
         ....:     print('n={}: {}'.format(n, A))
-        n=3: Delaunay automaton with 6 vertices
-        n=4: Delaunay automaton with 86 vertices
-        n=5: Delaunay automaton with 276 vertices
-        n=6: Delaunay automaton with 800 vertices
+        n=3: Delaunay automaton with 6 states
+        n=4: Delaunay automaton with 86 states
+        n=5: Delaunay automaton with 276 states
+        n=6: Delaunay automaton with 800 states
     """
     _name = 'Delaunay'
 
@@ -1433,7 +1433,7 @@ class DelaunayStrebelAutomaton(Automaton):
         sage: DS.run()
         0
         sage: DS
-        Delaunay-Strebel automaton with 11 vertices
+        Delaunay-Strebel automaton with 11 states
         sage: sum(kind == 'vertical-strebel' for kind, state in DS)
         1
         sage: sum(kind == 'horizontal-strebel' for kind, state in DS)
@@ -1460,34 +1460,34 @@ class DelaunayStrebelAutomaton(Automaton):
         ....:     n_d = sum(kind == 'delaunay' for kind, state in DS)
         ....:     print(n_hs, n_vs, n_d)
         StrebelGraph("(0,~1)(1,~0)")
-        Delaunay-Strebel automaton with 10 vertices
+        Delaunay-Strebel automaton with 10 states
         1 1 8
         StrebelGraph("(0:2,~1)(1,~0)")
-        Delaunay-Strebel automaton with 26 vertices
+        Delaunay-Strebel automaton with 26 states
         3 3 20
         StrebelGraph("(0:2,~1)(1,~0:2)")
-        Delaunay-Strebel automaton with 16 vertices
+        Delaunay-Strebel automaton with 16 states
         2 2 12
         StrebelGraph("(0,~1)(1)(~0)")
-        Delaunay-Strebel automaton with 6 vertices
+        Delaunay-Strebel automaton with 6 states
         1 1 4
         StrebelGraph("(0:2,~1)(1)(~0)")
-        Delaunay-Strebel automaton with 20 vertices
+        Delaunay-Strebel automaton with 20 states
         3 3 14
         StrebelGraph("(0,~0,~1:1,1)")
-        Delaunay-Strebel automaton with 13 vertices
+        Delaunay-Strebel automaton with 13 states
         1 1 11
         StrebelGraph("(0,~0,~1)(1)")
-        Delaunay-Strebel automaton with 10 vertices
+        Delaunay-Strebel automaton with 10 states
         1 1 8
         StrebelGraph("(0,2,~0,~1)(1)(~2)")
-        Delaunay-Strebel automaton with 34 vertices
+        Delaunay-Strebel automaton with 34 states
         2 2 30
         StrebelGraph("(0,2,~1)(1)(~2,~0)")
-        Delaunay-Strebel automaton with 52 vertices
+        Delaunay-Strebel automaton with 52 states
         1 1 50
         StrebelGraph("(0:2,2,~1)(1,~0)(~2)")
-        Delaunay-Strebel automaton with 126 vertices
+        Delaunay-Strebel automaton with 126 states
         6 6 114
 
     An example with linear constraints::
@@ -1500,7 +1500,7 @@ class DelaunayStrebelAutomaton(Automaton):
         sage: A.run()
         0
         sage: A
-        Delaunay-Strebel automaton with 250 vertices
+        Delaunay-Strebel automaton with 250 states
 
     An example with folded edges (quadratic differential with simple poles on
     edges)::
@@ -1512,7 +1512,7 @@ class DelaunayStrebelAutomaton(Automaton):
         sage: A.run()
         0
         sage: A
-        Delaunay-Strebel automaton with 46 vertices
+        Delaunay-Strebel automaton with 46 states
     """
     _name = 'Delaunay-Strebel'
 
@@ -1534,7 +1534,7 @@ class DelaunayStrebelAutomaton(Automaton):
             0
             sage: degenerations = A.codimension_one_horizontal_degenerations()
             sage: print(degenerations)
-            [Delaunay-Strebel automaton with 46 vertices]
+            [Delaunay-Strebel automaton with 46 states]
             sage: next(iter(degenerations[0]))[1].stratum()
             H_1(2, -1^2)
 
