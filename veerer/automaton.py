@@ -1516,6 +1516,53 @@ class DelaunayStrebelAutomaton(Automaton):
     """
     _name = 'Delaunay-Strebel'
 
+    def codimension_one_horizontal_degenerations(self):
+        r"""
+        Return the list of codimension one horizontal degenerations.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation, DelaunayStrebelAutomaton
+
+        The example of the stratum H(2)::
+
+            sage: vt = VeeringTriangulation("(0,1,2)(~1,3,4)(~3,5,6)(~6,~2,~5)(~4,7,8)(~8,~0,~7)", "RBBBRRBBR")
+            sage: A = DelaunayStrebelAutomaton(backward=True)
+            sage: A.add_seed(vt)
+            1
+            sage: A.run()
+            0
+            sage: degenerations = A.codimension_one_horizontal_degenerations()
+            sage: print(degenerations)
+            [Delaunay-Strebel automaton with 46 vertices]
+            sage: next(iter(degenerations[0]))[1].stratum()
+            H_1(2, -1^2)
+        """
+        # TODO: one can do a little bit of optimization as the Delaunay flip inside cylinders
+        # do not affect the degenerations
+        degenerations = set()
+        automata = []
+        for kind, state in self:
+            if kind == 'delaunay':
+                for (f_up, f_low) in state.codimension_one_horizontal_degenerations(mutable=True):
+                    assert f_up is None
+                    assert f_low.dimension() == state.dimension() - 1
+                    f_low.set_canonical_labels()
+                    f_low.set_immutable()
+                    degenerations.add(f_low)
+
+        while degenerations:
+            new_state = next(iter(degenerations))
+            automaton = new_state.delaunay_strebel_automaton()
+            delaunay = set(state for (kind, state) in automaton if kind == 'delaunay')
+            if any(x not in degenerations for x in delaunay):
+                missing = set(delaunay).difference(degenerations)
+                print('WARNING: missing {} states among {} in codimension one horizontal degeneration from new_state={}'.format(len(missing), len(delaunay), new_state))
+            automata.append(automaton)
+            degenerations.difference_update(delaunay)
+
+        return automata
+
     def _check(self):
         super()._check()
 
