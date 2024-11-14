@@ -28,7 +28,7 @@ from .constants import RED, BLUE, PURPLE, GREEN, HORIZONTAL, VERTICAL, RIGHT, LE
 from .triangulation import Triangulation
 from .cover import TriangulationCover
 from .veering_triangulation import VeeringTriangulation, VeeringTriangulations
-from .linear_family import VeeringTriangulationLinearFamily, StrebelGraphLinearFamily
+from .linear_family import VeeringTriangulationLinearFamily, StrebelGraphLinearFamily, VeeringTriangulationLinearFamilies
 from .strebel_graph import StrebelGraph
 from .automaton import FlipGraph, CoreAutomaton, ReducedCoreAutomaton, DelaunayAutomaton, DelaunayStrebelAutomaton
 from .flip_sequence import VeeringFlipSequence
