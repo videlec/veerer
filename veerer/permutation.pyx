@@ -1558,3 +1558,43 @@ def triangulation_relabelling_from(array.array vp, array.array ep, int start_edg
                     m -= 1
 
     return relabelling
+
+def perm_relabel_on_edges(array.array ep, array.array r, int n=-1, int m=-1):
+    r"""
+    INPUT:
+
+    - ep - edge permutation
+
+    - r - relabelling permutation on half edges (list of length n)
+
+    - n - num half edges
+
+    - m - num edges
+
+    OUTPUT: list of length m
+
+    EXAMPLES::
+
+        sage: from array import array
+        sage: from veerer.permutation import perm_relabel_on_edges
+
+        sage: ep = array('i', [8, 1, 2, 7, 4, 5, 6, 3, 0])
+        sage: r = array('i', [3, 0, 5, 4, 6, 2, 1, 8, 7])
+        sage: perm_relabel_on_edges(ep, r, 9, 7)
+        array('i', [3, 0, 5, 4, 6, 2, 1])
+    """
+    cdef array.array rr = array.clone(ep, m, False)
+
+    cdef int i, j, k
+    for i in range(m):
+        if ep[i] < i:
+            raise ValueError("not in canonical form")
+        j = r[i]
+        k = r[ep[i]]
+        if (j >= m and k >= m):
+            raise ValueError("relabelling not preserving canonical form")
+        if j < k:
+            rr[i] = j
+        else:
+            rr[i] = k
+    return rr

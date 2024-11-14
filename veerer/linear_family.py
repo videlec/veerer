@@ -38,7 +38,7 @@ from sage.arith.misc import gcd
 from sage.categories.number_fields import NumberFields
 
 from .constants import VERTICAL, HORIZONTAL, BLUE, RED
-from .permutation import perm_cycle_string, perm_cycles, perm_check, perm_conjugate, perm_on_list
+from .permutation import perm_cycle_string, perm_cycles, perm_check, perm_conjugate, perm_on_list, perm_relabel_on_edges
 from .polyhedron import LinearExpressions, ConstraintSystem
 from .strebel_graph import StrebelGraph
 from .veering_triangulation import VeeringTriangulation
@@ -122,45 +122,6 @@ def subspace_cmp(subspace1, subspace2, check=True):
         if c:
             return c
     return 0
-
-
-def relabel_on_edges(ep, r, n, m):
-    r"""
-    INPUT:
-
-    - ep - edge permutation
-
-    - r - relabelling permutation on half edges (list of length n)
-
-    - n - num half edges
-
-    - m - num edges
-
-    OUTPUT: list of length m
-
-    EXAMPLES::
-
-        sage: from array import array
-        sage: from veerer.linear_family import relabel_on_edges
-
-        sage: ep = array('i', [8, 1, 2, 7, 4, 5, 6, 3, 0])
-        sage: r = array('i', [3, 0, 5, 4, 6, 2, 1, 8, 7])
-        sage: relabel_on_edges(ep, r, 9, 7)
-        array('i', [3, 0, 5, 4, 6, 2, 1])
-    """
-    rr = array('i', [-1] * m)
-    for i in range(m):
-        if ep[i] < i:
-            raise ValueError("not in canonical form")
-        j = r[i]
-        k = r[ep[i]]
-        if (j >= m and k >= m):
-            raise ValueError("relabelling not preserving canonical form")
-        if j < k:
-            rr[i] = j
-        else:
-            rr[i] = k
-    return rr
 
 
 def matrix_permutation(mat, perm):
@@ -588,7 +549,7 @@ class LinearFamily:
             if not perm_check(p, n):
                 raise ValueError('invalid relabelling permutation')
 
-        rr = relabel_on_edges(self._ep, p, n, m)
+        rr = perm_relabel_on_edges(self._ep, p, n, m)
         matrix_permutation(self._subspace, rr)
         self._subspace.echelonize()
         self._constellation_class.relabel(self, p, False)
@@ -608,7 +569,7 @@ class LinearFamily:
 
         for start_edge in self._automorphism_good_starts():
             relabelling = self._relabelling_from(start_edge)
-            rr = relabel_on_edges(self._ep, relabelling, n, m)
+            rr = perm_relabel_on_edges(self._ep, relabelling, n, m)
 
             fp_new = perm_conjugate(self._fp, relabelling)
             ep_new = perm_conjugate(self._ep, relabelling)
