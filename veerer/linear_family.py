@@ -29,7 +29,7 @@ import numbers
 from random import choice, shuffle
 
 from sage.structure.element import get_coercion_model, Matrix
-from sage.structure.richcmp import op_EQ
+from sage.structure.richcmp import op_EQ, rich_to_bool
 from sage.rings.integer_ring import ZZ
 from sage.rings.rational_field import QQ
 from sage.matrix.constructor import matrix
