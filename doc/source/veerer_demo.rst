@@ -263,10 +263,10 @@ of the product of the two train-track polytopes.
 Core automaton
 --------------
 
-The core automaton of a given triangulations `T_0` is the directed graph whose
-vertices are core veering triangulations that can be reached from `T_0` by a
-sequence of flips and there is a directed edge `T_i \to T_j` if `T_j` is obtained
-from `T_i` by a flip.
+The core automaton of a given triangulations `T_0` is the automaton (or
+directed graph) whose states (or vertices) are core veering triangulations that
+can be reached from `T_0` by a sequence of flips and there is a transition (or
+directed edge) `T_i \to T_j` if `T_j` is obtained from `T_i` by a flip.
 
 ::
 
@@ -278,7 +278,7 @@ from `T_i` by a flip.
     sage: A0.run()
     0
     sage: A0
-    Core veering automaton with 2 vertices
+    Core veering automaton with 2 states
 
 ::
 
@@ -348,8 +348,8 @@ Some data (orientable case)
 To give an idea about the complexity and timings when generating the
 above data, here are the steps involved. The timings are for the stratum
 component H(4)^hyp that is the fourth row in the above array: -
-generating the core graph ~20 secs for H(4)^hyp (the graph has 9116
-vertices and 44664 edges) - filtering the geometric triangulations
+generating the core graph ~20 secs for H(4)^hyp (the automaton has 9116
+states and 44664 transitions) - filtering the geometric triangulations
 (single test involves a polytope computation) ~20 secs for H(4)^hyp -
 filtering cylindrical (single test is cheap) ~2 sec for H(4)^hyp
 
