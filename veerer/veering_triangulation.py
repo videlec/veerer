@@ -3116,7 +3116,7 @@ class VeeringTriangulation(Triangulation):
         return self.delaunay_cone(*args, **kwds)
 
     def linear_subvariety(self):
-        from .real_linear_subvariety import IrreducibleRealLinearSubvariety
+        from .linear_subvariety import IrreducibleRealLinearSubvariety
         DS = self.delaunay_strebel_automaton()
         return IrreducibleRealLinearSubvariety(DS._graph)
 
