@@ -3201,7 +3201,7 @@ class VeeringTriangulation(Triangulation):
             sage: cols = "RBRR"
             sage: vt = VeeringTriangulation(fp, bdry, cols)
             sage: vt.delaunay_strebel_automaton()
-            Delaunay-Strebel automaton with 11 states
+            Delaunay-Strebel automaton with 10 states
         """
         from .automaton import DelaunayStrebelAutomaton
         if backward is None:
@@ -4653,9 +4653,141 @@ class VeeringTriangulation(Triangulation):
                             edges.append(i)
                 yield self.degeneration(edges_up=edges, mutable=mutable)
 
+    def vertical_degeneration_edge_subsets(self):
+        r"""
+        Iterate through subsets of admissible edge degenerations of given complex codimension ``codim``.
+
+        Warning: we do not check for the "boundary of cylinder" condition.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation, VeeringTriangulationLinearFamily
+
+            sage: vt = VeeringTriangulation("(0,8,~7)(1,3,~2)(2,10,~3)(4,6,~5)(5,11,~6)(7,~9,~8)(9,~11,~10)(~4,~1,~0)", "RRBRBBRRBRRB")
+            sage: list(vt.vertical_degeneration_edge_subsets())
+            [(2,),
+             (6,),
+             (8,),
+             (2, 6),
+             (2, 8),
+             (6, 8),
+             (2, 6, 8),
+             (4, 5, 6, 11),
+             (2, 4, 5, 6, 11),
+             (4, 5, 6, 8, 11)]
+
+            sage: vt = VeeringTriangulation("(0,1,2)(3,4,5)(6,7,8)(~0,~7,~5)(~3,~4,~2)(~6,~1,~8)", "RRBRRBRRB")
+            sage: list(vt.vertical_degeneration_edge_subsets())
+            [(8,), (2, 3, 4, 5)]
+
+            sage: vt = VeeringTriangulation("(0,~7,6)(1,~5,~2)(2,4,~3)(3,11,~4)(5,10,~6)(7,9,~8)(8,~10,~9)(~11,~1,~0)", "RBRBRRBRBRRR")
+            sage: list(vt.vertical_degeneration_edge_subsets())
+            [(1,), (3,), (6,), (8,), (1, 3), (1, 6), (3, 8), (6, 8), (1, 3, 6), (1, 6, 8)]
+        """
+        cone = self.delaunay_cone()
+        dim = cone.space_dimension()
+        ne = self.num_edges()
+        L = LinearExpressions(self.base_ring())
+        ne = self.num_edges()
+        x = [L.variable(e) for e in range(ne)]
+        y = [L.variable(ne + e) for e in range(ne)]
+
+        cylinders = {}
+        # NOTE: each cylinder is a quadruple (middle, bottom, top, folded)
+        for middle, bot, top, _ in itertools.chain(self.cylinders(RED), self.cylinders(BLUE)):
+            middle = [self._norm(e) for e in middle]
+            bot = [self._norm(e) for e in bot]
+            top = [self._norm(e) for e in top]
+            cylinders[frozenset(bot)] = set().union(top, middle)
+            cylinders[frozenset(top)] = set().union(bot, middle)
+
+        def completion(vanishing_edges, vanishing_cone):
+            cs = ConstraintSystem(dim)
+            for e in vanishing_edges:
+                cs.insert(x[e] == 0)
+                cs.insert(y[e] == 0)
+
+            done = False
+            while not done:
+                # print('new loop')
+                vanishing_cone = vanishing_cone.add_constraints(cs)
+
+                # print('current cone dimension={}'.format(vanishing_cone.affine_dimension()))
+                vanishing_indices = [True] * (2 * ne)
+                for r in vanishing_cone.rays():
+                    for i in range(2 * ne):
+                        if r[i]:
+                            vanishing_indices[i] = False
+                done = True
+                for i in range(ne):
+                    num = vanishing_indices[i] + vanishing_indices[ne + i]
+                    if num == 0:
+                        # print('i={} in Eup'.format(i))
+                        pass
+                    elif num == 1:
+                        # print('i={} partial vanishing'.format(i))
+                        cs.insert(x[i] == 0)
+                        cs.insert(y[i] == 0)
+                        done = False
+                        vanishing_edges.add(i)
+                    elif num == 2:
+                        # print('i={} in Elow'.format(i))
+                        vanishing_edges.add(i)
+
+                # exclude horizontal degenerations
+                for bdry, forced in cylinders.items():
+                    if bdry.issubset(vanishing_edges) and not forced.issubset(vanishing_edges):
+                        vanishing_edges.update(forced)
+                        for e in forced.difference(vanishing_edges):
+                            cs.add_edge(e)
+                        done = False
+
+        # 1. for each edge, we compute inductively what needs to degenerate
+        # on the V-representation we can get the list of vanishing edges
+        ne = self.num_edges()
+        ans = [set() for _ in range(ne + 1)]
+        for e in range(ne):
+            vanishing_edges = set([e])
+            completion(vanishing_edges, cone)
+            ans[len(vanishing_edges)].add(frozenset(vanishing_edges))
+
+        # 2. make all possible unions of such subsets
+        for i in range(1, ne):
+            for edges1 in ans[i]:
+                for j in range(1, i + 1):
+                    for edges2 in ans[j]:
+                        if edges1 != edges2:
+                            vanishing_edges = set().union(edges1, edges2)
+                            completion(vanishing_edges, cone)
+                            ans[len(vanishing_edges)].add(frozenset(vanishing_edges))
+
+        output = []
+        for i in range(1, ne):
+            output.extend(sorted(tuple(sorted(t)) for t in ans[i]))
+        return output
+
     def codimension_one_vertical_degenerations(self, mutable=False, mapping=False):
-        self.delaunay_cone()
-        pass
+        r"""
+        Return codimension one vertical degenerations.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,8,~7)(1,3,~2)(2,10,~3)(4,6,~5)(5,11,~6)(7,~9,~8)(9,~11,~10)(~4,~1,~0)", "RRBRBBRRBRRB")
+            sage: [(f_up.stratum(), f_low.stratum()) for (f_up, f_low) in vt.codimension_one_vertical_degenerations()]
+            [(H_2(2), H_0(1^2, -4)),
+             (H_2(2), H_0(1^2, -4)),
+             (H_2(2), H_0(1^2, -4)),
+             (H_1(0^2), H_0(1^2, -2^2)),
+             (H_1(0^2), H_0(1^2, -2^2)),
+             (H_1(0^2), H_0(1^2, -2^2)),
+             (H_1(0), H_1(1^2, -2)),
+             (H_1(0^2), H_0(1^2, -2^2)),
+             (H_1(0), H_1(1^2, -2)),
+             (H_1(0), H_1(1^2, -2))]
+        """
+        for edges in self.vertical_degeneration_edge_subsets():
+            yield self.degeneration(edges_low=edges, mutable=mutable)
 
     def is_half_edge_strebel(self, e, slope=VERTICAL, check=True):
         r"""
