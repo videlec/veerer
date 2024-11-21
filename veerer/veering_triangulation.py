@@ -4583,12 +4583,14 @@ class VeeringTriangulation(Triangulation):
 
         vt_low = VeeringTriangulation.from_permutations(vp_low, ep_low, None, (angle_excess_low, colouring_low), mutable=mutable)
 
+        edges_up = sorted(edges_up)
+        edges_low = sorted(edges_low)
+
         # compute constraints in order to produce linear families
-        constraints = self.constraints_matrix().matrix_from_columns(sorted(edges_up) + sorted(edges_low))
+        constraints = self.constraints_matrix().matrix_from_columns(edges_up + edges_low)
         constraints.echelonize()
         i = 0
         constraints_up = constraints[:, :len(edges_up)]
-        i = 0
         while i < constraints_up.nrows() and constraints_up[i]:
             i += 1
         constraints_up = constraints_up[:i]
@@ -4605,13 +4607,13 @@ class VeeringTriangulation(Triangulation):
             for e in range(n):
                 if mix_p[e] == -1:
                     continue
-                a = self._norm(e)
-                b = self._norm(mix_p[e])
+                a = edges_up.index(self._norm(e))
+                b = edges_up.index(self._norm(mix_p[e]))
                 if generators_up.column(a) != generators_up.column(b):
                     raise RuntimeError('a={} b={}\ngenerators_matrix={}'.format(a, b, generators_up))
 
-            half_edges_up_to_edge_index = {e: i for i, e in enumerate(sorted(edges_up))}
-            half_edges_up_to_edge_index.update({ep[e]: i for i, e in half_edges_up_to_edge_index.items()})
+            half_edges_up_to_edge_index = {e: i for i, e in enumerate(edges_up)}
+            half_edges_up_to_edge_index.update({ep[e]: i for e, i in half_edges_up_to_edge_index.items()})
             representatives = [half_edges_up_to_edge_index[e] for e, e_up in relabelling_up.items() if e_up <= ep_up[e_up]]
             f_up = VeeringTriangulationLinearFamily(vt_up, generators_up.matrix_from_columns(representatives), mutable=mutable)
         else:
