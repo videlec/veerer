@@ -3115,6 +3115,11 @@ class VeeringTriangulation(Triangulation):
         warn('geometric_polytope is deprecated; use delaunay_cone instead')
         return self.delaunay_cone(*args, **kwds)
 
+    def linear_subvariety(self):
+        from .real_linear_subvariety import IrreducibleRealLinearSubvariety
+        DS = self.delaunay_strebel_automaton()
+        return IrreducibleRealLinearSubvariety(DS._graph)
+
     def delaunay_automaton(self, run=True, backward=None, backend=None):
         r"""
         Return the Delaunay automaton containing this veering triangulation or family.
@@ -3135,7 +3140,6 @@ class VeeringTriangulation(Triangulation):
         EXAMPLES::
 
             sage: from veerer import VeeringTriangulation
-
 
             sage: fp = "(0,~7,6)(1,~8,~2)(2,~6,~3)(3,5,~4)(4,8,~5)(7,~1,~0)"
             sage: cols = "RBRBRBBBB"
@@ -3171,7 +3175,7 @@ class VeeringTriangulation(Triangulation):
         warn('geometric_automaton is deprecated; use delaunay_automaton instead')
         return self.delaunay_automaton(self, *args, **kwds)
 
-    def delaunay_strebel_automaton(self, run=True, backward=None, backend=None):
+    def delaunay_strebel_automaton(self, run=True, backward=None, verbosity=0, backend=None):
         r"""
         Return the Delaunay-Strebel automaton containing this veering triangulation.
 
@@ -3202,7 +3206,7 @@ class VeeringTriangulation(Triangulation):
         from .automaton import DelaunayStrebelAutomaton
         if backward is None:
             backward = any(self._bdry)
-        A = DelaunayStrebelAutomaton(backward=backward, backend=backend)
+        A = DelaunayStrebelAutomaton(backward=backward, verbosity=verbosity, backend=backend)
         A.add_seed(self)
         if run:
             A.run()
@@ -4452,8 +4456,8 @@ class VeeringTriangulation(Triangulation):
             edges_up = set(edges_up)
             edges_low = set(range(m)).difference(edges_up)
         if edges_up is None:
-            edges_up = set(edges_up)
-            edges_low = set(range(m)).difference(edges_low)
+            edges_low = set(edges_low)
+            edges_up = set(range(m)).difference(edges_low)
         else:
             edges_low = set(edges_low)
             edges_up = set(edges_up)
@@ -4604,7 +4608,7 @@ class VeeringTriangulation(Triangulation):
                 a = self._norm(e)
                 b = self._norm(mix_p[e])
                 if generators_up.column(a) != generators_up.column(b):
-                    raise RuntimeError('a={} b={}\ngenerators_matrix={}'.format(a, b, genmerators_matrix))
+                    raise RuntimeError('a={} b={}\ngenerators_matrix={}'.format(a, b, generators_up))
 
             half_edges_up_to_edge_index = {e: i for i, e in enumerate(sorted(edges_up))}
             half_edges_up_to_edge_index.update({ep[e]: i for i, e in half_edges_up_to_edge_index.items()})
@@ -4646,6 +4650,10 @@ class VeeringTriangulation(Triangulation):
                         if j:
                             edges.append(i)
                 yield self.degeneration(edges_up=edges, mutable=mutable)
+
+    def codimension_one_vertical_degenerations(self, mutable=False, mapping=False):
+        self.delaunay_cone()
+        pass
 
     def is_half_edge_strebel(self, e, slope=VERTICAL, check=True):
         r"""
