@@ -43,7 +43,7 @@ class IrreducibleRealLinearSubvariety:
 
             sage: vt = VeeringTriangulation("(0,1,2)(~1,3,4)(~3,5,6)(~6,~2,~5)(~4,7,8)(~8,~0,~7)", "RBBBRRBBR")
             sage: L = vt.linear_subvariety()
-            sage: L.codimension_one_horizontal_degenerations()
+            sage: L.codimension_one_horizontal_degenerations()  # optional - surface_dynamics
             [Irreducible real linear subvariety of dimension 3 in H_1(2, -1^2)]
 
         Degenerations of the eigenform loci of discriminant 17 in the stratum H(1,1). Even though these are
@@ -53,7 +53,7 @@ class IrreducibleRealLinearSubvariety:
             sage: a0, b0, c0, e0 = next(VeeringTriangulationLinearFamilies.H2_prototype_parameters(17, spin=0))
             sage: X17_0 = VeeringTriangulationLinearFamilies.prototype_H2(a0, b0, c0, e0)
             sage: L0 = X17_0.linear_subvariety()  # long time ~5secs
-            sage: L0.codimension_one_horizontal_degenerations()  # long time
+            sage: L0.codimension_one_horizontal_degenerations()  # long time # optional - surface_dynamics
             [Irreducible real linear subvariety of dimension 1 in Q_0(1, -1, -2^2),
              Irreducible real linear subvariety of dimension 1 in Q_0(1, -1, -2^2),
              Irreducible real linear subvariety of dimension 1 in Q_0(1, -1, -2^2)]
@@ -61,7 +61,7 @@ class IrreducibleRealLinearSubvariety:
             sage: a1, b1, c1, e1 = next(VeeringTriangulationLinearFamilies.H2_prototype_parameters(17, spin=1))
             sage: X17_1 = VeeringTriangulationLinearFamilies.prototype_H2(a1, b1, c1, e1)
             sage: L1 = X17_1.linear_subvariety()  # long time ~5secs
-            sage: L1.codimension_one_horizontal_degenerations()  # long time
+            sage: L1.codimension_one_horizontal_degenerations()  # long time # optional - surface_dynamics
             [Irreducible real linear subvariety of dimension 1 in Q_0(1, -1, -2^2),
              Irreducible real linear subvariety of dimension 1 in Q_0(1, -1, -2^2),
              Irreducible real linear subvariety of dimension 1 in Q_0(1, -1, -2^2)]
@@ -103,7 +103,7 @@ class IrreducibleRealLinearSubvariety:
             sage: from veerer import VeeringTriangulation
             sage: vt = VeeringTriangulation("(0,1,2)(~1,3,4)(~3,5,6)(~6,~2,~5)(~4,7,8)(~8,~0,~7)", "RBBBRRBBR")
             sage: L = vt.linear_subvariety()
-            sage: L.codimension_one_vertical_degenerations()
+            sage: L.codimension_one_vertical_degenerations() # optional - surface_dynamics
             ([Irreducible real linear subvariety of dimension 3 in H_1(0^2),
               Irreducible real linear subvariety of dimension 2 in H_1(0)],
              [Irreducible real linear subvariety of dimension 2 in H_1(2, -2),

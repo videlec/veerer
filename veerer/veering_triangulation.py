@@ -4774,7 +4774,7 @@ class VeeringTriangulation(Triangulation):
 
             sage: from veerer import VeeringTriangulation
             sage: vt = VeeringTriangulation("(0,8,~7)(1,3,~2)(2,10,~3)(4,6,~5)(5,11,~6)(7,~9,~8)(9,~11,~10)(~4,~1,~0)", "RRBRBBRRBRRB")
-            sage: [(f_up.stratum(), f_low.stratum()) for (f_up, f_low) in vt.codimension_one_vertical_degenerations()]
+            sage: [(f_up.stratum(), f_low.stratum()) for (f_up, f_low) in vt.codimension_one_vertical_degenerations()]  # optional - surface_dynamics
             [(H_2(2), H_0(1^2, -4)),
              (H_2(2), H_0(1^2, -4)),
              (H_2(2), H_0(1^2, -4)),
