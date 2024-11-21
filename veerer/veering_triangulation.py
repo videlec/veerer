@@ -243,6 +243,9 @@ class VeeringTriangulation(Triangulation):
     def base_ring(self):
         return ZZ
 
+    def veering_triangulation(self):
+        return self
+
     def right_wedges(self, slope=VERTICAL):
         r"""
         Return the (vertical or horizontal) right sides of the wedges in this veering triangulation.
@@ -1199,6 +1202,17 @@ class VeeringTriangulation(Triangulation):
             sage: vt = VeeringTriangulation(fp, bdry, cols)
             sage: assert vt.dimension() == vt.as_linear_family().dimension() == 2
             sage: assert vt.stratum().dimension() == 2  # optional - surface_dynamics # not tested (not yet in surface_dynamics)
+
+        An example with a disconnected linear family::
+
+            sage: from veerer import VeeringTriangulation, VeeringTriangulationLinearFamily, DelaunayStrebelAutomaton
+            sage: vt = VeeringTriangulation("(1,3,~2)(2,6,~3)(4,~6,~5)(7,~11,~8)(8,9,10)(11,~20,~12)(13,~17,~14)(14,15,16)(17,~19,~18)(19,~15,~16)(20,~9,~10)(~4,~1,~0)", boundary="(0:1)(5:1)(12:1,~13:1)(18:1,~7:1)", colouring="RRRBBRRRRBRBRRRBRBRRR")
+            sage: subspace = [(2, 0, 0, 0, 2, 2, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0),
+            ....:           (0, 2, 0, 2, -2, 0, 2, 0, 1, 1, 0, -1, 0, 0, 1, 1, 0, -1, 0, 1, 1),
+            ....:                     (0, 0, 2, -2, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0)]
+            sage: f = VeeringTriangulationLinearFamily(vt, subspace)
+            sage: f.stratum_dimension()
+            9
         """
         # each folded edge gives a simple pole
         ans = self.num_boundary_faces() + self.num_vertices() + self.num_folded_edges()
@@ -1206,7 +1220,10 @@ class VeeringTriangulation(Triangulation):
             ans += 2 * self.genus() - 2 + (self.is_holomorphic() and self.is_abelian())
         else:
             for comp in self.connected_components():
-                G = VeeringTriangulation.subgraph(self, comp)
+                # NOTE: the code below could be called by a VeeringTriangulationLinearFamily
+                # for which the subgraph code is broken
+                # see https://github.com/flatsurf/veerer/issues/54
+                G = VeeringTriangulation.subgraph(self.veering_triangulation(), comp)
                 ans += 2 * G.genus() - 2 + (G.is_holomorphic() and G.is_abelian())
         return ans
 
@@ -4912,7 +4929,7 @@ class VeeringTriangulation(Triangulation):
         bdry = self._bdry
         colouring = self._colouring
 
-        dim = VeeringTriangulation.dimension(self)
+        dim = self.stratum_dimension()
         m = 2 * dim - self.num_folded_edges() # number of half-edges
 
         # index of half-edges that remain in the strebel graph
