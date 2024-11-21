@@ -118,6 +118,8 @@ from .linear_family import VeeringTriangulationLinearFamily
 from .constants import RED, BLUE, PURPLE, VERTICAL, HORIZONTAL, PROPERTIES_COLOURS, colour_to_char, colour_to_string
 from .permutation import perm_invert
 
+from sage.graphs.digraph import DiGraph
+
 # TODO: when set to True a lot of intermediate checks are performed
 CHECK = False
 
@@ -154,8 +156,7 @@ class Automaton:
         # the automaton is encoded in two dictionaries where the keys are the states
         # and the values are respectively the outgoing or incoming edges.
         # In both cases, the neighbors are encoded by pairs (neighbor, label)
-        self._forward_neighbors = {}
-        self._backward_neighbors = {}
+        self._graph = DiGraph(multiedges=True, loops=True)
 
         # list of seeds to be considered to explore the automaton from
         self._seeds = []
@@ -179,22 +180,12 @@ class Automaton:
         Some consistency checks.
         """
         if not (self._branch or self._backward_flip_queue or self._seeds):
-            d1 = set(self._forward_neighbors).difference(self._backward_neighbors)
-            assert not d1, d1
-
-            d2 = set(self._backward_neighbors).difference(self._forward_neighbors)
-            assert not d2, d2
-
-            num_incoming_edges = sum(len(v) for v in self._backward_neighbors.values())
-            num_outgoing_edges = sum(len(v) for v in self._forward_neighbors.values())
-            assert num_outgoing_edges == num_incoming_edges, (num_outgoing_edges, num_incoming_edges)
-
             for state in self:
-                in_neighbors1 = set(x for x, label in self._backward_neighbors[state])
+                in_neighbors1 = set(self._graph.neighbors_in(state))
                 in_neighbors2 = set(x for x, label in self._in_neighbors(state))
-                assert in_neighbors1 == in_neighbors2, (state, in_neighbors1, in_neighbors2)
+                assert in_neighbors2.issubset(in_neighbors1), (state, in_neighbors1, in_neighbors2)
 
-                out_neighbors1 = set(x for x, label in self._forward_neighbors[state])
+                out_neighbors1 = set(self._graph.neighbors_out(state))
                 out_neighbors2 = set(x for x, label in self._out_neighbors(state))
                 assert out_neighbors1 == out_neighbors2, (state, out_neighbors1, out_neighbors2)
 
@@ -209,7 +200,8 @@ class Automaton:
         else:
             status = ''
             name = self._name[0].upper() + self._name[1:]
-        return ("%s%s automaton with %s %s" % (status, name, len(self._forward_neighbors), 'state' if len(self._forward_neighbors) <= 1 else 'states'))
+        nv = self._graph.num_verts()
+        return ("%s%s automaton with %s %s" % (status, name, nv, 'state' if nv <= 1 else 'states'))
 
     def __repr__(self):
         return str(self)
@@ -235,7 +227,7 @@ class Automaton:
             sage: A.number_of_states()
             86
         """
-        return len(self._forward_neighbors)
+        return self._graph.num_verts()
 
     number_of_states = __len__
     num_states = __len__
@@ -261,7 +253,7 @@ class Automaton:
             sage: A.number_of_transitions()
             300
         """
-        return sum(len(v) for v in self._forward_neighbors.values())
+        return self._graph.num_edges()
 
     num_transitions = number_of_transitions
 
@@ -292,7 +284,7 @@ class Automaton:
             0
             sage: assert all(t.angles() == [6] for t in A)
         """
-        return iter(self._forward_neighbors)
+        return iter(self._graph)
 
     states = __iter__
 
@@ -310,7 +302,7 @@ class Automaton:
 
         In the Delaunay automaton, the sources are the horizontal-Strebel veering triangulations::
 
-            sage: A = DelaunayAutomaton(backward=True)
+            sage: A = DelaunayAutomaton()
             sage: A.add_seed(vt)
             1
             sage: A.run()
@@ -319,18 +311,8 @@ class Automaton:
             [VeeringTriangulation("(0,~3,2)(1,3,~2)", boundary="(~1:2,~0:2)", colouring="RRBR")]
             sage: set(A.sources()) == set(vt for vt in A if vt.is_strebel(HORIZONTAL))
             True
-
-        In the Delaunay-Strebel automaton, the sources are the horizontal Strebel graphs::
-
-            sage: A = DelaunayStrebelAutomaton(backward=True)
-            sage: A.add_seed(vt)
-            1
-            sage: A.run()
-            0
-            sage: list(A.sources())
-            [('horizontal-strebel', StrebelGraph("(0,~1:1,~0,1:1)"))]
         """
-        return (x for x, backward_neighbors in self._backward_neighbors.items() if not backward_neighbors)
+        return self._graph.sources()
 
     def sinks(self):
         r"""
@@ -346,7 +328,7 @@ class Automaton:
 
         In the Delaunay automaton, the sinks are the vertical-Strebel veering triangulations::
 
-            sage: A = DelaunayAutomaton(backward=True)
+            sage: A = DelaunayAutomaton()
             sage: A.add_seed(vt)
             1
             sage: A.run()
@@ -358,29 +340,27 @@ class Automaton:
 
         In the Delaunay-Strebel, the sinks are the vertical Strebel graphs::
 
-            sage: A = DelaunayStrebelAutomaton(backward=True)
+            sage: A = DelaunayStrebelAutomaton()
             sage: A.add_seed(vt)
             1
             sage: A.run()
             0
             sage: list(A.sinks())
-            [('vertical-strebel', StrebelGraph("(0,~1:1,~0,1:1)"))]
+            [StrebelGraph("(0,~1:1,~0,1:1)")]
         """
-        return (x for x, forward_neighbors in self._forward_neighbors.items() if not forward_neighbors)
+        return self._graph.sinks()
 
     def transitions(self):
         r"""
         Run through the transitions of this automaton.
         """
-        for s, out_neighbors in self._forward_neighbors.items():
-            for t, label in out_neighbors:
-                yield (s, t, label)
+        return self._graph.edges()
 
     def __contains__(self, state):
         r"""
         Return whether ``state`` is contained in the automaton.
         """
-        return state.copy(mutable=False) in self._forward_neighbors
+        return state.copy(mutable=False) in self._graph
 
     # TODO: provide vertex_map and edge_map functions
     def to_graph(self, directed=True, multiedges=True, loops=True):
@@ -423,10 +403,7 @@ class Automaton:
             from sage.graphs.graph import Graph
             G = Graph(loops=loops, multiedges=multiedges)
 
-        for g, neighb in self._forward_neighbors.items():
-            for gg, label in neighb:
-                G.add_edge(g, gg, label)
-
+        G.add_edges(self._graph.edges())
         return G
 
     # TODO: move or deprecate (not a generic method)
@@ -453,7 +430,7 @@ class Automaton:
             True
         """
         aut = {}
-        for vt in self._forward_neighbors:
+        for vt in self:
             vt2 = vt.copy(mutable=True)
             vt2.rotate()
             vt2.set_canonical_labels()
@@ -489,7 +466,7 @@ class Automaton:
             True
         """
         aut = {}
-        for vt in self._forward_neighbors:
+        for vt in self:
             vt2 = vt.copy(mutable=True)
             vt2.conjugate()
             vt2.set_canonical_labels()
@@ -555,7 +532,7 @@ class Automaton:
         f.write('/*                                                                    */\n')
         f.write('/*    $ sfdp -Tpdf -o file.pdf file.dot                               */\n')
         f.write('/*                                                                    */\n')
-        seed_line = '/* seed: %s' % min(self._forward_neighbors)
+        seed_line = '/* seed: %s' % min(self._graph)
         seed_line += ' ' * (70 - len(seed_line)) + '*/\n'
         f.write(seed_line)
         f.write('/*                                                                    */\n')
@@ -564,7 +541,7 @@ class Automaton:
 
         f.write('digraph MyGraph {\n')
         f.write(' node [shape=circle style=filled margin=0.1 width=0 height=0]\n')
-        for T in self._forward_neighbors:
+        for T in self:
             g = T.to_string()
             if triangulations:
                 t_filename = os.path.join(path, g + '.svg')
@@ -582,7 +559,7 @@ class Automaton:
             else:
                 f.write('    %s [label="%d" color="%s"];\n' % (g, aut_size, colour))
 
-            for TT, flip_data in self._forward_neighbors[T]:
+            for _, TT, flip_data in self._graph.outgoing_edges(T):
                 gg = TT.to_string()
                 # TODO: restore coloring options
                 # f.write('    %s -> %s [color="%s;%f:%s"];\n' % (g, gg, old_col, 0.5, new_col))
@@ -684,11 +661,7 @@ class Automaton:
         return self.from_triangulation(VeeringTriangulation.from_stratum(stratum), **kwds)
 
     def out_neighbors(self, state):
-        state = state.copy(mutable=False)
-        neighbors = self._forward_neighbors.get(state, None)
-        if neighbors is None:
-            raise ValueError('state not in the automaton')
-        return neighbors
+        return self._graph.neighbors_out(state.copy(mutable=False))
 
     ######################
     # search implementation #
@@ -705,7 +678,7 @@ class Automaton:
         if setup:
             state = self._seed_setup(state)
 
-        if state in self._forward_neighbors:
+        if state in self._graph:
             if self._verbosity >= 2:
                 print('[add_seed] state=%s already in the graph' % (state,))
             return 0
@@ -726,7 +699,7 @@ class Automaton:
         while self._seeds or self._backward_flip_queue:
             while self._seeds:
                 seed = self._seeds.pop()
-                if seed not in self._forward_neighbors:
+                if seed not in self._graph:
                     # not explored forward yet
                     return seed
 
@@ -740,6 +713,9 @@ class Automaton:
                 if self._verbosity >= 2:
                     print('[_next_seed] add back_neighbor %s' % (back_neighbor,))
                 self.add_seed(back_neighbor, setup=False)
+
+        if self._verbosity >= 2:
+            print('[_next seed] done')
 
     def run(self, max_size=None):
         r"""
@@ -825,13 +801,12 @@ class Automaton:
             sage: A
             Core veering automaton with 2 states
         """
-        forward_neighbors = self._forward_neighbors
-        backward_neighbors = self._backward_neighbors
+        graph = self._graph
         backward_flip_queue = self._backward_flip_queue
         branch = collections.deque(self._branch)
 
         count = 0
-        old_size = len(self._forward_neighbors)
+        old_size = self._graph.num_verts()
         while max_size is None or count < max_size:
             if self._verbosity >= 2:
                 print('[automaton] new loop')
@@ -852,8 +827,7 @@ class Automaton:
                     print('[automaton] seed %s' % (state,))
                     sys.stdout.flush()
 
-                forward_neighbors[state] = []
-                backward_neighbors[state] = []
+                graph.add_vertex(state)
                 if self._backward:
                     self._backward_flip_queue.append(state)
                 branch.clear()
@@ -877,10 +851,8 @@ class Automaton:
                 sys.stdout.flush()
 
             for out_neighbor, label in self._out_neighbors(state):
-                if out_neighbor not in forward_neighbors:
-                    assert out_neighbor not in backward_neighbors
-                    forward_neighbors[out_neighbor] = []
-                    backward_neighbors[out_neighbor] = []
+                if out_neighbor not in graph:
+                    graph.add_vertex(out_neighbor)
                     branch.append(out_neighbor)
 
                     if self._backward:
@@ -888,8 +860,7 @@ class Automaton:
 
                     count += 1
 
-                forward_neighbors[state].append((out_neighbor, label))
-                backward_neighbors[out_neighbor].append((state, label))
+                graph.add_edge(state, out_neighbor, label)
 
         self._branch = list(branch)
         return 1
@@ -1376,7 +1347,7 @@ class DelaunayAutomaton(Automaton):
         """
         cylindricals = set()
         orbits = []
-        for x in self._forward_neighbors:
+        for x in self:
             if x in cylindricals or not x.is_cylindrical(col):
                 continue
             orbit = set()
@@ -1384,7 +1355,7 @@ class DelaunayAutomaton(Automaton):
             while todo:
                 x = todo.pop()
                 orbit.add(x)
-                for y, (edges, new_col) in self._forward_neighbors[x]:
+                for _, y, (edges, new_col) in self._graph.outgoing_edges(x):
                     if new_col == col and y not in orbit:
                         assert y.is_cylindrical(col)
                         orbit.add(y)
@@ -1400,16 +1371,12 @@ class DelaunayAutomaton(Automaton):
 # transitions from Strebel graphs to Delauany triangulations
 class DelaunayStrebelAutomaton(Automaton):
     r"""
+    for vt in veering_triangulations:
+        # compute outgoing edges and record Strebel so that we deduce the Strebel -> veering
     Delaunay-Strebel automaton.
 
     The states of the Delaunay-Strebel automaton are Delaunay triangulations,
-    vertical Strebel graphs and horizontal Strebel graphs. They are stored
-    as pairs ``(kind, state)`` where
-
-    - ``kind`` is either one of the strings ``'delaunay'``,
-      ``'vertical-strebel'`` or ``'horizontal-strebel'``
-    - ``state`` is either a :class:`VeeringTriangulation` or
-      :class:`StrebelGraph`
+    vertical Strebel graphs.
 
     EXAMPLES:
 
@@ -1433,12 +1400,10 @@ class DelaunayStrebelAutomaton(Automaton):
         sage: DS.run()
         0
         sage: DS
-        Delaunay-Strebel automaton with 11 states
-        sage: sum(kind == 'vertical-strebel' for kind, state in DS)
+        Delaunay-Strebel automaton with 10 states
+        sage: sum(isinstance(state, StrebelGraph) for state in DS)
         1
-        sage: sum(kind == 'horizontal-strebel' for kind, state in DS)
-        1
-        sage: sum(kind == 'delaunay' for kind, state in DS)
+        sage: sum(isinstance(state, VeeringTriangulation) for state in DS)
         9
 
     Some one and two dimensional examples in genus 0::
@@ -1455,40 +1420,39 @@ class DelaunayStrebelAutomaton(Automaton):
         ....:     _ = DS.run()
         ....:     DS._check()
         ....:     print(DS)
-        ....:     n_hs = sum(kind == 'horizontal-strebel' for kind, state in DS)
-        ....:     n_vs = sum(kind == 'vertical-strebel' for kind, state in DS)
-        ....:     n_d = sum(kind == 'delaunay' for kind, state in DS)
-        ....:     print(n_hs, n_vs, n_d)
+        ....:     n_s = sum(isinstance(state, StrebelGraph) for state in DS)
+        ....:     n_d = sum(isinstance(state, VeeringTriangulation) for state in DS)
+        ....:     print(n_s, n_d)
         StrebelGraph("(0,~1)(1,~0)")
-        Delaunay-Strebel automaton with 10 states
-        1 1 8
+        Delaunay-Strebel automaton with 9 states
+        1 8
         StrebelGraph("(0:2,~1)(1,~0)")
-        Delaunay-Strebel automaton with 26 states
-        3 3 20
+        Delaunay-Strebel automaton with 23 states
+        3 20
         StrebelGraph("(0:2,~1)(1,~0:2)")
-        Delaunay-Strebel automaton with 16 states
-        2 2 12
+        Delaunay-Strebel automaton with 14 states
+        2 12
         StrebelGraph("(0,~1)(1)(~0)")
-        Delaunay-Strebel automaton with 6 states
-        1 1 4
+        Delaunay-Strebel automaton with 5 states
+        1 4
         StrebelGraph("(0:2,~1)(1)(~0)")
-        Delaunay-Strebel automaton with 20 states
-        3 3 14
+        Delaunay-Strebel automaton with 17 states
+        3 14
         StrebelGraph("(0,~0,~1:1,1)")
-        Delaunay-Strebel automaton with 13 states
-        1 1 11
+        Delaunay-Strebel automaton with 12 states
+        1 11
         StrebelGraph("(0,~0,~1)(1)")
-        Delaunay-Strebel automaton with 10 states
-        1 1 8
+        Delaunay-Strebel automaton with 9 states
+        1 8
         StrebelGraph("(0,2,~0,~1)(1)(~2)")
-        Delaunay-Strebel automaton with 34 states
-        2 2 30
+        Delaunay-Strebel automaton with 32 states
+        2 30
         StrebelGraph("(0,2,~1)(1)(~2,~0)")
-        Delaunay-Strebel automaton with 52 states
-        1 1 50
+        Delaunay-Strebel automaton with 51 states
+        1 50
         StrebelGraph("(0:2,2,~1)(1,~0)(~2)")
-        Delaunay-Strebel automaton with 126 states
-        6 6 114
+        Delaunay-Strebel automaton with 120 states
+        6 114
 
     An example with linear constraints::
 
@@ -1500,7 +1464,7 @@ class DelaunayStrebelAutomaton(Automaton):
         sage: A.run()
         0
         sage: A
-        Delaunay-Strebel automaton with 250 states
+        Delaunay-Strebel automaton with 248 states
 
     An example with folded edges (quadratic differential with simple poles on
     edges)::
@@ -1512,198 +1476,94 @@ class DelaunayStrebelAutomaton(Automaton):
         sage: A.run()
         0
         sage: A
-        Delaunay-Strebel automaton with 46 states
+        Delaunay-Strebel automaton with 45 states
     """
     _name = 'Delaunay-Strebel'
-
-    def codimension_one_horizontal_degenerations(self):
-        r"""
-        Return the list of codimension one horizontal degenerations as a list of Delaunay-Strebel automata.
-
-        EXAMPLES::
-
-            sage: from veerer import VeeringTriangulation, VeeringTriangulationLinearFamilies, DelaunayStrebelAutomaton
-
-        The example of the stratum H(2)::
-
-            sage: vt = VeeringTriangulation("(0,1,2)(~1,3,4)(~3,5,6)(~6,~2,~5)(~4,7,8)(~8,~0,~7)", "RBBBRRBBR")
-            sage: A = DelaunayStrebelAutomaton(backward=True)
-            sage: A.add_seed(vt)
-            1
-            sage: A.run()
-            0
-            sage: degenerations = A.codimension_one_horizontal_degenerations()
-            sage: print(degenerations)
-            [Delaunay-Strebel automaton with 46 states]
-            sage: next(iter(degenerations[0]))[1].stratum()
-            H_1(2, -1^2)
-
-        Degenerations of the eigenform loci of discriminant 17 in the stratum H(1,1)::
-
-            sage: a0, b0, c0, e0 = next(VeeringTriangulationLinearFamilies.H2_prototype_parameters(17, spin=0))
-            sage: X17_0 = VeeringTriangulationLinearFamilies.prototype_H2(a0, b0, c0, e0)
-            sage: A0 = X17_0.delaunay_strebel_automaton()  # long time ~5secs
-            sage: D0 = A0.codimension_one_horizontal_degenerations()  # long time
-            sage: len(D0)  # long time`
-            3
-
-            sage: a1, b1, c1, e1 = next(VeeringTriangulationLinearFamilies.H2_prototype_parameters(17, spin=1))
-            sage: X17_1 = VeeringTriangulationLinearFamilies.prototype_H2(a1, b1, c1, e1)
-            sage: A1 = X17_1.delaunay_strebel_automaton()  # long time ~5secs
-            sage: A1.codimension_one_horizontal_degenerations()  # long time
-            sage: len(D1)  # long time
-            3
-        """
-        # TODO: one can do a little bit of optimization as the Delaunay flip inside cylinders
-        # do not affect the degenerations
-        degenerations = set()
-        automata = []
-        for kind, state in self:
-            if kind == 'delaunay':
-                for (f_up, f_low) in state.codimension_one_horizontal_degenerations(mutable=True):
-                    assert f_up is None
-                    assert f_low.dimension() == state.dimension() - 1
-                    f_low.set_canonical_labels()
-                    f_low.set_immutable()
-                    degenerations.add(f_low)
-
-        while degenerations:
-            new_state = next(iter(degenerations))
-            automaton = new_state.delaunay_strebel_automaton()
-            delaunay = set(state for (kind, state) in automaton if kind == 'delaunay')
-            if any(x not in degenerations for x in delaunay):
-                missing = set(delaunay).difference(degenerations)
-                print('WARNING: missing {} states among {} in codimension one horizontal degeneration from new_state={}'.format(len(missing), len(delaunay), new_state))
-            automata.append(automaton)
-            degenerations.difference_update(delaunay)
-
-        return automata
 
     def _check(self):
         super()._check()
 
         from .features import surface_dynamics_feature
         if surface_dynamics_feature.is_present():
-            s = set(state.stratum() for kind, state in self)
+            s = set(state.stratum() for state in self)
             if len(s) != 1:
                 raise ValueError('got different strata: {}'.format(sorted(s)))
-
-        horizontal_strebel = set()
-        vertical_strebel = set()
-        for kind, state in self:
-            if kind == 'horizontal-strebel':
-                horizontal_strebel.add(state)
-            elif kind == 'vertical-strebel':
-                vertical_strebel.add(state)
-
-        assert horizontal_strebel == vertical_strebel, horizontal_strebel.symmetric_difference(vertical_strebel)
 
     def _setup(self, backend=None):
         self._backend = backend
 
     def _seed_setup(self, state):
-        if isinstance(state, tuple) and len(state) == 2:
-            kind, state = state
-        elif isinstance(state, VeeringTriangulation):
-            kind = 'delaunay'
-        elif isinstance(state, StrebelGraph):
-            kind = 'vertical-strebel'
-        else:
+        if not isinstance(state, (VeeringTriangulation, StrebelGraph)):
             raise TypeError('invalid state')
 
         if self._backend is None:
             from .polyhedron.cone import default_backend
             self._backend = default_backend(state.base_ring())
 
-        if kind == 'delaunay':
+        if isinstance(state, VeeringTriangulation):
             if not state.is_delaunay(backend=self._backend):
                 raise ValueError('invalid seed: non-Delaunay veering triangulation {}'.format(state))
 
         state = state.copy(mutable=True)
         state.set_canonical_labels()
         state.set_immutable()
-        return (kind, state)
+        return state
 
     def _out_neighbors(self, state, check=CHECK):
         r"""
         Return the list of out-neighbors.
+
+        These are
+        - forward flips
+        - strebelization (if no forward flip)
+        - rotation
         """
-        kind, state = state
-        if kind == 'delaunay':
+        if isinstance(state, VeeringTriangulation):
             flips = state.delaunay_flips(backend=self._backend)
             if not flips:
+                # strebelization
+                if self._verbosity >= 2:
+                    print('[_out_neighbors] strebelization')
                 if CHECK:
                     assert state.is_strebel(VERTICAL)
                 out_neighbor = state.strebel_graph(VERTICAL, mutable=True)
                 out_neighbor.set_canonical_labels()
                 out_neighbor.set_immutable()
-                yield (('vertical-strebel', out_neighbor), 'strebel')
-                return
+                yield (out_neighbor, 'strebel')
 
-            for edges, col in flips:
-                assert all(state.colour(e) == state.colour(edges[0]) for e in edges)
-                out_neighbor = state.copy(mutable=True)
-                for e in edges:
-                    out_neighbor.flip(e, col, check=CHECK)
-                if CHECK:
-                    out_neighbor._check(RuntimeError)
-                    if not out_neighbor.is_delaunay(backend=self._backend):
-                        raise RuntimeError
-                out_neighbor.set_canonical_labels()
-                out_neighbor.set_immutable()
-                yield ((kind, out_neighbor), (edges, col))
-
-        elif kind == 'vertical-strebel':
-            return
-
-        elif kind == 'horizontal-strebel':
-            for colouring in state.colourings():
-                for vt in state.delaunay_triangulations(colouring, HORIZONTAL, mutable=True):
-                    vt.set_canonical_labels()
-                    vt.set_immutable()
-                    yield (('delaunay', vt), colouring)
-
-        else:
-            raise RuntimeError
-
-    def _in_neighbors(self, state):
-        """
-        Return the list of Delaunay backward flippable edges from ``state``.
-        """
-        kind, state = state
-        if kind == 'delaunay':
-            flips = state.backward_delaunay_flips(backend=self._backend)
-            if not flips:
-                if CHECK:
-                    assert state.is_strebel(HORIZONTAL)
-                in_neighbor = state.strebel_graph(HORIZONTAL, mutable=True)
-                in_neighbor.set_canonical_labels()
-                in_neighbor.set_immutable()
-                yield (('horizontal-strebel', in_neighbor), 'strebel')
-                return
-
-            for edges, col in flips:
-                assert all(state.colour(e) == state.colour(edges[0]) for e in edges)
-                in_neighbor = state.copy(mutable=True)
-                for e in edges:
-                    in_neighbor.flip_back(e, col, check=CHECK)
+            else:
+                # forward flips
+                if self._verbosity >= 2:
+                    print('[_out_neighbors] forward_flips')
+                for edges, col in flips:
+                    assert all(state.colour(e) == state.colour(edges[0]) for e in edges)
+                    out_neighbor = state.copy(mutable=True)
+                    for e in edges:
+                        out_neighbor.flip(e, col, check=CHECK)
                     if CHECK:
-                        in_neighbor._check(RuntimeError)
-                        if not in_neighbor.is_delaunay(backend=self._backend):
+                        out_neighbor._check(RuntimeError)
+                        if not out_neighbor.is_delaunay(backend=self._backend):
                             raise RuntimeError
-                in_neighbor.set_canonical_labels()
-                in_neighbor.set_immutable()
-                yield ((kind, in_neighbor), (edges, col))
+                    out_neighbor.set_canonical_labels()
+                    out_neighbor.set_immutable()
+                    yield (out_neighbor, (edges, col))
 
-        elif kind == 'vertical-strebel':
+            # rotation
+            if self._verbosity >= 2:
+                print('[_out_neighbors] rotate')
+            out_neighbor = state.copy(mutable=True)
+            out_neighbor.rotate()
+            out_neighbor.set_canonical_labels()
+            out_neighbor.set_immutable()
+            yield (out_neighbor, 'rotate')
+
+    def _in_neighbors(self, state, check=CHECK):
+        if isinstance(state, StrebelGraph):
             for colouring in state.colourings():
                 for vt in state.delaunay_triangulations(colouring, VERTICAL, mutable=True):
                     vt.set_canonical_labels()
                     vt.set_immutable()
-                    yield (('delaunay', vt), colouring)
+                    yield (vt, colouring)
 
-        elif kind == 'horizontal-strebel':
-            return
 
-        else:
-            raise RuntimeError
+
