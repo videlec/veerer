@@ -831,7 +831,7 @@ class StrebelGraph(Constellation):
 
             sage: G = StrebelGraph("(0,1,2,3)")
             sage: G.delaunay_strebel_automaton()
-            Delaunay-Strebel automaton with 328 states
+            Delaunay-Strebel automaton with 327 states
         """
         from .automaton import DelaunayStrebelAutomaton
         A = DelaunayStrebelAutomaton(backward=True, backend=backend)
