@@ -354,7 +354,7 @@ class Automaton:
         r"""
         Run through the transitions of this automaton.
         """
-        return self._graph.edges()
+        return self._graph.edges(sort=False)
 
     def __contains__(self, state):
         r"""
@@ -403,7 +403,7 @@ class Automaton:
             from sage.graphs.graph import Graph
             G = Graph(loops=loops, multiedges=multiedges)
 
-        G.add_edges(self._graph.edges())
+        G.add_edges(self._graph.edges(sort=False))
         return G
 
     # TODO: move or deprecate (not a generic method)
