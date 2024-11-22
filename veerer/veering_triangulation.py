@@ -109,7 +109,7 @@ class VeeringTriangulation(Triangulation):
         sage: VeeringTriangulation("(0,1,2)(~1:1,~2:1)", colouring="RBR")
         VeeringTriangulation("(0,1,2)(~2:1,~1:1)", "RBR")
     """
-    __slots__ = ['_colouring']
+    __slots__ = ['_colouring', '_delaunay_cone']
 
     def __init__(self, *args, triangulation=None, boundary=None, colouring=None, mutable=False, check=True):
         if len(args) == 3:
@@ -3105,6 +3105,11 @@ class VeeringTriangulation(Triangulation):
         if x_low_bound or y_low_bound or hw_bound:
             raise NotImplementedError
 
+        try:
+            return self._delaunay_cone[backend]
+        except (AttributeError, KeyError):
+            pass
+
         R = self.base_ring()
         L = LinearExpressions(R)
         zero = R.zero()
@@ -3116,7 +3121,14 @@ class VeeringTriangulation(Triangulation):
         self._set_delaunay_constraints_fast(cs, L)
         self._set_subspace_constraints_fast(cs, L, VERTICAL)
         self._set_subspace_constraints_fast(cs, L, HORIZONTAL)
-        return cs.cone(backend)
+        delaunay_cone = cs.cone(backend)
+        if not self._mutable:
+            try:
+                cache = self._delaunay_cone
+            except AttributeError:
+                cache = self._delaunay_cone = {}
+            self._delaunay_cone[backend] = delaunay_cone
+        return delaunay_cone
 
     def geometric_polytope(self, *args, **kwds):
         from warnings import warn
@@ -4696,13 +4708,12 @@ class VeeringTriangulation(Triangulation):
         dim = cone.space_dimension()
         ne = self.num_edges()
         L = LinearExpressions(self.base_ring())
-        ne = self.num_edges()
         x = [L.variable(e) for e in range(ne)]
         y = [L.variable(ne + e) for e in range(ne)]
 
         cylinders = {}
-        # NOTE: each cylinder is a quadruple (middle, bottom, top, folded)
         for middle, bot, top, _ in itertools.chain(self.cylinders(RED), self.cylinders(BLUE)):
+            # NOTE: each cylinder is a quadruple (middle, bottom, top, folded)
             middle = [self._norm(e) for e in middle]
             bot = [self._norm(e) for e in bot]
             top = [self._norm(e) for e in top]
@@ -4750,24 +4761,29 @@ class VeeringTriangulation(Triangulation):
                             cs.add_edge(e)
                         done = False
 
+            return frozenset(vanishing_edges), vanishing_cone
+
         # 1. for each edge, we compute inductively what needs to degenerate
         # on the V-representation we can get the list of vanishing edges
         ne = self.num_edges()
-        ans = [set() for _ in range(ne + 1)]
+        ans = [{} for _ in range(ne + 1)]
         for e in range(ne):
             vanishing_edges = set([e])
-            completion(vanishing_edges, cone)
-            ans[len(vanishing_edges)].add(frozenset(vanishing_edges))
+            vanishing_edges, vanishing_cone = completion(vanishing_edges, cone)
+            k = len(vanishing_edges)
+            ans[k][vanishing_edges] = vanishing_cone
 
         # 2. make all possible unions of such subsets
         for i in range(1, ne):
-            for edges1 in ans[i]:
+            for edges1, cone1 in ans[i].items():
                 for j in range(1, i + 1):
-                    for edges2 in ans[j]:
+                    for edges2, cone2 in ans[j].items():
                         if edges1 != edges2:
                             vanishing_edges = set().union(edges1, edges2)
-                            completion(vanishing_edges, cone)
-                            ans[len(vanishing_edges)].add(frozenset(vanishing_edges))
+                            vanishing_cone = cone1.intersection(cone2)
+                            vanishing_edges, vanishing_cone = completion(vanishing_edges, vanishing_cone)
+                            k = len(vanishing_edges)
+                            ans[k][vanishing_edges] = vanishing_cone
 
         output = []
         for i in range(1, ne):
