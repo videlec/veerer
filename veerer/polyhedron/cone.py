@@ -246,6 +246,18 @@ class Cone_ppl(Cone):
             cone.add_constraint(constraint.ppl())
         return Cone_ppl(ZZ, cone)
 
+    def intersection(self, other, inplace=False):
+        if type(self) is not type(other):
+            raise NotImplementedError
+        if inplace:
+            self._cone.intersection_assign(other._cone)
+            return self
+        else:
+            import ppl
+            cone = ppl.C_Polyhedron(self._cone)
+            cone.intersection_assign(other._cone)
+            return Cone_ppl(ZZ, cone)
+
 
 class Cone_sage(Cone):
     r"""
@@ -294,6 +306,16 @@ class Cone_sage(Cone):
         ieqs, eqns = cs.ieqs_eqns(self._cone.ambient_dim())
         new_cone = self._cone.intersection(Polyhedron(ieqs=ieqs, eqns=eqns))
         return Cone_sage(new_cone.base_ring(), new_cone)
+
+    def intersection(self, other, inplace=False):
+        if type(self) is not type(other):
+            raise NotImplementedError
+        new_cone = self._cone.intersection(other._cone)
+        if inplace:
+            self._cone = new_cone
+            return self
+        else:
+            return Cone_sage(new_cone.base_ring(), new_cone)
 
 
 class NFElementHandler:
@@ -353,6 +375,18 @@ class Cone_normaliz(Cone):
     def lines(self):
         raise NotImplementedError
 
+    def intersection(self, other, inplace=False):
+        if type(self) is not type(other):
+            raise NotImplementedError
+        ieqs = self._nmz_result("SupportHyperplanes") + other._nmz_result("SupportHyperplanes")
+        eqns = self._nmz_result("Equations") + other._nmz_result("Equations")
+        cone = self._new_normaliz(ieqs, eqns)
+        if inplace:
+            self._cone = cone
+            return self
+        else:
+            return self._wrap(cone)
+
 
 class Cone_normalizQQ(Cone_normaliz):
     r"""
@@ -364,6 +398,13 @@ class Cone_normalizQQ(Cone_normaliz):
     def _new(ieqs, eqns):
         from PyNormaliz import NmzCone
         return Cone_normalizQQ(QQ, NmzCone(inequalities=ieqs, equations=eqns))
+
+    def _new_normaliz(self, ieqs, eqns):
+        return self._new(ieqs, eqns)
+
+    def _wrap(self, cone):
+        from PyNormaliz import NmzCone
+        return Cone_normalizQQ(QQ, cone)
 
     @staticmethod
     def vector_space(dim=None):
@@ -398,6 +439,15 @@ class Cone_normalizNF(Cone_normaliz):
         ans._nf_data = nf_data
         return ans
 
+    def _new_normaliz(self, ieqs, eqns):
+        from PyNormaliz import NmzCone
+        return NmzCone(number_field=self._nf_data, inequalities=ieqs, equations=eqns)
+
+    def _wrap(self, cone):
+        ans = Cone_normalizNF(self._base_ring, cone)
+        ans._nf_data = self._nf_data
+        return ans
+
     @staticmethod
     def vector_space(dim=None):
         if dim is None:
@@ -411,7 +461,6 @@ class Cone_normalizNF(Cone_normaliz):
         ans = Cone_normalizNF(base_ring, NmzCone(number_field=nf_data, subspace=basis))
         ans._nf_data = nf_data
         return ans
-
 
     def add_constraints(self, cs):
         from PyNormaliz import NmzCone
