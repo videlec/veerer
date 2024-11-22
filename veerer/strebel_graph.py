@@ -32,7 +32,7 @@ from sage.matrix.constructor import matrix
 from sage.matrix.special import identity_matrix
 
 from .permutation import perm_check, perm_cycles, perm_cycles_to_string, str_to_cycles_and_data
-from .triangulation import face_edge_perms_init, boundary_init, Triangulation
+from .triangulation import face_edge_boundary_init, Triangulation
 from .constellation import Constellation
 from .constants import *
 from veerer.polyhedron import *
@@ -60,10 +60,10 @@ def one_edge_completion(t, angle_excess, colouring):
         sage: colouring = [2,1,1,2]
         sage: angle_excess = array('i', [3, 3, 0, 3])
         sage: one_edge_completion(t, angle_excess, colouring)
-        ((Triangulation("(2,~0,~1)", boundary="(0:1)(1:1)(~2:1)"),
+        ((Triangulation("(2,~0,~1)(0:1)(1:1)(~2:1)"),
           array('i', [3, 3, 0, 3, 0, 0]),
           array('i', [2, 1, 1, 1, 1, 2])),
-         (Triangulation("(2,~0,~1)", boundary="(0:1)(1:1)(~2:1)"),
+         (Triangulation("(2,~0,~1)(0:1)(1:1)(~2:1)"),
           array('i', [3, 3, 0, 3, 0, 0]),
           array('i', [2, 1, 2, 2, 1, 2])))
     """
@@ -236,8 +236,7 @@ class StrebelGraph(Constellation):
             bdry = faces.boundary_vector(copy=True)
         else:
             faces, boundary = str_to_cycles_and_data(faces)
-            fp, ep = face_edge_perms_init(faces)
-            bdry = boundary_init(fp, ep, boundary)
+            fp, ep, bdry = face_edge_boundary_init(faces, boundary)
 
         Constellation.__init__(self, len(fp), None, ep, fp, (bdry,), mutable, check)
 
@@ -591,20 +590,20 @@ class StrebelGraph(Constellation):
             ....:         assert all(vt.stratum() == G.stratum() for vt in vts)  # optional - surface_dynamics
             ....:         print(colouring, list(G.veering_triangulations(colouring)))
             StrebelGraph("(0,~1:1,~0,1:1)")
-            array('i', [1, 1, 1, 1]) [VeeringTriangulation("", boundary="(0:1,~1:2,~0:1,1:2)", colouring="RR")]
-            array('i', [1, 2, 2, 1]) [VeeringTriangulation("(0,2,1)(3,~1,~0)", boundary="(~3:1,~2:2)", colouring="RBBR"), VeeringTriangulation("(0,2,1)(3,~1,~0)", boundary="(~3:2,~2:2)", colouring="RBBB"), VeeringTriangulation("(0,2,1)(3,~1,~0)", boundary="(~3:2,~2:2)", colouring="RBRR"), VeeringTriangulation("(0,2,1)(3,~1,~0)", boundary="(~3:2,~2:1)", colouring="RBRB")]
-            array('i', [2, 1, 1, 2]) [VeeringTriangulation("", boundary="(0:1,~1:1,~0:1,1:1)", colouring="BR")]
-            array('i', [2, 2, 2, 2]) [VeeringTriangulation("", boundary="(0:1,~1:2,~0:1,1:2)", colouring="BB")]
+            array('i', [1, 1, 1, 1]) [VeeringTriangulation("(0:1,~1:2,~0:1,1:2)", "RR")]
+            array('i', [1, 2, 2, 1]) [VeeringTriangulation("(0,2,1)(3,~1,~0)(~3:1,~2:2)", "RBBR"), VeeringTriangulation("(0,2,1)(3,~1,~0)(~3:2,~2:2)", "RBBB"), VeeringTriangulation("(0,2,1)(3,~1,~0)(~3:2,~2:2)", "RBRR"), VeeringTriangulation("(0,2,1)(3,~1,~0)(~3:2,~2:1)", "RBRB")]
+            array('i', [2, 1, 1, 2]) [VeeringTriangulation("(0:1,~1:1,~0:1,1:1)", "BR")]
+            array('i', [2, 2, 2, 2]) [VeeringTriangulation("(0:1,~1:2,~0:1,1:2)", "BB")]
             StrebelGraph("(0,~1)(1)(~0)")
-            array('i', [1, 1, 1, 1]) [VeeringTriangulation("", boundary="(0:1,~1:1)(1:1)(~0:1)", colouring="RR")]
-            array('i', [1, 2, 2, 1]) [VeeringTriangulation("(0,2,~1)", boundary="(1:1)(~2:1)(~0:1)", colouring="RBR"), VeeringTriangulation("(0,2,~1)", boundary="(1:1)(~2:1)(~0:1)", colouring="RBB")]
-            array('i', [2, 1, 1, 2]) [VeeringTriangulation("(0,~1,2)", boundary="(1:1)(~2:1)(~0:1)", colouring="BRR"), VeeringTriangulation("(0,~1,2)", boundary="(1:1)(~2:1)(~0:1)", colouring="BRB")]
-            array('i', [2, 2, 2, 2]) [VeeringTriangulation("", boundary="(0:1,~1:1)(1:1)(~0:1)", colouring="BB")]
+            array('i', [1, 1, 1, 1]) [VeeringTriangulation("(0:1,~1:1)(1:1)(~0:1)", "RR")]
+            array('i', [1, 2, 2, 1]) [VeeringTriangulation("(0,2,~1)(1:1)(~2:1)(~0:1)", "RBR"), VeeringTriangulation("(0,2,~1)(1:1)(~2:1)(~0:1)", "RBB")]
+            array('i', [2, 1, 1, 2]) [VeeringTriangulation("(0,~1,2)(1:1)(~2:1)(~0:1)", "BRR"), VeeringTriangulation("(0,~1,2)(1:1)(~2:1)(~0:1)", "BRB")]
+            array('i', [2, 2, 2, 2]) [VeeringTriangulation("(0:1,~1:1)(1:1)(~0:1)", "BB")]
             StrebelGraph("(0:2)(1:2)(~1,~0:2)")
-            array('i', [1, 1, 1, 1]) [VeeringTriangulation("", boundary="(0:3)(1:3)(~1:1,~0:3)", colouring="RR")]
-            array('i', [1, 2, 2, 1]) [VeeringTriangulation("", boundary="(0:3)(1:3)(~1:1,~0:2)", colouring="RB")]
-            array('i', [2, 1, 1, 2]) [VeeringTriangulation("(2,~0,~1)", boundary="(0:3)(1:3)(~2:3)", colouring="BRR"), VeeringTriangulation("(2,~0,~1)", boundary="(0:3)(1:3)(~2:3)", colouring="BRB")]
-            array('i', [2, 2, 2, 2]) [VeeringTriangulation("", boundary="(0:3)(1:3)(~1:1,~0:3)", colouring="BB")]
+            array('i', [1, 1, 1, 1]) [VeeringTriangulation("(0:3)(1:3)(~1:1,~0:3)", "RR")]
+            array('i', [1, 2, 2, 1]) [VeeringTriangulation("(0:3)(1:3)(~1:1,~0:2)", "RB")]
+            array('i', [2, 1, 1, 2]) [VeeringTriangulation("(2,~0,~1)(0:3)(1:3)(~2:3)", "BRR"), VeeringTriangulation("(2,~0,~1)(0:3)(1:3)(~2:3)", "BRB")]
+            array('i', [2, 2, 2, 2]) [VeeringTriangulation("(0:3)(1:3)(~1:1,~0:3)", "BB")]
         """
         def is_complete(t, angle_excess, colouring):
             return not any(b1 and b2 == 0 for (b1, b2) in zip(t._bdry, angle_excess))

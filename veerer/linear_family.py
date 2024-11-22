@@ -931,7 +931,7 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
             sage: vt = VeeringTriangulation("(1,4,~2)(2,~6,~3)(3,~5,~4)", boundary="(0:1)(5:1)(6:1)(~1:1,~0:1)", colouring="BBRRBBB")
             sage: F = VeeringTriangulationLinearFamily(vt, [(1, 2, 0, -1, 2, 1, 1), (0, 0, 1, 1, -1, 0, 0)])
             sage: F
-            VeeringTriangulationLinearFamily("(1,4,~2)(2,~6,~3)(3,~5,~4)", boundary="(0:1)(5:1)(6:1)(~1:1,~0:1)", colouring="BBRRBBB", [(1, 2, 0, -1, 2, 1, 1), (0, 0, 1, 1, -1, 0, 0)])
+            VeeringTriangulationLinearFamily("(1,4,~2)(2,~6,~3)(3,~5,~4)(0:1)(5:1)(6:1)(~1:1,~0:1)", "BBRRBBB", [(1, 2, 0, -1, 2, 1, 1), (0, 0, 1, 1, -1, 0, 0)])
             sage: F.strebel_graph()
             StrebelGraphLinearFamily("(0)(1,~2)(2,~3,~1,~0)(3)", [(1, 0, 1, 1), (0, 1, -1, 0)])
 

@@ -308,7 +308,7 @@ class Automaton:
             sage: A.run()
             0
             sage: list(A.sources())
-            [VeeringTriangulation("(0,~3,2)(1,3,~2)", boundary="(~1:2,~0:2)", colouring="RRBR")]
+            [VeeringTriangulation("(0,~3,2)(1,3,~2)(~1:2,~0:2)", "RRBR")]
             sage: set(A.sources()) == set(vt for vt in A if vt.is_strebel(HORIZONTAL))
             True
         """
@@ -334,7 +334,7 @@ class Automaton:
             sage: A.run()
             0
             sage: list(A.sinks())
-            [VeeringTriangulation("(0,~3,2)(1,3,~2)", boundary="(~1:2,~0:2)", colouring="RRRB")]
+            [VeeringTriangulation("(0,~3,2)(1,3,~2)(~1:2,~0:2)", "RRRB")]
             sage: set(A.sinks()) == set(vt for vt in A if vt.is_strebel(VERTICAL))
             True
 

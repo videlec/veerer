@@ -44,7 +44,7 @@ from .constants import *
 from .constellation import Constellation
 from .permutation import *
 from .misc import det2
-from .triangulation import face_edge_perms_init, boundary_init, Triangulation
+from .triangulation import face_edge_boundary_init, Triangulation
 from .polyhedron import LinearExpressions, ConstraintSystem
 from .polyhedron.linear_expression import LinearConstraint
 from .polyhedron.linear_algebra import linear_form_project, vector_normalize
@@ -100,14 +100,14 @@ class VeeringTriangulation(Triangulation):
     Triangulations with boundary::
 
         sage: VeeringTriangulation("(0,1,2)(~0,3,4)", "(~1:1)(~2:1)(~3:1)(~4:1)", "RBRBR")
-        VeeringTriangulation("(0,1,2)(3,4,~0)", boundary="(~4:1)(~3:1)(~2:1)(~1:1)", colouring="RBRBR")
-        sage: VeeringTriangulation("(0,1,2)(~0,3,4)", boundary="(~1:1)(~2:1)(~3:1)(~4:1)", colouring="RBRBR")
-        VeeringTriangulation("(0,1,2)(3,4,~0)", boundary="(~4:1)(~3:1)(~2:1)(~1:1)", colouring="RBRBR")
+        VeeringTriangulation("(0,1,2)(3,4,~0)(~4:1)(~3:1)(~2:1)(~1:1)", "RBRBR")
+        sage: VeeringTriangulation("(0,1,2)(~0,3,4)(~1:1)(~2:1)(~3:1)(~4:1)", colouring="RBRBR")
+        VeeringTriangulation("(0,1,2)(3,4,~0)(~4:1)(~3:1)(~2:1)(~1:1)", "RBRBR")
 
     Triangulations with boundary and folded edges::
 
-        sage: VeeringTriangulation("(0,1,2)", boundary="(~1:1,~2:1)", colouring="RBR")
-        VeeringTriangulation("(0,1,2)", boundary="(~2:1,~1:1)", colouring="RBR")
+        sage: VeeringTriangulation("(0,1,2)(~1:1,~2:1)", colouring="RBR")
+        VeeringTriangulation("(0,1,2)(~2:1,~1:1)", "RBR")
     """
     __slots__ = ['_colouring']
 
@@ -140,8 +140,7 @@ class VeeringTriangulation(Triangulation):
                 else:
                     triangulation = list(triangulation)
                 triangulation.extend(boundary_cycles)
-            fp, ep = face_edge_perms_init(triangulation)
-            bdry = boundary_init(fp, ep, boundary)
+            fp, ep, bdry = face_edge_boundary_init(triangulation, boundary)
 
         if colouring is None:
             if isinstance(triangulation, VeeringTriangulation):
@@ -697,24 +696,16 @@ class VeeringTriangulation(Triangulation):
             sage: VeeringTriangulation("(0,1,2)", [RED, RED, BLUE])
             VeeringTriangulation("(0,1,2)", "RRB")
             sage: VeeringTriangulation("(0,1,2)(3,4,~0)", "(~4:1,~3:1,~2:1,~1:1)", "RRBRB")
-            VeeringTriangulation("(0,1,2)(3,4,~0)", boundary="(~4:1,~3:1,~2:1,~1:1)", colouring="RRBRB")
+            VeeringTriangulation("(0,1,2)(3,4,~0)(~4:1,~3:1,~2:1,~1:1)", "RRBRB")
             sage: t = Triangulation("(0,1,2)(3,~0,~1)", "(~3:2,~2:2)")
             sage: VeeringTriangulation(t, "RBBR")
-            VeeringTriangulation("(0,1,2)(3,~0,~1)", boundary="(~3:2,~2:2)", colouring="RBBR")
+            VeeringTriangulation("(0,1,2)(3,~0,~1)(~3:2,~2:2)", "RBBR")
         """
         cycles = perm_cycles(self._fp, n=self._n)
         face_cycles = perm_cycles_to_string([c for c in cycles if not self._bdry[c[0]]], involution=self._ep)
-        bdry_cycles = perm_cycles_to_string([c for c in cycles if self._bdry[c[0]]], involution=self._ep, data=self._bdry)
+        face_cycles += perm_cycles_to_string([c for c in cycles if self._bdry[c[0]]], involution=self._ep, data=self._bdry)
         colouring = self._colouring_string(short=True)
-        if bdry_cycles:
-            return "VeeringTriangulation(\"{}\", boundary=\"{}\", colouring=\"{}\")".format(
-                            face_cycles,
-                            bdry_cycles,
-                            colouring)
-        else:
-            return "VeeringTriangulation(\"{}\", \"{}\")".format(
-                       face_cycles,
-                       colouring)
+        return "VeeringTriangulation(\"{}\", \"{}\")".format(face_cycles, colouring)
 
     def __repr__(self):
         return str(self)
@@ -2478,7 +2469,7 @@ class VeeringTriangulation(Triangulation):
             sage: vt = VeeringTriangulation("(0,5,~4)(2,6,~5)(3,~0,7)(4,~3,~1)", boundary="(1:1)(~7:1)(~6:1)(~2:1)", colouring="RRRBBBBB")
             sage: f1 = vt.add_residue_constraints([[1, 1, 1, 0]])
             sage: f1
-            VeeringTriangulationLinearFamily("(0,5,~4)(2,6,~5)(3,~0,7)(4,~3,~1)", boundary="(1:1)(~7:1)(~6:1)(~2:1)", colouring="RRRBBBBB", [(1, 0, 0, 0, 0, 1, 1, 1), (0, 1, 0, 0, 1, 1, 1, 0), (0, 0, 0, 1, 1, 1, 1, 1)])
+            VeeringTriangulationLinearFamily("(0,5,~4)(2,6,~5)(3,~0,7)(4,~3,~1)(1:1)(~7:1)(~6:1)(~2:1)", "RRRBBBBB", [(1, 0, 0, 0, 0, 1, 1, 1), (0, 1, 0, 0, 1, 1, 1, 0), (0, 0, 0, 1, 1, 1, 1, 1)])
             sage: f1.is_core()
             True
             sage: f1.is_delaunay()
@@ -2486,7 +2477,7 @@ class VeeringTriangulation(Triangulation):
 
             sage: f2 = vt.add_residue_constraints([[1, 1, 0, 1]])
             sage: f2
-            VeeringTriangulationLinearFamily("(0,5,~4)(2,6,~5)(3,~0,7)(4,~3,~1)", boundary="(1:1)(~7:1)(~6:1)(~2:1)", colouring="RRRBBBBB", [(1, 0, 0, -1, -1, 0, 0, 0), (0, 1, 0, -1, 0, 0, 0, -1), (0, 0, 1, -1, -1, -1, 0, -1)])
+            VeeringTriangulationLinearFamily("(0,5,~4)(2,6,~5)(3,~0,7)(4,~3,~1)(1:1)(~7:1)(~6:1)(~2:1)", "RRRBBBBB", [(1, 0, 0, -1, -1, 0, 0, 0), (0, 1, 0, -1, 0, 0, 0, -1), (0, 0, 1, -1, -1, -1, 0, -1)])
             sage: f2.is_core()
             False
 

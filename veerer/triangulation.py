@@ -38,36 +38,56 @@ from .permutation import (perm_init, perm_check, perm_cycles, perm_dense_cycles,
 from .constellation import Constellation
 
 
-def face_edge_perms_init(faces):
+def face_edge_boundary_init(faces, boundary=None):
     r"""
-    INPUT:: ``faces`` - a list or a string encoding a permutation
+    Function to simplify initialization of a constellation with boundaries.
+
+    INPUT::
+
+    - ``faces`` - a list of cycles or a string encoding a permutation
+
+    - ``boundary`` - a dictionary, a list or a string encoding the boundary data
 
     EXAMPLES::
 
-        sage: from veerer.triangulation import face_edge_perms_init  # random output due to deprecation warnings from realalg
+        sage: from veerer.triangulation import face_edge_boundary_init  # random output due to deprecation warnings from realalg
 
-        sage: face_edge_perms_init('(0,1,2)(~0,~1,~2)')
-        (array('i', [1, 2, 0, 5, 3, 4]), array('i', [5, 4, 3, 2, 1, 0]))
+        sage: face_edge_boundary_init('(0,1,2)(~0,~1,~2)')
+        (array('i', [1, 2, 0, 5, 3, 4]), array('i', [5, 4, 3, 2, 1, 0]), array('i', [0, 0, 0, 0, 0, 0]))
 
-        sage: face_edge_perms_init('(0,1,2)')
-        (array('i', [1, 2, 0]), array('i', [0, 1, 2]))
+        sage: face_edge_boundary_init('(0,1,2)')
+        (array('i', [1, 2, 0]), array('i', [0, 1, 2]), array('i', [0, 0, 0]))
 
-        sage: face_edge_perms_init('(0,1,2)(~0)(~1)(~2)')
-        (array('i', [1, 2, 0, 3, 4, 5]), array('i', [5, 4, 3, 2, 1, 0]))
+        sage: face_edge_boundary_init('(0,1,2)(~0)(~1)(~2)')
+        (array('i', [1, 2, 0, 3, 4, 5]), array('i', [5, 4, 3, 2, 1, 0]), array('i', [0, 0, 0, 0, 0, 0]))
+
+        sage: face_edge_boundary_init('(0:1,1:2,2)(~0)(~1)(~2)')
+        (array('i', [1, 2, 0, 3, 4, 5]),
+         array('i', [5, 4, 3, 2, 1, 0]),
+         array('i', [1, 2, 0, 0, 0, 0]))
 
     TESTS:
 
-    Check that edge permutation do not depend on the details of faces::
+    Check that the edge permutation does not depend on the details of faces::
 
         sage: f1 = "(0,~5,4)(3,5,6)(1,2,~6)"
         sage: f2 = "(0,6,5)(1,2,~6)(3,4,~5)"
         sage: f3 = "(6,4,3)(~6,~5,1)(5,0,2)"
-        sage: assert face_edge_perms_init(f1)[1] == face_edge_perms_init(f2)[1] == face_edge_perms_init(f3)[1]
+        sage: assert face_edge_boundary_init(f1)[1] == face_edge_boundary_init(f2)[1] == face_edge_boundary_init(f3)[1]
     """
-    if isinstance(faces, str):
-        l = str_to_cycles(faces)
+    if boundary is None:
+        if isinstance(faces, str):
+            l, boundary = str_to_cycles_and_data(faces)
+        else:
+            l = [[int(i) for i in c] for c in faces]
     else:
-        l = [[int(i) for i in c] for c in faces]
+        if isinstance(faces, str):
+            l = str_to_cycles(faces)
+        else:
+            l = [[int(i) for i in c] for c in faces]
+        if isinstance(boundary, str):
+            ll, boundary = str_to_cycles_and_data(boundary)
+            l.extend(ll)
 
     pos = []
     neg = []
@@ -123,40 +143,15 @@ def face_edge_perms_init(faces):
                 e1 = ep[~e1]
             fp[e0] = e1
 
-    return perm_init(fp), perm_init(ep)
-
-
-def boundary_init(fp, ep, boundary):
-    r"""
-    Initialize boundary data given face and edge permutation.
-
-    EXAMPLES:
-
-    A test with folded edges::
-
-        sage: from array import array
-        sage: from veerer.triangulation import boundary_init
-        sage: fp = array('i', [1, 2, 0, 4, 3])
-        sage: ep = array('i', [0, 4, 3, 2, 1])
-        sage: boundary_init(fp, ep, {0: 1})
-        array('i', [1, 0, 0, 0, 0])
-        sage: boundary_init(fp, ep, {1: 1})
-        array('i', [0, 1, 0, 0, 0])
-        sage: boundary_init(fp, ep, {2: 1})
-        array('i', [0, 0, 1, 0, 0])
-        sage: boundary_init(fp, ep, {-2: 1})
-        array('i', [0, 0, 0, 0, 1])
-        sage: boundary_init(fp, ep, {-3: 1})
-        array('i', [0, 0, 0, 1, 0])
-    """
-    n = len(ep)
+    fp = perm_init(fp)
+    ep = perm_init(ep)
 
     if boundary is None:
-        return array('i', [0] * n)
-    elif isinstance(boundary, (array, tuple, list)):
+        boundary = array('i', [0] * n)
+    elif isinstance(boundary, (tuple, list, array)):
         if len(boundary) != n:
             raise ValueError('invalid input argument')
-        return array('i', boundary)
+        boundary = array('i', boundary)
     elif isinstance(boundary, dict):
         edge_to_half_edge = {}
         for j, c in enumerate(perm_cycles(ep, n)):
@@ -182,10 +177,11 @@ def boundary_init(fp, ep, boundary):
             if e > n:
                 raise ValueError('keys must be valid edges, got {!r}'.format(e))
             output[edge_to_half_edge[e]] = v
-        return output
+        boundary = output
     else:
         raise TypeError('invalid boundary data')
 
+    return fp, ep, boundary
 
 
 # NOTE: we don't really care that we have a triangulation here. When
@@ -299,16 +295,16 @@ class Triangulation(Constellation):
     Examples with boundaries::
 
         sage: Triangulation("(0,1,2)(~0)(~1)(~2)", boundary={"~0": 1, "~1": 1, "~2": 1})
-        Triangulation("(0,1,2)", boundary="(~2:1)(~1:1)(~0:1)")
-        sage: Triangulation("(0,1,2)", boundary="(~0:1)(~1:1,~2:1)")
-        Triangulation("(0,1,2)", boundary="(~2:1,~1:1)(~0:1)")
+        Triangulation("(0,1,2)(~2:1)(~1:1)(~0:1)")
+        sage: Triangulation("(0,1,2)(~0:1)(~1:1,~2:1)")
+        Triangulation("(0,1,2)(~2:1,~1:1)(~0:1)")
         sage: Triangulation("(0,1,2)(~0,~1,~2)", boundary={"~0": 0})
         Triangulation("(0,1,2)(~2,~0,~1)")
 
     Example with boundary and folded edges::
 
-        sage: Triangulation("(0,1,2)", boundary="(~1:1,~2:1)")
-        Triangulation("(0,1,2)", boundary="(~2:1,~1:1)")
+        sage: Triangulation("(0,1,2)(~1:1,~2:1)")
+        Triangulation("(0,1,2)(~2:1,~1:1)")
 
     Examples with invalid boundaries::
 
@@ -333,8 +329,7 @@ class Triangulation(Constellation):
                 else:
                     triangles = list(triangles)
                 triangles.extend(boundary_cycles)
-            fp, ep = face_edge_perms_init(triangles)
-            bdry = boundary_init(fp, ep, boundary)
+            fp, ep, bdry = face_edge_boundary_init(triangles, boundary)
 
         Constellation.__init__(self, len(fp), None, ep, fp, (bdry,), mutable, check)
 
@@ -653,11 +648,8 @@ class Triangulation(Constellation):
         """
         cycles = perm_cycles(self._fp, n=self._n)
         face_cycles = perm_cycles_to_string([c for c in cycles if not self._data[0][c[0]]], involution=self._ep)
-        bdry_cycles = perm_cycles_to_string([c for c in cycles if self._data[0][c[0]]], involution=self._ep, data=self._data[0])
-        if bdry_cycles:
-            return 'Triangulation("%s", boundary="%s")' % (face_cycles, bdry_cycles)
-        else:
-            return 'Triangulation("%s")' % face_cycles
+        face_cycles += perm_cycles_to_string([c for c in cycles if self._data[0][c[0]]], involution=self._ep, data=self._data[0])
+        return 'Triangulation("%s")' % face_cycles
 
     def __repr__(self):
         return str(self)
@@ -1074,7 +1066,7 @@ class Triangulation(Constellation):
             sage: t = Triangulation("(0,1,2)(~0,3,4)", boundary="(~4:1,~3:1,~2:1,~1:1)", mutable=True)
             sage: t.flip(0)
             sage: t
-            Triangulation("(0,2,3)(1,~0,4)", boundary="(~4:1,~3:1,~2:1,~1:1)")
+            Triangulation("(0,2,3)(1,~0,4)(~4:1,~3:1,~2:1,~1:1)")
             sage: t.flip(2)
             Traceback (most recent call last):
             ...
