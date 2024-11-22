@@ -1531,6 +1531,15 @@ class DelaunayStrebelAutomaton(Automaton):
                 out_neighbor.set_immutable()
                 yield (out_neighbor, 'strebel')
 
+                # rotation
+                if self._verbosity >= 2:
+                    print('[_out_neighbors] rotate')
+                out_neighbor = state.copy(mutable=True)
+                out_neighbor.rotate()
+                out_neighbor.set_canonical_labels()
+                out_neighbor.set_immutable()
+                yield (out_neighbor, 'rotate')
+
             else:
                 # forward flips
                 if self._verbosity >= 2:
@@ -1547,15 +1556,6 @@ class DelaunayStrebelAutomaton(Automaton):
                     out_neighbor.set_canonical_labels()
                     out_neighbor.set_immutable()
                     yield (out_neighbor, (edges, col))
-
-            # rotation
-            if self._verbosity >= 2:
-                print('[_out_neighbors] rotate')
-            out_neighbor = state.copy(mutable=True)
-            out_neighbor.rotate()
-            out_neighbor.set_canonical_labels()
-            out_neighbor.set_immutable()
-            yield (out_neighbor, 'rotate')
 
     def _in_neighbors(self, state, check=CHECK):
         if isinstance(state, StrebelGraph):
