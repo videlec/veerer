@@ -885,7 +885,7 @@ def perm_cycle_string(array.array p, singletons=True, n=-1, involution=None):
 
 def perm_orbit(array.array p, int i):
     r"""
-    Return the orbit of ``i`` under the permutation ``p``.
+    Return the forward orbit of ``i`` under the permutation ``p``.
 
     EXAMPLES::
 
@@ -898,7 +898,7 @@ def perm_orbit(array.array p, int i):
     cdef int j
     cdef list res = [i]
     j = p.data.as_ints[i]
-    while j != i:
+    while j != -1 and j != i:
         res.append(j)
         j = p.data.as_ints[j]
     return res
