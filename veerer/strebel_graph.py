@@ -32,7 +32,7 @@ from sage.matrix.constructor import matrix
 from sage.matrix.special import identity_matrix
 
 from .permutation import perm_check, perm_cycles, perm_cycles_to_string, str_to_cycles_and_data
-from .triangulation import face_edge_boundary_init, Triangulation
+from .triangulation import face_boundary_init, Triangulation
 from .constellation import Constellation
 from .constants import *
 from veerer.polyhedron import *
@@ -57,8 +57,8 @@ def one_edge_completion(t, angle_excess, colouring):
         sage: from veerer import Triangulation
         sage: from veerer.strebel_graph import one_edge_completion
         sage: t = Triangulation("", "(0:1)(1:1)(~0:1,~1:1)")
-        sage: colouring = [2,1,1,2]
-        sage: angle_excess = array('i', [3, 3, 0, 3])
+        sage: colouring = [2, 1]
+        sage: angle_excess = array('i', [3, 0, 3, 3])
         sage: one_edge_completion(t, angle_excess, colouring)
         ((Triangulation("(2,~0,~1)(0:1)(1:1)(~2:1)"),
           array('i', [3, 3, 0, 3, 0, 0]),
@@ -82,13 +82,17 @@ def one_edge_completion(t, angle_excess, colouring):
     #   x-----------x-----------x
     #             E           B
 
-    n = t._n
+    n = 2 * t._ne
     vp = t._vp
     ep = t._ep
     fp = t._fp
     bdry = t._bdry
-    m = t.num_edges()
-    M = m + 1
+    m = n     # new positive half-edge
+    M = n + 1 # new negative half-edge
+
+    for x in range(1, n, 2):
+        if vp[x] == -1:
+            assert bdry[x] == angle_excess[x] == 0
 
     found = False
     for e in range(n):
@@ -98,44 +102,22 @@ def one_edge_completion(t, angle_excess, colouring):
     if not found:
         raise ValueError('already complete')
 
-
-    # add an edge (m, M) and possibly shift e
-    newvp = array('i', vp)
-    newep = array('i', ep)
-    newfp = array('i', fp)
-
-    newvp.insert(m, -1)
-    newvp.insert(M, -1)
-    newep.insert(m, -1)
-    newep.insert(M, -1)
-    newfp.insert(m, -1)
-    newfp.insert(M, -1)
-
-    newep[m] = M
-    newep[M] = m
-
-    for ee in range(n + 2):
-        if (ee != m) and (ee != M):
-            vpe = newvp[ee]
-            fpe = newfp[ee]
-            epe = newep[ee]
-            if fpe > m - 1:
-                newfp[ee] = fpe + 2
-            if vpe > m - 1:
-                newvp[ee] = vpe + 2
-            if epe > m - 1:
-                newep[ee] = epe + 2
-
-    if e > m - 1:
-        e = e + 2
-    E = newep[e]
+    E = e ^ 1 if vp[e ^ 1] != -1 else e
+    a = vp[e]
+    A = a ^ 1 if vp[a ^ 1] != -1 else a
+    b = fp[e]
+    c = vp[A]
+    C = c ^ 1 if vp[c ^ 1] != -1 else c
 
     # build the new triangle face (e, m, A)
-    a = newvp[e]
-    A = newep[a]
-    b = newfp[e]
-    c = newvp[A]
-    C = newep[c]
+    newvp = array('i', vp)
+    newfp = array('i', fp)
+
+    newvp.append(-1)
+    newvp.append(-1)
+    newfp.append(-1)
+    newfp.append(-1)
+
     newfp[e] = m
     newfp[m] = A
     newvp[A] = M
@@ -145,7 +127,6 @@ def one_edge_completion(t, angle_excess, colouring):
     assert is_bigon == (b == A)
 
     if is_bigon:
-        assert b == A
         newfp[M] = M
         newvp[M] = m
         newvp[b] = M
@@ -157,8 +138,8 @@ def one_edge_completion(t, angle_excess, colouring):
 
     # new bdry: m is internal, M is boundary and e and A becomes internal
     newbdry = bdry[:]
-    newbdry.insert(m, 0)
-    newbdry.insert(M, 1)
+    newbdry.append(0)
+    newbdry.append(1)
 
     assert newbdry[e] == 1
     assert newbdry[A] == 1
@@ -166,31 +147,30 @@ def one_edge_completion(t, angle_excess, colouring):
 
     # build new colourings
     colouring1 = array('i', colouring)
-    colouring1.insert(m, -1)
-    colouring1.insert(M, -1)
+    colouring1.append(-1)
 
     # claim: a and e must have different colours
     # (so that both RED and BLUE are allowed for the new edge (m, M)
-    assert colouring1[a] != colouring1[e]
+    assert colouring1[a // 2] != colouring1[e // 2]
 
     colouring2 = colouring1[:]
-    colouring1[m] = colouring1[M] = RED
-    colouring2[m] = colouring2[M] = BLUE
+    colouring1[-1] = RED
+    colouring2[-1] = BLUE
 
     # build new angle excesses
     angle_excess1 = angle_excess[:]
-    angle_excess1.insert(m, -1)
-    angle_excess1.insert(M, -1)
+    angle_excess1.append(-1)
+    angle_excess1.append(-1)
     angle_excess1[M] = angle_excess1[A]
     angle_excess1[A] = angle_excess1[m] = 0
 
     angle_excess2 = angle_excess1[:]
 
     if not is_bigon:
-        col_a = colouring1[a]
-        col_b = colouring1[b]
-        col_c = colouring1[c]
-        col_e = colouring1[e]
+        col_a = colouring1[a // 2]
+        col_b = colouring1[b // 2]
+        col_c = colouring1[c // 2]
+        col_e = colouring1[e // 2]
 
         if col_a == BLUE:
             assert col_e == RED
@@ -205,7 +185,11 @@ def one_edge_completion(t, angle_excess, colouring):
             if col_c == RED:
                 angle_excess2[M] -= 1
 
-    t = Triangulation.from_permutations(newvp, newep, newfp, (newbdry,), mutable=False, check=False)
+    t = Triangulation.from_permutations(newvp, newfp, (newbdry,), mutable=False, check=False)
+    for e in range(1, n + 2, 2):
+        if t._vp[e] == -1:
+            assert newbdry[e] == angle_excess1[e] == angle_excess2[e] == 0
+
     return ((t, angle_excess1, colouring1), (t, angle_excess2, colouring2))
 
 
@@ -229,19 +213,21 @@ class StrebelGraph(Constellation):
     """
     __slots__ = ['_excess']
 
-    def __init__(self, faces, mutable=False, check=True):
+    def __init__(self, faces, excess=None, mutable=False, check=True):
         if isinstance(faces, StrebelGraph):
             fp = faces.face_permutation(copy=True)
             ep = faces.edge_permutation(copy=True)
-            bdry = faces.boundary_vector(copy=True)
+            excess = faces.half_plane_excess(copy=True)
         else:
-            faces, boundary = str_to_cycles_and_data(faces)
-            fp, ep, bdry = face_edge_boundary_init(faces, boundary)
+            fp, excess = face_boundary_init(faces, excess)
 
-        Constellation.__init__(self, len(fp), None, ep, fp, (bdry,), mutable, check)
+        Constellation.__init__(self, len(fp) // 2, None, fp, (excess,), (), mutable, check)
 
     def _set_data_pointers(self):
-        self._excess = self._data[0]
+        self._excess = self._half_edges_data[0]
+
+    def half_plane_excess(self, copy=True):
+        return self._excess[:] if copy else self._excess
 
     boundary_faces = Constellation.faces
     num_boundary_faces = Constellation.num_faces
@@ -259,9 +245,9 @@ class StrebelGraph(Constellation):
             sage: from veerer import StrebelGraph
             sage: T = StrebelGraph("(0,1,2)(~0,~1:1,~2:2)")
             sage: str(T)
-            'StrebelGraph("(0,1,2)(~2:2,~0,~1:1)")'
+            'StrebelGraph("(0,1,2)(~0,~1:1,~2:2)")'
         """
-        bdry_cycles = perm_cycles_to_string(perm_cycles(self._fp, n=self._n), involution=self._ep, data=self._excess)
+        bdry_cycles = perm_cycles_to_string(perm_cycles(self._fp, 2*self._ne), edge_like=True, data=self._excess)
         return 'StrebelGraph("%s")' % bdry_cycles
 
     def __repr__(self):
@@ -282,7 +268,7 @@ class StrebelGraph(Constellation):
         ep = self._ep
         vp = self._vp
 
-        if any(e == ep[e] for e in range(self._n)):
+        if self.has_folded_edge():
             return (False, None) if certificate else False
 
         # Try to give a coherent holonomy with signs for each half edge. To
@@ -292,10 +278,10 @@ class StrebelGraph(Constellation):
         # The half-edge orientations is propagated walking along edges and
         # vertices.
 
-        oris = [None] * self._n  # list of orientations decided so far
+        oris = [None] * (2 * self._ne)  # list of orientations decided so far
         oris[0] = True
-        oris[ep[0]] = False
-        q = [0, ep[0]]  # queue of half-edges to be treated
+        oris[ep(0)] = False
+        q = [0, ep(0)]  # queue of half-edges to be treated
 
         while q:
             e = q.pop()
@@ -308,10 +294,10 @@ class StrebelGraph(Constellation):
                     o = not o
 
                 if oris[f] is None:
-                    assert oris[ep[f]] is None
+                    assert oris[ep(f)] is None
                     oris[f] = o
-                    oris[ep[f]] = not o
-                    q.append(ep[f])
+                    oris[ep(f)] = not o
+                    q.append(ep(f))
                 elif oris[f] != o:
                     return (False, None) if certificate else False
                 else:
@@ -366,43 +352,7 @@ class StrebelGraph(Constellation):
         from surface_dynamics import Stratum
         return Stratum(hol + [-1] * num_folded_edges + mer, k)
 
-    @staticmethod
-    def from_face_edge_perms(vp, ep, fp=None, boundary=None, mutable=False, check=True):
-        r"""
-        Deprecated methods.
-
-        Use the classmethod ``Constellation.from_permutations`` instead.
-
-        EXAMPLES::
-
-            sage: from veerer import *
-            sage: from array import array
-            sage: vp = array('i', [1, 3, 0, 2])
-            sage: ep = array('i', [3, 2, 1, 0])
-            sage: StrebelGraph.from_face_edge_perms(vp, ep, boundary = array('i', [1, 0, 0, 1]))
-            doctest:warning
-            ...
-            UserWarning: the method StrebelGraph.from_face_edge_perms is deprecated; use the classmethod from_permutations instead
-            StrebelGraph("(0:1,1,~0:1,~1)")
-        """
-        import warnings
-        warnings.warn('the method StrebelGraph.from_face_edge_perms is deprecated; use the classmethod from_permutations instead')
-
-        n = len(vp)
-
-        if fp is None:
-            fp = array('i', [-1] * n)
-            for i in range(n):
-                fp[ep[vp[i]]] = i
-
-        if boundary is None:
-            bdry = array('i', [0] * n)
-        else:
-            bdry = array('i', boundary)
-
-        return StrebelGraph.from_permutations(vp, ep, fp, (bdry,), mutable, check)
-
-    def abelian_cover(self, mutable=False):
+    def abelian_cover(self, mutable=False, involution_and_quotient=False):
         r"""
         Return the orientation double cover of this Strebel graph.
 
@@ -411,32 +361,55 @@ class StrebelGraph(Constellation):
             sage: from veerer import StrebelGraph
             sage: sg = StrebelGraph("(0:1,1,2)(~2,~3,~4:1)(3,~1:1,5)(~0:1,4,~5)")
             sage: sg.abelian_cover()
-            StrebelGraph("(0:1,1,2,~11:1,~10,~9)(3,~1:1,~6,~8,10:1,5)(4,6,~0:1,~7,~5,11:1)(7:1,9,8,~4:1,~2,~3)")
+            StrebelGraph("(0:1,1,2,~6:1,~7,~8)(~0:1,~10,~5,6:1,4,11)(~1:1,~11,~9,7:1,5,3)(~2,~3,10:1,8,9,~4:1)")
             sage: print(sg.stratum(), sg.abelian_cover().stratum())  # optional - surface_dynamics
             Q_0(2^4, -3^4) H_1(1^8, -2^4)
+
+            sage: StrebelGraph("(0)").abelian_cover()
+            StrebelGraph("(0)(~0)")
+            sage: StrebelGraph("(0:1)").abelian_cover()
+            StrebelGraph("(0:1,~0:1)")
+            sage: StrebelGraph("(0,~0)").abelian_cover()
+            StrebelGraph("(0,1)(~0,~1)")
         """
-        n = self._n
         vp = self._vp
-        ep = self._ep
 
-        ep_cov = array('i', [-1] * (2 * n))
-        vp_cov = array('i', [-1] * (2 * n))
-        for e in range(n):
-            f = ep[e]
-            ep_cov[e] = f + n
-            ep_cov[f + n] = e
+        n = (4 * self._ne - 2 * self.num_folded_edges())
 
+        j = 2 * self._ne
+        inv = array('i', [-1] * (2 * self._ne))  # involution on the cover
+        quot = array('i', [-1] * (2 * self._ne))  # quotient map
+        excess_cov = array('i', [-1] * n)
+        for e in range(self._ne):
+            quot[2 * e] = 2 * e
+            if self._vp[2 * e + 1] == -1:
+                inv[2 * e] = 2 * e + 1
+                excess_cov[2 * e] = excess_cov[2 * e + 1] = self._excess[2 * e]
+                quot[2 * e + 1] = 2 * e
+            else:
+                excess_cov[2 * e] = excess_cov[j + 1] = self._excess[2 * e]
+                excess_cov[2 * e + 1] = excess_cov[j] = self._excess[2 * e + 1]
+                inv[2 * e] = j + 1
+                inv[2 * e + 1] = j
+                j += 2
+                quot[2 * e + 1] = 2 * e + 1
+                quot[j] = 2 * e + 1
+                quot[j + 1] = 2 * e
+
+        vp_cov = array('i', [-1] * n)
+        for e in range(2 * self._ne):
             f = vp[e]
-            if self._excess[e] % 2 == 0:
-                vp_cov[e] = f + n
-                vp_cov[e + n] = f
+            if f == -1:
+                continue
+            if ((self._excess[e] % 2 == 0) + (e % 2 != f % 2)) % 2:
+                vp_cov[e] = inv[f]
+                vp_cov[inv[e]] = f
             else:
                 vp_cov[e] = f
-                vp_cov[e + n] = f + n
+                vp_cov[inv[e]] = inv[f]
 
-        excess_cov = self._excess * 2
-
-        return StrebelGraph.from_permutations(vp_cov, ep_cov, None, (excess_cov,), mutable=mutable, check=False)
+        sg_cov = StrebelGraph.from_permutations(vp_cov, None, (excess_cov,), mutable=mutable, check=False)
+        return (sg_cov, inv, quot) if involution_and_quotient else sg_cov
 
     def as_linear_family(self):
         r"""
@@ -447,7 +420,7 @@ class StrebelGraph(Constellation):
             sage: from veerer import StrebelGraph
             sage: G = StrebelGraph("(0,1,2)(~0,~1:1,~2:2)")
             sage: G.as_linear_family()
-            StrebelGraphLinearFamily("(0,1,2)(~2:2,~0,~1:1)", [(1, 0, 0), (0, 1, 0), (0, 0, 1)])
+            StrebelGraphLinearFamily("(0,1,2)(~0,~1:1,~2:2)", [(1, 0, 0), (0, 1, 0), (0, 0, 1)])
         """
         from sage.matrix.special import identity_matrix
         from .linear_family import StrebelGraphLinearFamily
@@ -467,28 +440,32 @@ class StrebelGraph(Constellation):
             sage: G = StrebelGraph("(0,1,2)(~0,~1:1,~2:2)")
             sage: for colouring in G.colourings():
             ....:     print(colouring, G.angle_excess(colouring))
-            array('i', [1, 1, 1, 1, 1, 1]) array('i', [1, 1, 1, 3, 2, 1])
-            array('i', [1, 1, 2, 2, 1, 1]) array('i', [0, 1, 1, 3, 2, 0])
-            array('i', [1, 2, 1, 1, 2, 1]) array('i', [1, 1, 0, 2, 2, 1])
-            array('i', [1, 2, 2, 2, 2, 1]) array('i', [0, 1, 1, 3, 2, 0])
-            array('i', [2, 1, 1, 1, 1, 2]) array('i', [1, 0, 1, 3, 1, 1])
-            array('i', [2, 1, 2, 2, 1, 2]) array('i', [1, 0, 1, 3, 1, 1])
-            array('i', [2, 2, 1, 1, 2, 2]) array('i', [1, 1, 0, 2, 2, 1])
-            array('i', [2, 2, 2, 2, 2, 2]) array('i', [1, 1, 1, 3, 2, 1])
+            array('i', [1, 1, 1]) array('i', [1, 1, 1, 2, 1, 3])
+            array('i', [1, 1, 2]) array('i', [0, 0, 1, 2, 1, 3])
+            array('i', [1, 2, 1]) array('i', [1, 1, 1, 2, 0, 2])
+            array('i', [1, 2, 2]) array('i', [0, 0, 1, 2, 1, 3])
+            array('i', [2, 1, 1]) array('i', [1, 1, 0, 1, 1, 3])
+            array('i', [2, 1, 2]) array('i', [1, 1, 0, 1, 1, 3])
+            array('i', [2, 2, 1]) array('i', [1, 1, 1, 2, 0, 2])
+            array('i', [2, 2, 2]) array('i', [1, 1, 1, 2, 1, 3])
+
+            sage: G = StrebelGraph("(0,1,~1)")
+            sage: for colouring in G.colourings():
+            ....:     print(colouring, G.angle_excess(colouring))
         """
         # remark: red-red corners with angle excess 0 and 1 both correspond
         # to zero half-plane excess.
         # claim: it is impossible to have a red-red corner with 0 angle
         # excess in a strebel graph.
 
-        n = self._n
+        n = 2 * self._ne
         vp = self._vp
         alpha = array('i', self._excess)
 
         for e in range(n):
             e1 = vp[e]
-            if (slope == VERTICAL and (colouring[e] != RED or colouring[e1] != BLUE)) or \
-               (slope == HORIZONTAL and (colouring[e] != BLUE or colouring[e1] != RED)):
+            if (e1 != -1) and ((slope == VERTICAL and (colouring[e // 2] != RED or colouring[e1 // 2] != BLUE)) or \
+               (slope == HORIZONTAL and (colouring[e // 2] != BLUE or colouring[e1 // 2] != RED))):
                 alpha[e] += 1
 
         return alpha
@@ -505,12 +482,14 @@ class StrebelGraph(Constellation):
 
             sage: G = StrebelGraph("(0,1,2)(~0,~1:1,~2:2)")
             sage: list(G.colourings())
-            [array('i', [1, 1, 1, 1, 1, 1]),
-             array('i', [1, 1, 2, 2, 1, 1]),
-             ...
-             array('i', [2, 2, 1, 1, 2, 2]),
-             array('i', [2, 2, 2, 2, 2, 2])]
-
+            [array('i', [1, 1, 1]),
+             array('i', [1, 1, 2]),
+             array('i', [1, 2, 1]),
+             array('i', [1, 2, 2]),
+             array('i', [2, 1, 1]),
+             array('i', [2, 1, 2]),
+             array('i', [2, 2, 1]),
+             array('i', [2, 2, 2])]
 
             sage: G = StrebelGraph("(0,1,2,3)")
             sage: list(G.colourings())
@@ -520,14 +499,7 @@ class StrebelGraph(Constellation):
              array('i', [2, 2, 2, 1]),
              array('i', [2, 2, 2, 2])]
         """
-        ne = self.num_edges()
-        m = self.num_folded_edges()
-        ep = self._ep
-
-        for colouring in itertools.product([RED, BLUE], repeat=ne):
-            colouring = array('i', colouring)
-            colouring.extend([colouring[ep[e]] for e in range(ne, self._n)])
-            yield colouring
+        return (array('i', x) for x in itertools.product([RED, BLUE], repeat=self._ne))
 
     def _set_strebel_constraints(self, insert, x):
         for v in x:
@@ -576,11 +548,13 @@ class StrebelGraph(Constellation):
             sage: examples.append(StrebelGraph("(~1:1,~0,1:1,0)"))
             sage: examples.append(StrebelGraph("(0,~1)(1)(~0)"))
             sage: examples.append(StrebelGraph("(0:2)(1:2)(~1,~0:2)"))
+            sage: examples.append(StrebelGraph("(0,1,2,3)"))
             sage: for G in examples:  # optional - surface_dynamics
             ....:     print(G.stratum())
             H_1(2, -2)
             H_0(1, -1^3)
             H_0(4, -2^3)
+            Q_0(2, -1^4, -2)
 
             sage: for G in examples:
             ....:     print(G)
@@ -608,9 +582,13 @@ class StrebelGraph(Constellation):
         def is_complete(t, angle_excess, colouring):
             return not any(b1 and b2 == 0 for (b1, b2) in zip(t._bdry, angle_excess))
 
-        n = self._n
+        n = 2 * self._ne
         angle_excess = self.angle_excess(colouring, slope=slope)
-        t0 = Triangulation.from_permutations(self._vp[:], self._ep[:], self._fp[:], (array('i', [1] * n),), mutable=False, check=True)
+        bdry = array('i', [1] * n)
+        for e in range(1, n, 2):
+            if self._vp[e] == -1:
+                bdry[e] = 0
+        t0 = Triangulation.from_permutations(self._vp[:], self._fp[:], (bdry,), mutable=False, check=True)
         T = (t0, angle_excess, colouring)
         complete = []
         incomplete = []
@@ -630,10 +608,9 @@ class StrebelGraph(Constellation):
         from .veering_triangulation import VeeringTriangulation
         for t, angle_excess, colouring in complete:
             vp = t._vp
-            ep = t._ep
             fp = t._fp
             cols = array('i', colouring)
-            yield VeeringTriangulation.from_permutations(vp, ep, fp, (angle_excess, cols), mutable=mutable, check=True)
+            yield VeeringTriangulation.from_permutations(vp, fp, (angle_excess,), (cols,), mutable=mutable, check=True)
 
     def delaunay_triangulations(self, colouring, slope=VERTICAL, mutable=False, backend=None):
         r"""
@@ -734,8 +711,7 @@ class StrebelGraph(Constellation):
 
         for i, f in enumerate(self.faces()):
             for e in f:
-                j = e if e < ep[e] else ep[e]
-                r[i, j] += orientations[e]
+                r[i, e // 2] += orientations[e]
 
         return r
 

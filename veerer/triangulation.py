@@ -31,14 +31,12 @@ from sage.structure.richcmp import op_LT, op_LE, op_EQ, op_NE, op_GT, op_GE, ric
 
 from .permutation import (perm_init, perm_check, perm_cycles, perm_dense_cycles,
                           perm_invert, perm_conjugate, perm_cycle_string, perm_cycles_lengths,
-                          perm_cycles_to_string, perm_on_list,
-                          perm_num_cycles, str_to_cycles, str_to_cycles_and_data, perm_compose, perm_from_base64_str,
-                          uint_base64_str, uint_from_base64_str, perm_base64_str,
-                          perms_are_transitive, triangulation_relabelling_from)
+                          perm_cycles_to_string, perm_on_list, perm_relabel_on_edges,
+                          perm_num_cycles, str_to_cycles, str_to_cycles_and_data)
 from .constellation import Constellation
 
 
-def face_edge_boundary_init(faces, boundary=None):
+def face_boundary_init(faces, boundary=None):
     r"""
     Function to simplify initialization of a constellation with boundaries.
 
@@ -50,21 +48,16 @@ def face_edge_boundary_init(faces, boundary=None):
 
     EXAMPLES::
 
-        sage: from veerer.triangulation import face_edge_boundary_init  # random output due to deprecation warnings from realalg
+        sage: from veerer.triangulation import face_boundary_init  # random output due to deprecation warnings from realalg
 
-        sage: face_edge_boundary_init('(0,1,2)(~0,~1,~2)')
-        (array('i', [1, 2, 0, 5, 3, 4]), array('i', [5, 4, 3, 2, 1, 0]), array('i', [0, 0, 0, 0, 0, 0]))
-
-        sage: face_edge_boundary_init('(0,1,2)')
-        (array('i', [1, 2, 0]), array('i', [0, 1, 2]), array('i', [0, 0, 0]))
-
-        sage: face_edge_boundary_init('(0,1,2)(~0)(~1)(~2)')
-        (array('i', [1, 2, 0, 3, 4, 5]), array('i', [5, 4, 3, 2, 1, 0]), array('i', [0, 0, 0, 0, 0, 0]))
-
-        sage: face_edge_boundary_init('(0:1,1:2,2)(~0)(~1)(~2)')
-        (array('i', [1, 2, 0, 3, 4, 5]),
-         array('i', [5, 4, 3, 2, 1, 0]),
-         array('i', [1, 2, 0, 0, 0, 0]))
+        sage: face_boundary_init('(0,1,2)(~0,~1,~2)')
+        (array('i', [2, 3, 4, 5, 0, 1]), array('i', [0, 0, 0, 0, 0, 0]))
+        sage: face_boundary_init('(0,1,2)')
+        (array('i', [2, -1, 4, -1, 0, -1]), array('i', [0, 0, 0, 0, 0, 0]))
+        sage: face_boundary_init('(0,1,2)(~0)(~1)(~2)')
+        (array('i', [2, 1, 4, 3, 0, 5]), array('i', [0, 0, 0, 0, 0, 0]))
+        sage: face_boundary_init('(0:1,1:2,2)(~0)(~1)(~2)')
+        (array('i', [2, 1, 4, 3, 0, 5]), array('i', [1, 0, 2, 0, 0, 0]))
 
     TESTS:
 
@@ -73,7 +66,7 @@ def face_edge_boundary_init(faces, boundary=None):
         sage: f1 = "(0,~5,4)(3,5,6)(1,2,~6)"
         sage: f2 = "(0,6,5)(1,2,~6)(3,4,~5)"
         sage: f3 = "(6,4,3)(~6,~5,1)(5,0,2)"
-        sage: assert face_edge_boundary_init(f1)[1] == face_edge_boundary_init(f2)[1] == face_edge_boundary_init(f3)[1]
+        sage: assert face_boundary_init(f1)[1] == face_boundary_init(f2)[1] == face_boundary_init(f3)[1]
     """
     if boundary is None:
         if isinstance(faces, str):
@@ -104,66 +97,42 @@ def face_edge_boundary_init(faces, boundary=None):
 
     pos.sort()
     neg.sort(reverse=True)
+    if pos[0] != 0:
+        raise ValueError("missing half-edge 0")
     for i in range(len(pos) - 1):
         if pos[i] == pos[i+1]:
-            raise ValueError("repeated edge label {}".format(pos[i]))
+            raise ValueError("repeated half-edge {}".format(pos[i]))
         elif pos[i + 1] != pos[i] + 1:
-            raise ValueError("missing edge label {} (pos={})".format(pos[i] + 1, pos))
+            raise ValueError("missing half-edge {}".format(pos[i] + 1))
     for i in range(len(neg) - 1):
         if neg[i] == neg[i+1]:
-            raise ValueError("repeated edge label ~{}".format(~neg[i]))
+            raise ValueError("repeated half-edge ~{}".format(~neg[i]))
 
     # number of half edges
-    n = len(pos) + len(neg)
+    ne = len(pos)
 
-    # build the edge permutation ep
-    ep = [-1] * n  # edge permutation
-    m = n - 1   # label available at the back
-    for e in neg:
-        E = ~e
-        e = m
-        if ep[E] != -1:
-            raise ValueError("inconsistent permutation data")
-        m -= 1
-        ep[E] = e
-        ep[e] = E
-    for i in range(n):
-        if ep[i] == -1:
-            ep[i] = i
+    def to_half_edge(x):
+        return 2 * x if x >= 0 else 2 * ~x + 1
 
-    fp = [-1] * n  # face permutation
+    # build the face permutation
+    fp = [-1] * (2 * ne)
     for c in l:
         k = len(c)
         for i in range(k):
-            e0 = c[i]
-            e1 = c[(i + 1) % k]
-            if e0 < 0:
-                e0 = ep[~e0]
-            if e1 < 0:
-                e1 = ep[~e1]
+            e0 = to_half_edge(c[i])
+            e1 = to_half_edge(c[(i + 1) % k])
             fp[e0] = e1
+    fp = perm_init(fp, partial=True)
 
-    fp = perm_init(fp)
-    ep = perm_init(ep)
-
+    # construct the boundary
     if boundary is None:
-        boundary = array('i', [0] * n)
+        boundary = array('i', [0] * (2 * ne))
     elif isinstance(boundary, (tuple, list, array)):
-        if len(boundary) != n:
+        if len(boundary) != 2 * ne:
             raise ValueError('invalid input argument')
         boundary = array('i', boundary)
     elif isinstance(boundary, dict):
-        edge_to_half_edge = {}
-        for j, c in enumerate(perm_cycles(ep, n)):
-            if len(c) == 1:
-                edge_to_half_edge[j] = c[0]
-            elif len(c) == 2:
-                edge_to_half_edge[j] = c[0]
-                edge_to_half_edge[~j] = c[1]
-            else:
-                raise ValueError
-
-        output = array('i', [0] * n)
+        output = array('i', [0] * (2 * ne))
         for e, v in boundary.items():
             if isinstance(e, str):
                 if not e:
@@ -174,14 +143,14 @@ def face_edge_boundary_init(faces, boundary=None):
                     e = int(e)
             elif isinstance(e, numbers.Integral):
                 e = int(e)
-            if e > n:
-                raise ValueError('keys must be valid edges, got {!r}'.format(e))
-            output[edge_to_half_edge[e]] = v
+            if e not in pos and e not in neg:
+                raise ValueError('keys in the bdry dictionary must be valid half-edges, got {!r}'.format(e))
+            output[to_half_edge(e)] = v
         boundary = output
     else:
         raise TypeError('invalid boundary data')
 
-    return fp, ep, boundary
+    return fp, boundary
 
 
 # NOTE: we don't really care that we have a triangulation here. When
@@ -261,7 +230,7 @@ class Triangulation(Constellation):
 
         sage: from veerer import *
 
-        sage: T = Triangulation("(~2, 1, ~0)(~1, 0, 2)", mutable=True)
+        sage: T = Triangulation("(0,2,~1)(~0,~2,1)", mutable=True)
         sage: T.genus()
         1
         sage: T.num_triangles()
@@ -270,16 +239,16 @@ class Triangulation(Constellation):
         1
         sage: T.flip(0)
         sage: T
-        Triangulation("(0,~1,~2)(1,2,~0)")
+        Triangulation("(0,~1,~2)(~0,1,2)")
         sage: T.flip(0)
         sage: T
-        Triangulation("(0,~2,1)(2,~1,~0)")
+        Triangulation("(0,~2,1)(~0,2,~1)")
         sage: T.flip(0)
         sage: T
-        Triangulation("(0,1,2)(~2,~0,~1)")
+        Triangulation("(0,1,2)(~0,~1,~2)")
         sage: T.flip(0)
         sage: T
-        Triangulation("(0,2,~1)(1,~0,~2)")
+        Triangulation("(0,2,~1)(~0,~2,1)")
 
         sage: T.set_immutable()
         sage: T.flip(0)
@@ -295,16 +264,16 @@ class Triangulation(Constellation):
     Examples with boundaries::
 
         sage: Triangulation("(0,1,2)(~0)(~1)(~2)", boundary={"~0": 1, "~1": 1, "~2": 1})
-        Triangulation("(0,1,2)(~2:1)(~1:1)(~0:1)")
+        Triangulation("(0,1,2)(~0:1)(~1:1)(~2:1)")
         sage: Triangulation("(0,1,2)(~0:1)(~1:1,~2:1)")
-        Triangulation("(0,1,2)(~2:1,~1:1)(~0:1)")
+        Triangulation("(0,1,2)(~0:1)(~1:1,~2:1)")
         sage: Triangulation("(0,1,2)(~0,~1,~2)", boundary={"~0": 0})
-        Triangulation("(0,1,2)(~2,~0,~1)")
+        Triangulation("(0,1,2)(~0,~1,~2)")
 
     Example with boundary and folded edges::
 
         sage: Triangulation("(0,1,2)(~1:1,~2:1)")
-        Triangulation("(0,1,2)(~2:1,~1:1)")
+        Triangulation("(0,1,2)(~1:1,~2:1)")
 
     Examples with invalid boundaries::
 
@@ -329,51 +298,15 @@ class Triangulation(Constellation):
                 else:
                     triangles = list(triangles)
                 triangles.extend(boundary_cycles)
-            fp, ep, bdry = face_edge_boundary_init(triangles, boundary)
+            fp, bdry = face_boundary_init(triangles, boundary)
 
-        Constellation.__init__(self, len(fp), None, ep, fp, (bdry,), mutable, check)
+        Constellation.__init__(self, len(fp) // 2, None, fp, (bdry,), (), mutable, check)
 
     def _set_data_pointers(self):
-        self._bdry = self._data[0]
+        self._bdry = self._half_edges_data[0]
 
-    @staticmethod
-    def from_face_edge_perms(fp, ep, vp=None, boundary=None, mutable=False, check=True):
-        r"""
-        INPUT:
-
-        - ``fp``, ``ep``, ``vp`` -- the face, edge and vertex permutation
-
-        - ``check`` - boolean (default: ``True``) - if set to ``False`` no
-          check are performed
-
-        EXAMPLES::
-
-            sage: from veerer import Triangulation
-            sage: from array import array
-
-            sage: fp = array('i', [1, 2, 0, 4, 8, 6, 7, 5, 3])
-            sage: ep = array('i', [8, 7, 2, 3, 4, 5, 6, 1, 0])
-            sage: vp = array('i', [2, 8, 7, 0, 3, 1, 5, 6, 4])
-            sage: Triangulation.from_face_edge_perms(fp, ep, vp)
-            doctest:warning
-            ...
-            UserWarning: the method Triangulation.from_face_edge_perms is deprecated; use the classmethod from_permutations instead
-            Triangulation("(0,1,2)(3,4,~0)(5,6,~1)")
-        """
-        import warnings
-        warnings.warn('the method Triangulation.from_face_edge_perms is deprecated; use the classmethod from_permutations instead')
-
-        n = len(fp)
-        if vp is None:
-            vp = array('i', [-1] * n)
-            for i in range(n):
-                vp[fp[ep[i]]] = i
-        if boundary is None:
-            bdry = array('i', [0] * n)
-        else:
-            bdry = array('i', boundary)
-
-        return Triangulation.from_permutations(vp, ep, fp, (bdry,), mutable, check)
+    def boundary_vector(self, copy=True):
+        return self._bdry[:] if copy else self._bdry
 
     def _check(self, error=RuntimeError):
         r"""
@@ -384,7 +317,7 @@ class Triangulation(Constellation):
             sage: Triangulation("(0,1,3)")
             Traceback (most recent call last):
             ...
-            ValueError: missing edge label 2 (pos=[0, 1, 3])
+            ValueError: missing half-edge 2
 
             sage: Triangulation("(0,1,~2)")
             Traceback (most recent call last):
@@ -397,24 +330,21 @@ class Triangulation(Constellation):
             ValueError: non-trianglular internal face starting at half-edge i=0
 
             sage: from array import array
-            sage: fp = array('i', [1,2,0])
-            sage: ep = array('i', [0,1,2])
-            sage: vp = array('i', [1,2,0])
-            sage: Triangulation.from_face_edge_perms(fp, ep, vp)
+            sage: fp = array('i', [2,-1,4,-1,0,-1])
+            sage: vp = array('i', [2,-1,4,-1,0,-1])
+            sage: Triangulation.from_permutations(vp, fp, (array('i', [0]*6),))
             Traceback (most recent call last):
             ...
             ValueError: fev relation not satisfied at half-edge i=0
 
-            sage: fp = array('i', [1,2,0])
-            sage: ep = array('i', [1,2,0])
-            sage: vp = array('i', [1,2,0])
-            sage: Triangulation.from_face_edge_perms(fp, ep, vp)
+            sage: fp = array('i', [2,-1,4,-1,0,-1])
+            sage: vp = array('i', [2,-1,4,-1,0,-1])
+            sage: Triangulation.from_permutations(vp, fp, (array('i', [0]*6),))
             Traceback (most recent call last):
             ...
-            ValueError: invalid edge permutation at half-edge i=0 (vp=array('i', [1, 2, 0]) ep=array('i', [1, 2, 0]) fp=array('i', [1, 2, 0]))
+            ValueError: fev relation not satisfied at half-edge i=0
         """
         Constellation._check(self, error)
-        n = self._n
 
         for face in self.faces():
             i = face[0]
@@ -448,7 +378,7 @@ class Triangulation(Constellation):
         from .features import flipper_feature
         flipper_feature.require()
 
-        if any(self._data[0]):
+        if any(self._bdry):
             raise ValueError('triangulation has boundary')
 
         import flipper
@@ -508,7 +438,7 @@ class Triangulation(Constellation):
         r"""
         Return the number of triangles.
         """
-        return sum(self._data[0][c[0]] == 0 for c in perm_cycles(self._fp))
+        return sum(self._bdry[c[0]] == 0 for c in perm_cycles(self._fp))
 
     def triangles(self):
         r"""
@@ -519,10 +449,13 @@ class Triangulation(Constellation):
             sage: from veerer import Triangulation
 
             sage: T = Triangulation("(0,1,2)(3,4,5)(~0,~3,6)")
-            sage: T.faces()
-            [[0, 1, 2], [3, 4, 5], [6, 8, 7]]
+            sage: T.triangles()
+            [[0, 2, 4], [1, 7, 12], [6, 8, 10]]
+            sage: T = Triangulation("(0,1,2)(~0)(~1,~2)", {"~0": 1, "~1": 1, "~2": 1})
+            sage: T.triangles()
+            [[0, 2, 4]]
         """
-        return [c for c in perm_cycles(self._fp, True, self._n) if self._data[0][c[0]] == 0]
+        return [c for c in perm_cycles(self._fp, True, 2 * self._ne) if self._bdry[c[0]] == 0]
 
     def boundary_faces(self):
         r"""
@@ -537,9 +470,9 @@ class Triangulation(Constellation):
             []
             sage: T = Triangulation("(0,1,2)(~0)(~1,~2)", {"~0": 1, "~1": 1, "~2": 1})
             sage: T.boundary_faces()
-            [[3, 4], [5]]
+            [[1], [3, 5]]
         """
-        return [c for c in perm_cycles(self._fp, True, self._n) if self._data[0][c[0]]]
+        return [c for c in perm_cycles(self._fp, True, 2 * self._ne) if self._bdry[c[0]]]
 
     def num_boundary_faces(self):
         r"""
@@ -561,7 +494,7 @@ class Triangulation(Constellation):
             sage: Triangulation(fp, bdry).num_boundary_faces()
             1
         """
-        return sum(bool(self._data[0][c[0]]) for c in perm_cycles(self._fp))
+        return sum(bool(self._bdry[c[0]]) for c in perm_cycles(self._fp))
 
     def euler_characteristic(self):
         r"""
@@ -644,11 +577,11 @@ class Triangulation(Constellation):
             sage: from veerer import *
             sage: T = Triangulation("(0,1,2)(~0,~1,~2)")
             sage: str(T)
-            'Triangulation("(0,1,2)(~2,~0,~1)")'
+            'Triangulation("(0,1,2)(~0,~1,~2)")'
         """
-        cycles = perm_cycles(self._fp, n=self._n)
-        face_cycles = perm_cycles_to_string([c for c in cycles if not self._data[0][c[0]]], involution=self._ep)
-        face_cycles += perm_cycles_to_string([c for c in cycles if self._data[0][c[0]]], involution=self._ep, data=self._data[0])
+        cycles = perm_cycles(self._fp, n=2 * self._ne)
+        face_cycles = perm_cycles_to_string([c for c in cycles if not self._bdry[c[0]]], edge_like=True)
+        face_cycles += perm_cycles_to_string([c for c in cycles if self._bdry[c[0]]], edge_like=True, data=self._bdry)
         return 'Triangulation("%s")' % face_cycles
 
     def __repr__(self):
@@ -673,14 +606,15 @@ class Triangulation(Constellation):
             V = m._row_ambient_module()
 
         # boundary condition
+        half_edges_to_edges = perm_dense_cycles(self._ep, 2 * self._ne)
         for F in self.faces():
             v = V.zero()
-            for e in F:
-                E = ep[e]
-                if E > e:
+            for h in F:
+                e = half_edges_to_edges[h]
+                if ep[h] > h:
                     v += m[e]
-                elif E < e:
-                    v -= m[E]
+                elif ep[h] < h:
+                    v -= m[e]
                 else:
                     # folded edge condition
                     # NOTE: it is stupid to keep all these zeros in
@@ -720,30 +654,32 @@ class Triangulation(Constellation):
         m = matrix(ZZ, nf + nfe, ne)
 
         # face equations
+        half_edges_to_edges = perm_dense_cycles(self._ep, 2 * self._ne)
         for i, f in enumerate(self.faces()):
-            for e in f:
-                if ep[e] == e:
+            for h in f:
+                e = half_edges_to_edges[h]
+                if ep[h] == h:
                     continue
-                elif ep[e] < e:
-                    m[i, ep[e]] -= 1
+                elif ep[h] < h:
+                    m[i, e] -= 1
                 else:
                     m[i, e] += 1
 
         # force the folded edge to have coefficient zero
-        for e in range(ne):
-            if ep[e] == e:
-                m[i, e] = 1
+        for j, edge in enumerate(self.edges()):
+            if len(edge) == 1:
+                m[i, j] = 1
                 i += 1
 
         # compute and check
-        h = m.right_kernel_matrix().transpose()
-        self._check_homology_matrix(h)
-        return h
+        hom = m.right_kernel_matrix().transpose()
+        self._check_homology_matrix(hom)
+        return hom
 
-    def flip_homological_action(self, e, m, twist=False):
+    def flip_homological_action(self, h, m, twist=False):
         r"""
         Multiply the matrix ``m`` on the left by the homology action of
-        the ``e``-flip.
+        the flip of the half-edge ``h``.
 
         The matrix ``m`` must have ``ne`` rows and each column represents a
         vector in cohomology (possibly twisted for quadratic differentials).
@@ -755,7 +691,7 @@ class Triangulation(Constellation):
 
         INPUT:
 
-        - ``e`` - a half edge
+        - ``h`` - a half edge
 
         - ``m`` - matrix
 
@@ -769,7 +705,7 @@ class Triangulation(Constellation):
             sage: T = Triangulation("(0,1,2)(~0,~1,~2)", mutable=True)
             sage: A = matrix([[1,1],[-1,0],[0,-1]])
             sage: B = copy(A)
-            sage: for e in [0,1,0,1]:
+            sage: for e in (0, 2, 0, 2):
             ....:     T.flip_homological_action(e, B)
             ....:     T.flip(e)
             sage: B
@@ -793,7 +729,7 @@ class Triangulation(Constellation):
             sage: w = [1,1,1,1,0,0]
             sage: A = matrix(ZZ, 3, 6, [u,v,w]).transpose()
             sage: B = copy(A)
-            sage: for i in (0,2,1,3):
+            sage: for i in (0, 4, 2, 6):
             ....:     T.flip_homological_action(i, B)
             ....:     T.flip(i)
             ....:     T._check_homology_matrix(B)
@@ -810,12 +746,13 @@ class Triangulation(Constellation):
         assert m.nrows() == ne
         ep = self._ep
 
-        if not twist and ep[e] == e:
+        if not twist and ep[h] == h:
             return
-        elif ep[e] < e:
-            e = ep[e]
 
-        a, b, c, d = self.square_about_edge(e)
+        half_edges_to_edges = perm_dense_cycles(self._ep, 2 * self._ne)
+        eh = half_edges_to_edges[h]
+
+        a, b, c, d = self.square_about_edge(h)
         # v_e use to be v_c + v_d and becomes v_d + v_a
         # v<----------u     v<----------u
         # |     a    ^^     |^    a     ^
@@ -837,20 +774,22 @@ class Triangulation(Constellation):
 
         A = ep[a]
         D = ep[d]
+        ea = half_edges_to_edges[a]
+        ed = half_edges_to_edges[d]
         if twist:
-            m[e] = (m[a] if a < A else m[A]) + (m[d] if d < D else m[D])
+            m[eh] = m[ea] + m[ed]
         else:
             if a == A and d == D:
                 try:
-                    m[e] = m.row_ambient_module().zero()
+                    m[eh] = m.row_ambient_module().zero()
                 except AttributeError:
-                    m[e] = m._row_ambient_module().zero()
+                    m[eh] = m._row_ambient_module().zero()
             elif a == A:
-                m[e] = m[d] if d < D else -m[D]
+                m[eh] = m[ed] if d < D else -m[eD]
             elif d == D:
-                m[e] = m[a] if a < A else -m[A]
+                m[eh] = m[ea] if a < A else -m[ea]
             else:
-                m[e] = (m[a] if a < A else -m[A]) + (m[d] if d < D else -m[D])
+                m[eh] = (m[ea] if a < A else -m[ea]) + (m[ed] if d < D else -m[ed])
 
     def relabel_homological_action(self, p, m, twist=False, check=True):
         r"""
@@ -888,16 +827,16 @@ class Triangulation(Constellation):
             ....:     T.relabel(p)
             ....:     T._check_homology_matrix(A)
         """
-        n = self._n
+        n = 2 * self._ne
         ne = self.num_edges()
+        ep = self.edge_permutation()
         if check and not perm_check(p, n):
-            p = perm_init(p, self._n, self._ep)
+            p = perm_init(p, 2 * self._ne, edge_like=True)
             if not perm_check(p, n):
                 raise ValueError('invalid relabeling permutation')
 
-        q = perm_invert(p)
-
-        ep = self._ep
+        r, s = perm_relabel_on_edges(ep, p, 2 * self._ne)
+        q = perm_invert(r, ne)
         seen = [False] * ne
 
         for e0 in range(ne):
@@ -905,36 +844,21 @@ class Triangulation(Constellation):
                 continue
 
             seen[e0] = True
-
             e = q[e0]
-            E = ep[e]
-            if E < e:
-                is_e0_neg = True
-                e, E = E, e
-            else:
-                is_e0_neg = False
             while not seen[e]:
                 assert e < ne
                 seen[e] = True
 
                 ee = q[e]
-                EE = ep[ee]
-
-                if EE < ee:
-                    is_neg = True
-                    ee, EE = EE, ee
-                else:
-                    is_neg = False
                 m.swap_rows(e, ee)
-                if is_neg and not twist:
+                if s[e] * s[ee] == -1 and not twist:
                     m[e] *= -1
 
                 e = ee
 
             # one more sign change?
-            assert e == e0
-            if is_e0_neg and not twist:
-                m[e] *= -1
+            if s[e0] == -1 and not twist:
+                m[e0] *= -1
 
     def is_flippable(self, e, check=True):
         r"""
@@ -949,9 +873,9 @@ class Triangulation(Constellation):
             True
             sage: T.is_flippable(1)
             True
-            sage: T.is_flippable(3)
+            sage: T.is_flippable(6)
             False
-            sage: T.is_flippable(4)
+            sage: T.is_flippable(8)
             True
 
         A torus with boundary::
@@ -959,19 +883,19 @@ class Triangulation(Constellation):
             sage: t = Triangulation("(0,2,1)(3,~1,~0)", boundary="(~3:1,~2:1)")
             sage: t.is_flippable(0)
             True
-            sage: t.is_flippable(1)
-            True
             sage: t.is_flippable(2)
+            True
+            sage: t.is_flippable(4)
             False
-            sage: t.is_flippable(3)
+            sage: t.is_flippable(5)
             False
         """
         if check:
             e = self._check_half_edge(e)
-        E = self._ep[e]
+        E = self._ep(e)
         a = self._fp[e]
         b = self._fp[a]
-        return not self._data[0][e] and not self._data[0][E] and a != E and b != E and self._data[0][e] == 0 and self._data[0][E] == 0
+        return not self._bdry[e] and not self._bdry[E] and a != E and b != E
 
     def flippable_edges(self):
         r"""
@@ -981,18 +905,16 @@ class Triangulation(Constellation):
 
             sage: T = Triangulation("(0,1,2)(~0,~1,~2)")
             sage: T.flippable_edges()
-            [0, 1, 2]
+            [0, 2, 4]
             sage: V = VeeringTriangulation(T, [RED, RED, BLUE])
             sage: V.flippable_edges()
-            [0, 1]
+            [0, 2]
 
             sage: T = Triangulation("(0,1,2)(~0,3,4)(~1,~2)(~3,~4)", {"~1": 1, "~2": 1, "~3": 1, "~4": 1})
             sage: T.flippable_edges()
             [0]
         """
-        n = self._n
-        ep = self._ep
-        return [e for e in range(n) if e <= ep[e] and self.is_flippable(e)]
+        return [e for e in range(0, 2 * self._ne, 2) if self.is_flippable(e)]
 
     def square_about_edge(self, e, check=True):
         r"""
@@ -1004,11 +926,11 @@ class Triangulation(Constellation):
 
             sage: T = Triangulation("(0,1,2)(~0,~1,~2)")
             sage: T.square_about_edge(0)
-            (1, 2, 4, 3)
+            (2, 4, 3, 5)
 
             sage: T = Triangulation("(0,1,2)")
             sage: T.square_about_edge(0)
-            (1, 2, 1, 2)
+            (2, 4, 2, 4)
         """
         # x<----------x
         # |     a    ^^
@@ -1027,8 +949,8 @@ class Triangulation(Constellation):
         if check:
             e = self._check_half_edge(e)
 
-        E = self._ep[e]
-        if check and (self._data[0][e] or self._data[0][E]):
+        E = self._ep(e)
+        if check and (self._bdry[e] or self._bdry[E]):
             raise ValueError('non internal edge')
 
         a = self._fp[e]
@@ -1038,6 +960,7 @@ class Triangulation(Constellation):
 
         return a, b, c, d
 
+    # TODO: e would better be an edge rather than a half-edge
     def flip(self, e, check=True):
         r"""
         Flip the edge ``e``.
@@ -1066,11 +989,11 @@ class Triangulation(Constellation):
             sage: t = Triangulation("(0,1,2)(~0,3,4)", boundary="(~4:1,~3:1,~2:1,~1:1)", mutable=True)
             sage: t.flip(0)
             sage: t
-            Triangulation("(0,2,3)(1,~0,4)(~4:1,~3:1,~2:1,~1:1)")
+            Triangulation("(0,2,3)(~0,4,1)(~1:1,~4:1,~3:1,~2:1)")
             sage: t.flip(2)
             Traceback (most recent call last):
             ...
-            ValueError: can not flip non internal edge 2
+            ValueError: can not flip non internal half-edge 2
         """
         # v<----------u     v<----------u
         # |     a    ^^     |^    a     ^
@@ -1092,28 +1015,21 @@ class Triangulation(Constellation):
         if check:
             e = self._check_half_edge(e)
 
-        E = self._ep[e]
-        if self._data[0][e] or self._data[0][E]:
-            raise ValueError('can not flip non internal edge %s' % self._norm(e))
+        E = self._ep(e)
+        if self._bdry[e] or self._bdry[E]:
+            raise ValueError('can not flip non internal half-edge %s' % e)
 
         a = self._fp[e]
         b = self._fp[a]
         if a == E or b == E:
-            raise ValueError('edge %s is not flippable' % self._norm(e))
+            raise ValueError('half-edge %s is not flippable' % e)
         c = self._fp[E]
         d = self._fp[c]
 
-        A = self._ep[a]
-        B = self._ep[b]
-        C = self._ep[c]
-        D = self._ep[d]
-
-        # Disabled for now
-        # F = self._fl[e]
-        # G = self._fl[E]
-
-        # v = self._vl[b]
-        # x = self._vl[d]
+        A = self._ep(a)
+        B = self._ep(b)
+        C = self._ep(c)
+        D = self._ep(d)
 
         # fix face perm and cycles
         self._fp[e] = b
@@ -1123,10 +1039,6 @@ class Triangulation(Constellation):
         self._fp[E] = d
         self._fp[d] = a
 
-        # Face labels
-        # self._fl[a] = G
-        # self._fl[c] = F
-
         # fix vertex perm
         self._vp[a] = D
         self._vp[b] = E
@@ -1135,10 +1047,7 @@ class Triangulation(Constellation):
         self._vp[d] = e
         self._vp[e] = C
 
-        # Vertex labels
-        # self._vl[e] = x
-        # self._vl[E] = v
-
+    # TODO: e would better be an edge rather than a half-edge
     def flip_back(self, e, check=True):
         r"""
         Flip back the edge ``e``.
@@ -1187,29 +1096,22 @@ class Triangulation(Constellation):
         if check:
             e = self._check_half_edge(e)
 
-        E = self._ep[e]
+        E = self._ep(e)
 
-        if self._data[0][e] or self._data[0][E]:
-            raise ValueError('can not flip non internal edge %s' % self._norm(e))
+        if self._bdry[e] or self._bdry[E]:
+            raise ValueError('can not flip non-internal half-edge %s' % e)
 
         a = self._fp[e]
         b = self._fp[a]
         if a == E or b == E:
-            raise ValueError('edge %s is not flippable' % self._norm(e))
+            raise ValueError('half-edge %s is not flippable' % e)
         c = self._fp[E]
         d = self._fp[c]
 
-        A = self._ep[a]
-        B = self._ep[b]
-        C = self._ep[c]
-        D = self._ep[d]
-
-        # Disabled for now
-        # F = self._fl[e]
-        # G = self._fl[E]
-
-        # v = self._vl[b]
-        # x = self._vl[d]
+        A = self._ep(a)
+        B = self._ep(b)
+        C = self._ep(c)
+        D = self._ep(d)
 
         # fix face perm and cycles
         self._fp[e] = d
@@ -1219,11 +1121,6 @@ class Triangulation(Constellation):
         self._fp[c] = E
         self._fp[E] = b
 
-        # Face labels
-        # Disabled for now
-        # self._fl[a] = G
-        # self._fl[c] = F
-
         # fix vertex perm
         self._vp[a] = D
         self._vp[b] = e
@@ -1231,11 +1128,6 @@ class Triangulation(Constellation):
         self._vp[c] = B
         self._vp[d] = E
         self._vp[E] = C
-
-        # Vertex labels
-        # Disabled for now
-        # self._vl[e] = x
-        # self._vl[E] = v
 
     def conjugate(self):
         r"""
@@ -1252,7 +1144,7 @@ class Triangulation(Constellation):
             sage: T = Triangulation("(0,1,2)(~0,~4,~2)(3,4,5)(~3,~1,~5)", mutable=True)
             sage: T.conjugate()
             sage: T
-            Triangulation("(0,2,4)(1,3,5)(~5,~4,~3)(~2,~1,~0)")
+            Triangulation("(0,2,4)(~0,~2,~1)(1,3,5)(~3,~5,~4)")
 
             sage: T = Triangulation("(0,1,2)(~0,~4,~2)(3,4,5)(~3,~1,~5)", mutable=False)
             sage: T.conjugate()
@@ -1281,7 +1173,7 @@ class Triangulation(Constellation):
         if not self._mutable:
             raise ValueError('immutable triangulation; use a mutable copy instead')
 
-        self._fp = perm_conjugate(perm_invert(self._fp), self._ep)
+        self._fp = perm_conjugate(perm_invert(self._fp), self.edge_permutation())
         self._vp = perm_invert(self._vp)
 
     # TODO: deprecate
@@ -1293,11 +1185,19 @@ class Triangulation(Constellation):
 
     def _check_xy(self, x, y):
         if len(x) == self.num_edges():
-            x = [x[self._norm(i)] for i in range(self._n)]
+            xx = []
+            for i, edge in enumerate(self.edges()):
+                for j in edge:
+                    xx.append(x[i])
+            x = xx
         elif len(x) != self._n or any(a < 0 for a in x):
             raise ValueError('invalid argument x')
         if len(y) == self.num_edges():
-            y = [y[self._norm(i)] for i in range(self._n)]
+            yy = []
+            for i, edge in enumerate(self.edges()):
+                for j in edge:
+                    yy.append(y[i])
+            y = yy
         elif len(y) != self._n or any(a < 0 for a in y):
             raise ValueError('invalid argument y')
         return (x, y)
@@ -1309,32 +1209,34 @@ class Triangulation(Constellation):
         EXAMPLES::
 
             sage: from veerer import Triangulation
+
             sage: t = "(0,1,2)(~0,~1,~2)"
             sage: t = Triangulation(t)
             sage: x = [1, 2, 1]
             sage: y = [1, 1, 2]
             sage: t.colouring_from_xy(x, y)
-            array('i', [1, 2, 2, 2, 2, 1])
+            array('i', [1, 2, 2])
+
             sage: t = "(0,1,2)(~0,~1,4)(~2,5,3)(~3,~4,~5)"
             sage: t = Triangulation(t)
             sage: x = [1, 2, 1, 2, 1, 1]
             sage: y = [1, 1, 2, 1, 2, 3]
             sage: t.colouring_from_xy(x, y)
-            array('i', [1, 2, 2, 1, 2, 1, 1, 2, 1, 2, 2, 1])
+            array('i', [1, 2, 2, 1, 2, 1])
         """
         from .constants import BLUE, RED, PURPLE, GREEN
 
         if check:
             x, y = self._check_xy(x, y)
 
-        def check_set_colouring(colouring, e, ep, col):
+        def check_set_colouring(colouring, e, col):
             if colouring[e] is None:
-                colouring[e] = colouring[ep[e]] = col
+                colouring[e] = col
             elif colouring[e] != col:
                 raise ValueError('inconsistent colouring between x and y for edge e={}'.format(e))
 
-        colouring = [None] * self._n
-        faces = perm_cycles(self._fp, True, self._n)
+        colouring = [None] * self._ne
+        faces = perm_cycles(self._fp, True, 2 * self._ne)
         ep = self._ep
         for face in faces:
             a, b, c = face
@@ -1348,8 +1250,8 @@ class Triangulation(Constellation):
                     xlarge = 2
                 else:
                     raise ValueError('inconsistent x data for triangle {}'.format(face))
-                check_set_colouring(colouring, face[(xlarge + 1) % 3], ep, BLUE)
-                check_set_colouring(colouring, face[(xlarge + 2) % 3], ep, RED)
+                check_set_colouring(colouring, face[(xlarge + 1) % 3] // 2, BLUE)
+                check_set_colouring(colouring, face[(xlarge + 2) % 3] // 2, RED)
             elif x_degenerate == 1:
                 if x[a] == 0:
                     xvert = 0
@@ -1357,9 +1259,9 @@ class Triangulation(Constellation):
                     xvert = 1
                 elif x[c] == 0:
                     xvert = 2
-                check_set_colouring(colouring, face[xvert], ep, GREEN)
-                check_set_colouring(colouring, face[(xvert + 1) % 3], ep, RED)
-                check_set_colouring(colouring, face[(xvert + 2) % 3], ep, BLUE)
+                check_set_colouring(colouring, face[xvert] // 2, GREEN)
+                check_set_colouring(colouring, face[(xvert + 1) % 3] // 2, RED)
+                check_set_colouring(colouring, face[(xvert + 2) % 3] // 2, BLUE)
             else:
                 raise ValueError('inconsistent x data for triangle {}'.format(face))
 
@@ -1373,8 +1275,8 @@ class Triangulation(Constellation):
                     ylarge = 2
                 else:
                     raise ValueError('inconsistent y data for triangle {}'.format(face))
-                check_set_colouring(colouring, face[(ylarge + 1) % 3], ep, RED)
-                check_set_colouring(colouring, face[(ylarge + 2) % 3], ep, BLUE)
+                check_set_colouring(colouring, face[(ylarge + 1) % 3] // 2, RED)
+                check_set_colouring(colouring, face[(ylarge + 2) % 3] // 2, BLUE)
             elif y_degenerate == 1:
                 if y[a] == 0:
                     yhor = 0
@@ -1383,8 +1285,8 @@ class Triangulation(Constellation):
                 elif y[c] == 0:
                     yhor = 2
                 check_set_colouring(colouring, face[yhor], ep, PURPLE)
-                check_set_colouring(colouring, face[(yhor + 1) % 3], ep, BLUE)
-                check_set_colouring(colouring, face[(yhor + 2) % 3], ep, RED)
+                check_set_colouring(colouring, face[(yhor + 1) % 3] // 2, BLUE)
+                check_set_colouring(colouring, face[(yhor + 2) % 3] // 2, RED)
             else:
                 raise ValueError('inconsistent y data for triangle {}'.format(face))
 

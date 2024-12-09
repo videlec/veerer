@@ -104,7 +104,7 @@ class VeeringFlipSequence(object):
         if reduced:
             self._start.forgot_forward_flippable_colour()
         self._end = self._start.copy(mutable=True)
-        self._relabelling = perm_id(self._start._n)
+        self._relabelling = perm_id(2 * self._start._ne)
         self._flips = []   # list of triples (e, col_after, col_before)
 
         if sequence is not None:
@@ -150,7 +150,7 @@ class VeeringFlipSequence(object):
         """
         args = [repr(self._start)]
         args.append("\"%s\"" % flip_sequence_to_string(self.flips()))
-        args.append("\"%s\"" % perm_cycle_string(self._relabelling, self._end._n, involution=self._end._ep))
+        args.append("\"%s\"" % perm_cycle_string(self._relabelling, 2 * self._end._ne, edge_like=True))
         return "VeeringFlipSequence({})".format(", ".join(args))
 
     # properties
@@ -226,7 +226,7 @@ class VeeringFlipSequence(object):
         """
         ne = self._end.num_edges()
         ep = self._end._ep
-        colours = self._end._colouring[:ne]
+        colours = self._end._colouring[:]
         undetermined = set(i for i in range(ne) if colours[i] == PURPLE)
 
         # run backward through flipped edges
@@ -235,7 +235,7 @@ class VeeringFlipSequence(object):
             e, col, oldcol = self._flips[i]
             e = self._relabelling[e]
             if e >= ne:
-                e = ep[e]
+                e = ep(e)
             if e in undetermined:
                 undetermined.remove(e)
                 colours[e] = col
@@ -244,10 +244,10 @@ class VeeringFlipSequence(object):
         # for unflipped edges, look at colours of the initial triangulation
         for e in undetermined:
             re = perm_preimage(self._relabelling, e)
-            col = self._start._colouring[re]
+            col = self._start._colouring[re // 2]
             if col != PURPLE:
                 if re >= ne:
-                    re = ep[re]
+                    re = ep(re)
                 colours[e] = col
 
         return colours
@@ -279,7 +279,7 @@ class VeeringFlipSequence(object):
             VeeringFlipSequence(VeeringTriangulation("(0,6,5)(1,2,~6)(3,4,~5)", "RBRRPBP"), "6B 4R 3B", "(0,3,1,4,2)(5,6,~5,~6)")
         """
         start = self._start
-        reduced = any(start._colouring[e] == PURPLE for e in range(start.num_edges()))
+        reduced = any(start._colouring[e] == PURPLE for e in range(start._ne))
         if reduced:
             # determine the coloured flip sequence
             coloured_flips = []
@@ -305,11 +305,11 @@ class VeeringFlipSequence(object):
         #  flipped)
         ep = self._start._ep
         ne = self._start.num_edges()
-        c = perm_id(self._start._n)
+        c = perm_id(2 * self._start._ne)
         for i,_ in inverse_flips:
-            c[i], c[ep[i]] = c[ep[i]], c[i]
-        r = perm_invert(self._relabelling, self._start._n)
-        r = perm_compose(c, r, self._start._n)
+            c[i], c[ep(i)] = c[ep(i)], c[i]
+        r = perm_invert(self._relabelling, 2 * self._start._ne)
+        r = perm_compose(c, r, 2 * self._start._ne)
 
         V.rotate()
         F = VeeringFlipSequence(V, inverse_flips, r, reduced=reduced)
@@ -324,7 +324,7 @@ class VeeringFlipSequence(object):
         from sage.matrix.special import identity_matrix
         m = identity_matrix(ZZ, self._start.num_edges())
         V = self._start.copy()
-        V.relabel_homological_action(perm_invert(self._relabelling, self._start._n), m, twist)
+        V.relabel_homological_action(perm_invert(self._relabelling, 2 * self._start._ne), m, twist)
         for e, col, oldcol in reversed(self._flips):
             pass
 
@@ -395,7 +395,7 @@ class VeeringFlipSequence(object):
             for e in new:
                 e = r[e]
                 if e >= n:
-                    e = ep[e]
+                    e = ep(e)
                 if e not in flipped:
                     modified = True
                     flipped.add(e)
@@ -590,15 +590,15 @@ class VeeringFlipSequence(object):
         Append the flip ``(e, col)`` to this flip sequence.
         """
         ep = self._end._ep
-        oldcol = self._end._colouring[e]
-        E = ep[e]
+        oldcol = self._end._colouring[e // 2]
+        E = ep(e)
         if E < e:
             e = E
         self._end.flip(e, col)
         if self._relabelling[e] != e:
             # push the flip to the left of relabelling
             e = perm_preimage(self._relabelling, e)
-            E = ep[e]
+            E = ep(e)
             if E < e:
                 e = E
         self._flips.append((e, col, oldcol))
@@ -607,7 +607,7 @@ class VeeringFlipSequence(object):
         r"""
         Swap the orientation of the edge ``e`` by modifying the relabelling of this flip sequence.
         """
-        E = self._end._ep[e]
+        E = self._end._ep(e)
         self._end.swap(e)
         self._relabelling[e] = E
         self._relabelling[E] = e
@@ -639,9 +639,9 @@ class VeeringFlipSequence(object):
         Append the relabelling ``r`` to this flip sequence.
         """
         end = self._end
-        if not perm_check(r, end._n):
-            r = perm_init(r, end._n, end._ep)
-            if not perm_check(r, end._n):
+        if not perm_check(r, 2 * end._ne):
+            r = perm_init(r, 2 * end._ne, end._ep)
+            if not perm_check(r, 2 * end._ne):
                 raise ValueError('invalid relabelling permutation')
 
         end.relabel(r)
@@ -665,11 +665,11 @@ class VeeringFlipSequence(object):
         if self._end != other._start:
             raise ValueError("composition undefined")
 
-        n = self._start._n
+        n = 2 * self._start._ne
         ne = self._start.num_edges()
         r = perm_invert(self._relabelling, n)
         ep = self._start._ep
-        self._flips.extend([((r[e] if r[e] < ne else ep[r[e]]), col, oldcol) for e, col, oldcol in other._flips])
+        self._flips.extend([((r[e] if r[e] < ne else ep(r[e])), col, oldcol) for e, col, oldcol in other._flips])
         self._end = other._end.copy()
         self._relabelling = perm_compose(self._relabelling, other._relabelling)
 
@@ -709,12 +709,12 @@ class VeeringFlipSequence(object):
         res._relabelling = perm_pow(res._relabelling, k)
 
         m = len(res._flips)
-        r = perm_invert(self._relabelling, self._start._n)
+        r = perm_invert(self._relabelling, 2 * self._start._ne)
         ne = self._start.num_edges()
         ep = self._start._ep
         for _ in range(m * (k-1)):
             e, col, oldcol = res._flips[-m]
-            res._flips.append(((r[e] if r[e] < ne else ep[r[e]]), col, oldcol))
+            res._flips.append(((r[e] if r[e] < ne else ep(r[e])), col, oldcol))
 
         # TODO: remove this expensive check
         res._check()

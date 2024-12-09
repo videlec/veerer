@@ -201,7 +201,7 @@ def perm_id(int n):
     return array.array('i', range(n))
 
 
-def perm_init(data, int n=-1, involution=None):
+def perm_init(data, int n=-1, edge_like=False, partial=False):
     """
     Return a permutation from the given data.
 
@@ -218,7 +218,7 @@ def perm_init(data, int n=-1, involution=None):
 
         sage: perm_init([3,2,1,4])
         array('i', [3, 2, 1, 4])
-        sage: perm_init([3,1,None,0])
+        sage: perm_init([3,1,-1,0])
         array('i', [3, 1, -1, 0])
 
     Cycle notation (not mentioned elements are considered to be fixed
@@ -234,18 +234,17 @@ def perm_init(data, int n=-1, involution=None):
         sage: perm_init('(0,1)(3,2)')
         array('i', [1, 0, 3, 2])
 
-    Initialize a permutation in the centralizer of an involution::
+        sage: perm_init("(2,4)")
+        array('i', [0, 1, 4, 3, 2])
+        sage: perm_init("(2,4)", partial=True)
+        array('i', [-1, -1, 4, -1, 2])
 
-        sage: perm_init('(0,2)(1,3)', involution=[0,4,2,5,1,3])
-        array('i', [2, 3, 0, 1, 5, 4])
-        sage: perm_init('(0,~1)', involution=[0,1])
-        array('i', [1, 0])
-        sage: perm_init('(0,~1)', involution=[2,3,0,1])
-        array('i', [3, 2, 1, 0])
-        sage: perm_init('(0,3)', involution=[0,4,2,5,1,3])
-        Traceback (most recent call last):
-        ...
-        ValueError: invalid input
+    Edge-like::
+
+        sage: perm_init("(0,~1,1)", edge_like=True)
+        array('i', [3, 1, 0, 2])
+        sage: perm_init("(0,~1,1)", edge_like=True, partial=True)
+        array('i', [3, -1, 0, 2])
 
     Zerology::
 
@@ -258,8 +257,6 @@ def perm_init(data, int n=-1, involution=None):
         sage: perm_init('()')
         array('i')
     """
-    if n == -1 and involution is not None:
-        n = len(involution)
     if isinstance(data, (array.array, tuple, list)):
         if not data:
             if n is not None:
@@ -267,25 +264,23 @@ def perm_init(data, int n=-1, involution=None):
             else:
                 return array.array('i', [])
         elif isinstance(data[0], (tuple, list)):
-            return perm_from_cycles(data, n=n, involution=involution)
+            return perm_from_cycles(data, n=n, edge_like=edge_like, partial=partial)
         else:
-            return array.array('i', (-1 if x is None else x for x in data))
+            return array.array('i', data)
 
     if isinstance(data, str):
         c = str_to_cycles(data)
-        return perm_from_cycles(c, n=n, involution=involution)
+        return perm_from_cycles(c, n=n, edge_like=edge_like, partial=partial)
 
     # TODO: test flipper conversion
     if data.__module__.startswith('flipper'):
-        if involution is None:
-            raise ValueError("involution must be provided")
         from .misc import flipper_isometry_to_perm
-        return flipper_isometry_to_perm(data, involution)
+        return flipper_isometry_to_perm(data)
 
     raise TypeError("The input must be list, tuple or string")
 
 
-def perm_from_cycles(t, int n=-1, involution=None):
+def perm_from_cycles(t, int n=-1, edge_like=False, partial=False):
     r"""
     Return a permutation on `[0, n-1]` from a list of cycles on `[0, n-1]`
 
@@ -295,8 +290,9 @@ def perm_from_cycles(t, int n=-1, involution=None):
 
     - ``n`` - optional domain size
 
-    - ``involution`` (optional) - if provided use it to convert minus
-      signs
+    - ``edge_like`` (optional boolean)
+
+    - ``partial`` (optional boolean)
 
     EXAMPLES::
 
@@ -318,32 +314,31 @@ def perm_from_cycles(t, int n=-1, involution=None):
 
     if n == -1:
         n = max(map(max, t)) + 1
+        if edge_like:
+            n *= 2
 
-    res = array.array('i', range(n))
+    res = array.array('i', [-1] * n) if partial else array.array('i', range(n))
 
     for c in t:
         a = int(c[0])
-        if a < 0:
-            a = n+a if involution is None else involution[~a]
-        for j in range(1,len(c)):
+        if edge_like:
+            a = 2 * a if a >= 0 else (2 * ~a + 1)
+        if not 0 <= a < n:
+            raise ValueError("invalid input")
+        for j in range(1, len(c)):
             b = int(c[j])
-            if b < 0:
-                b = n+b if involution is None else involution[~b]
+            if edge_like:
+                b = 2 * b if b >= 0 else (2 * ~b + 1)
+            if not 0 <= b < n:
+                raise ValueError("invalid input")
             res[a] = b
-            if involution is not None:
-                if (a == involution[a]) != (b == involution[b]):
-                    raise ValueError("invalid input")
-                res[involution[a]] = involution[b]
             a = b
         b = int(c[0])
-        if b < 0:
-            b = n+b if involution is None else involution[~b]
-
+        if edge_like:
+            b = 2 * b if b >= 0 else (2 * ~b + 1)
+        if not 0 <= b < n:
+            raise ValueError("invalid input")
         res[a] = b
-        if involution is not None:
-            if (a == involution[a]) != (b == involution[b]):
-                raise ValueError("invalid input")
-            res[involution[a]] = involution[b]
 
     return res
 
@@ -530,6 +525,8 @@ def uint_base64_str(n, l=None):
         '00f'
     """
     n = int(n)
+    if n < 0:
+        raise ValueError("negative input")
     s = ''
     while n:
         s = CHARS[n % 64] + s
@@ -583,10 +580,15 @@ def perm_base64_str(p):
 
         sage: perm_from_base64_str('vdh0keigmcjfpxtnrwsouyqba987654321zl', 36)
         array('i', [31, 13, 17, 0, 20, 14, 18, 16, 22, 12, 19, 15, 25, 33, 29, 23, 27, 32, 28, 24, 30, 34, 26, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 35, 21])
+
+    Partial permutation::
+
+        sage: perm_base64_str([-1, 3, -1, 1])
+        ~3~1
     """
     n = len(p)
     l = int(log(n, 64)) + 1 # number of digits used for each entry
-    return ''.join(uint_base64_str(i, l) for i in p)
+    return ''.join('~' * l if i == -1 else uint_base64_str(i, l) for i in p)
 
 
 def perm_from_base64_str(s, n):
@@ -606,11 +608,16 @@ def perm_from_base64_str(s, n):
         sage: p = array('i', r)
         sage: perm_from_base64_str(perm_base64_str(p), 3000) == p
         True
+
+    Partial permutation::
+
+        sage: perm_from_base64_str('x3x1', 4)
+        array('i', [-1, 3, -1, 1])
     """
     l = int(log(n, 64)) + 1 # number of digits used for each entry
     if len(s) != n * l:
         raise ValueError('wrong length')
-    return array.array('i', (uint_from_base64_str(s[i:i+l]) for i in range(0,len(s),l)))
+    return array.array('i', (-1 if s[i:i+l] == '~' * l else uint_from_base64_str(s[i:i+l]) for i in range(0, len(s), l)))
 
 #####################################################################
 # Boolean properties
@@ -650,20 +657,16 @@ def perm_dense_cycles(array.array p, int n=-1):
     """
     if n == -1:
         n = len(p)
-    cdef list deg = []
-    cdef list res = [-1] * n
-    k = 0
+    cdef array.array res = array.array('i', [-1] * n)
+    cdef int i, k = 0
     for i in range(n):
-        if res[i] != -1:
+        if p[i] == -1:
             continue
-        d = 0
         while res[i] == -1:
             res[i] = k
             i = p.data.as_ints[i]
-            d += 1
         k += 1
-        deg.append(d)
-    return res, deg
+    return res
 
 
 def perm_cycles(array.array p, singletons=True, int n=-1):
@@ -841,7 +844,7 @@ def perm_cycle_type(array.array p, int n=-1):
     return c
 
 
-def perm_cycles_to_string(list cycles, involution=None, data=None):
+def perm_cycles_to_string(list cycles, edge_like=False, data=None):
     r"""
     Return a string representing a list of cycles.
 
@@ -849,15 +852,15 @@ def perm_cycles_to_string(list cycles, involution=None, data=None):
 
     - ``cycles`` -- list of cycles
 
-    - ``involution`` -- optional involution (possibly with fixed points)
+    - ``edge_like`` -- optional boolean (default ``False``)
 
     - ``data`` -- optional data
     """
-    if involution:
+    if edge_like:
         if data:
-            elt = lambda e: ('%d' % e if e <= involution[e] else '~%d' % involution[e]) + ((':%d' % data[e]) if data[e] else '')
+            elt = lambda e: ('~%d' % (e // 2) if e % 2 else '%d' % (e // 2)) + ((':%d' % data[e]) if data[e] else '')
         else:
-            elt = lambda e: ('%d' % e if e <= involution[e] else '~%d' % involution[e])
+            elt = lambda e: ('~%d' % (e // 2)) if e % 2 else '%d' % (e // 2)
     elif data:
         elt = lambda e: ('%d' % e) + ((':%d' % data[e]) if data[e] else '')
     else:
@@ -866,7 +869,7 @@ def perm_cycles_to_string(list cycles, involution=None, data=None):
     return ''.join(map(lambda x: '(' + ','.join(map(elt, x)) + ')', cycles))
 
 
-def perm_cycle_string(array.array p, singletons=True, n=-1, involution=None):
+def perm_cycle_string(array.array p, singletons=True, n=-1, edge_like=False):
     r"""
     Return a string representing the cycle decomposition of `p`
 
@@ -880,7 +883,7 @@ def perm_cycle_string(array.array p, singletons=True, n=-1, involution=None):
         sage: perm_cycle_string(array('i', [0,2,1]), False)
         '(1,2)'
     """
-    return perm_cycles_to_string(perm_cycles(p, singletons, n), involution)
+    return perm_cycles_to_string(perm_cycles(p, singletons, n), edge_like)
 
 
 def perm_orbit(array.array p, int i):
@@ -997,6 +1000,8 @@ def perm_on_list(array.array p, a, int n=-1, swap=None):
             continue
         seen.data.as_ints[i] = 1
         j = p.data.as_ints[i]
+        if j == -1:
+            continue
         while not seen.data.as_ints[j]:
             if swap:
                 swap(a, i, j)
@@ -1006,6 +1011,57 @@ def perm_on_list(array.array p, a, int n=-1, swap=None):
                 a[j] = tmp
             seen.data.as_ints[j] = 1
             j = p.data.as_ints[j]
+            if j == -1:
+                raise ValueError("invalid permutation p")
+
+
+def perm_on_edge_list(array.array p, a, int n=-1, swap=None):
+    r"""
+    Inplace action of permutation on list-like objects.
+
+    INPUT:
+
+    - ``p`` - permutation of even length such that {p(2i), p(2i+1)} = {2j, 2j+1}
+
+    - ``a`` - list, array of length half the length of the permutation
+
+    - ``n`` - (optional) size of permutation
+
+    - ``swap`` - (optional) a swap function
+
+    EXAMPLES::
+
+        sage: from array import array
+        sage: from veerer.permutation import *
+
+        sage: l = [0,1,2,3,4]
+        sage: p = array('i', [4,2,3,0,1])
+        sage: perm_on_edge_list(p, l)
+        sage: l
+        [3, 4, 1, 2, 0]
+    """
+    if n == -1:
+        n = len(p)
+    if n % 2:
+        raise ValueError("n must be even")
+    cdef array.array seen = array.clone(p, n // 2, True)
+    cdef int i, j
+    for i in range(n // 2):
+        if seen.data.as_ints[i]:
+            continue
+        seen.data.as_ints[i] = 1
+        j = p.data.as_ints[2 * i] // 2
+        assert p.data.as_ints[2 * i + 1] == -1 or p.data.as_ints[2 * i] == p.data.as_ints[2 * i + 1] ^ 1
+        while not seen.data.as_ints[j]:
+            if swap:
+                swap(a, i, j)
+            else:
+                tmp = a[i]
+                a[i] = a[j]
+                a[j] = tmp
+            seen.data.as_ints[j] = 1
+            assert p.data.as_ints[2 * j + 1] == -1 or p.data.as_ints[2 * j] == p.data.as_ints[2 * j + 1] ^ 1
+            j = p.data.as_ints[2 * j] // 2
 
 #####################################################################
 # Group operations
@@ -1202,6 +1258,7 @@ def perm_conjugate(array.array p1, array.array p2, int n=-1):
 
     EXAMPLES::
 
+        sage: from array import array
         sage: from veerer.permutation import perm_conjugate, perm_random
 
         sage: p1 = perm_random(23)
@@ -1209,13 +1266,28 @@ def perm_conjugate(array.array p1, array.array p2, int n=-1):
         sage: res = perm_conjugate(p1, p2)
         sage: all(res[p2[i]] == p2[p1[i]] for i in range(23))
         True
+
+        sage: perm_conjugate(array('i', [8, 7, 2, 3, 4, 5, 6, 1, 0]), array('i', [0, 2, 4, 5, 6, 7, 3, 1]))
+        Traceback (most recent call last):
+        ...
+        ValueError: invalid input
     """
     if n == -1:
         n = len(p1)
+    if len(p2) < n:
+        raise ValueError("invalid input")
+
     cdef array.array res = array.clone(p1, n, False)
     cdef int i
     for i in range(n):
-        res.data.as_ints[p2.data.as_ints[i]] = p2.data.as_ints[p1.data.as_ints[i]]
+        res[i] = -1
+    for i in range(n):
+        if p1.data.as_ints[i] == -1 or p2.data.as_ints[i] == -1:
+            continue
+        if not (0 <= p1.data.as_ints[i] < n) or not (0 <= p2.data.as_ints[i] < n):
+            raise ValueError("invalid input")
+        else:
+            res.data.as_ints[p2.data.as_ints[i]] = p2.data.as_ints[p1.data.as_ints[i]]
     return res
 
 #####################################################################
@@ -1270,7 +1342,7 @@ def perms_are_transitive(p, int n=-1):
     """
     Test whether the group generated by the permutations in ``p`` is transitive.
 
-    We assume that the list of partial permutations act on
+    The function assumes that the list of partial permutations act on
     the same domain (ie the -1 occur at the same positions).
 
     INPUT:
@@ -1294,6 +1366,16 @@ def perms_are_transitive(p, int n=-1):
         True
         sage: perms_are_transitive([p0,p1,p2,p3])
         False
+
+    Example with partial permutations::
+
+        sage: p0 = [2, -1, 0, 3, 4]
+        sage: p1 = [0, -1, 3, 2, 4]
+        sage: p2 = [0, -1, 4, 3, 2]
+        sage: perms_are_transitive([p0, p1, p2])
+        True
+        sage: perms_are_transitive([p0, p1])
+        False
     """
     if not p:
         raise ValueError("empty list")
@@ -1302,10 +1384,13 @@ def perms_are_transitive(p, int n=-1):
     if n == -1:
         n = len(p0)
 
-    # compute the connected component of 0
+    # compute the connected component of the first active integer
     cc0 = [True if j == -1 else False for j in p0]
-    todo = [0]
-    cc0[0] = True
+    if all(cc0):
+        return True
+
+    todo = [next(i for i, j in enumerate(p0) if j != -1)]
+    cc0[todo[0]] = True
     while todo:
         j = todo.pop()
         for pp in p:
@@ -1321,6 +1406,9 @@ def perms_orbits(p, int n=-1):
     r"""
     Return the list of orbits of the permutation group generated by ``p``.
 
+    The function assumes that the list of partial permutations act on
+    the same domain (ie the -1 occur at the same positions).
+
     EXAMPLES::
 
         sage: from veerer.permutation import perm_init, perms_orbits
@@ -1329,6 +1417,13 @@ def perms_orbits(p, int n=-1):
         sage: p1 = perm_init("(0,4)(1,5)(2,6)(3,7)")
         sage: perms_orbits((p0, p1))
         [[0, 1, 4, 5], [2, 3, 6, 7]]
+
+    An example with partial permutations::
+
+        sage: p0 = [-1, 3, -1, 1, -1, 5, 6]
+        sage: p1 = [-1, 1, -1, 3, -1, 6, 5]
+        sage: perms_orbits((p0, p1))
+        [[1, 3], [5, 6]]
     """
     if not p:
         raise ValueError("empty list")
@@ -1337,7 +1432,7 @@ def perms_orbits(p, int n=-1):
         n = len(p[0])
 
     # compute the connected component of 0
-    viewed = [False] * n
+    viewed = [True if p[0][i] == -1 else False for i in range(n)]
     cc_list = []
     for i in range(n):
         if viewed[i]:
@@ -1489,89 +1584,148 @@ def perms_canonical_labels(p, e=None):
 # Triangulation relabellings
 #####################################################################
 
-def triangulation_relabelling_from(array.array vp, array.array ep, int start_edge):
+def edge_relabelling_from(array.array relabelling, array.array p, int n, int root, int image=0):
     r"""
-    Return a canonical relabelling where ``start_edge`` is mapped to ``0``.
+    We go along cycles of ``p``
+    """
+    if n < 0 or n % 2 or len(relabelling) < n or len(p) < n:
+        raise ValueError("invalid arguments")
+
+    cdef array.array to_process = array.clone(p, n, False)  # FIFO stack of half-edges to process
+    cdef int s, t  # bottom and top of to_process
+    cdef int e, e1
+
+    to_process.data.as_ints[0] = root
+    s = 0
+    t = 1
+
+    while s < t:
+        # pick the next half-edge and saturate its orbit with p0 and store the
+        # p1 images in to_process
+        e = to_process.data.as_ints[s]
+        s += 1
+        while relabelling.data.as_ints[e] == -1:
+            if relabelling.data.as_ints[e ^ 1] == -1:
+                relabelling.data.as_ints[e] = image
+                image += 2
+                if p[e ^ 1] != -1:
+                    to_process.data.as_ints[t] = e ^ 1
+                    t += 1
+            else:
+                relabelling.data.as_ints[e]  = relabelling.data.as_ints[e ^ 1] ^ 1
+            e = p.data.as_ints[e]
+
+    if image > n:
+        raise ValueError("invalid argument")
+
+    for e in range(n):
+        if relabelling.data.as_ints[e] == -1 and relabelling.data.as_ints[e ^ 1] != -1:
+            relabelling.data.as_ints[e] = relabelling.data.as_ints[e ^ 1] ^ 1
+
+    return image
+
+def perms_relabelling_from(array.array relabelling, array.array p0, array.array p1, int n, int root, int image=0):
+    r"""
+    Set ``relabelling`` to a canonical relabelling of the pair of permutations
+    ``(p0, p1)`` where ``root`` is mapped to ``image``.
+
+    The canonical exploration is a depth first search done by saturating with
+    ``p0`` first and then ``p1``.
+
+    INPUT:
+
+    - ``relabelling`` - a partial relabelling (initialized with ``-1`` at
+      unrelabelled positions). It is assumed that the relabelling is supported on
+      a union of orbits of the group generated by ``p0`` and ``p1``.
+
+    - ``p0``, ``p1`` - permutations of size ``n``
+
+    - ``n`` - size of the permutation
+
+    - ``root`` - (integer) half-edge
+
+    - ``image`` - (integer) default to 0
+
+    OUTPUT: The value of ``image`` at the end of the process. If ``image`` is
+    equal to ``n`` if and only if the constellation has been fully relabelled.
 
     EXAMPLES::
 
         sage: from array import array
-        sage: from veerer.permutation import triangulation_relabelling_from
+        sage: from veerer.permutation import permutations_relabelling_from
         sage: vp = array('i', [9, 13, 12, 11, 10, 14, 5, 6, 7, 8, 29, 25, 26, 27, 28, 1, 15, 16, 17, 18, 19, 0, 4, 3, 2, 21, 22, 23, 24, 20])
         sage: ep = array('i', [29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0])
-        sage: triangulation_relabelling_from(vp, ep, 0)
-        array('i', [0, 7, 21, 10, 18, 14, 20, 13, 17, 28, 27, 26, 25, 24, 23, 6, 5, 4, 3, 2, 1, 12, 16, 9, 15, 11, 19, 8, 22, 29])
+        sage: relabelling = array('i', [-1] * 30)
+        sage: permutations_relabelling_from(relabelling, vp, ep, 30, 0, 0)
+        30
+        sage: relabelling
+        array('i', [0, 22, 9, 26, 13, 5, 4, 3, 2, 1, 14, 27, 10, 23, 6, 21, 20, 19, 18, 17, 16, 29, 12, 25, 8, 28, 11, 24, 7, 15])
+
+    Note that if the group generated by ``vp`` and ``ep`` is not transitive,
+    then the relabelling is only partial. One needs to call the function twice
+    to get a full relabelling::
+
+        sage: vp = array('i', [3, 2, 1, 0])
+        sage: ep = array('i', [3, 1, 2, 0])
+
+        sage: relabelling = array('i', [-1] * 4)
+        sage: permutations_relabelling_from(relabelling, vp, ep, 4, 0, 0)
+        2
+        sage: relabelling
+
+        sage: relabelling = array('i', [-1] * 4)
+        sage: permutations_relabelling_from(relabelling, vp, ep, 4, 2, 0)
+        2
+        sage: relabelling
+
+        sage: relabelling = array('i', [-1] * 4)
+        sage: permutations_relabelling_from(relabelling, vp, ep, 4, 0, 0)
+        2
+        sage: permutations_relabelling_from(relabelling, vp, ep, 4, 1, 2)
+        4
+        sage: relabelling
+        array('i', [0, 2, 3, 1])
     """
-    # NOTE: the algorithm is as follows
-    # 0) we set k=0 and m=n-1 (labelling counter), any time we choose a new
-    #    label it is k and k is incremented. If it is not a folded edge, its
-    #    twin gets labelled m and m is decremented.
-    # 1) the start_edge is relabelled 0 and set as pending
-    # 2) while there is a pending half-edge, we look at its vp-cycle and
-    #    relabel each edge if needed
-    cdef int n = len(vp)
+    if n < 0 or len(relabelling) < n or len(p0) < n or len(p1) < n:
+        raise ValueError("invalid arguments")
 
-    cdef int k = 0      # current available label at the front.
-    cdef int m = n - 1  # current available label at the back.
-    cdef array.array relabelling = array.clone(vp, n, False)
-    cdef int e, e0
-    for e in range(n):
-        relabelling.data.as_ints[e] = -1
+    cdef array.array to_process = array.clone(p0, n, False)  # FIFO stack of half-edges to process
+    cdef int s, t  # bottom and top of to_process
+    cdef int e, e1
 
-    relabelling.data.as_ints[start_edge] = 0
-    k += 1
+    to_process.data.as_ints[0] = root
+    s = 0
+    t = 1
 
-    if ep.data.as_ints[start_edge] != start_edge:
-        relabelling.data.as_ints[ep.data.as_ints[start_edge]] = m
-        m -= 1
+    while s < t:
+        # pick the next half-edge and saturate its orbit with p0 and store the
+        # p1 images in to_process
+        e = to_process.data.as_ints[s]
+        s += 1
+        while relabelling.data.as_ints[e] == -1:
+            relabelling.data.as_ints[e] = image
+            image += 1
+            e1 = p1.data.as_ints[e]
+            if relabelling.data.as_ints[e1] == -1:
+                to_process.data.as_ints[t] = e1
+                t += 1
+            e = p0.data.as_ints[e]
 
-    cdef array.array to_process = array.clone(vp, n, False)
-    cdef int s = 1
-    to_process.data.as_ints[0] = start_edge
-    if ep.data.as_ints[start_edge] != start_edge:
-        to_process.data.as_ints[1] = ep.data.as_ints[start_edge]
-        s = 2
+    if image > n:
+        raise ValueError("invalid argument")
 
-    while s:
-        s -= 1
-        e0 = to_process.data.as_ints[s]
-        e = vp.data.as_ints[e0]
-        while e != e0:
-            if relabelling.data.as_ints[e] == -1:
-                relabelling.data.as_ints[e] = k
-                k += 1
-                if ep.data.as_ints[e] != e:
-                    relabelling.data.as_ints[ep.data.as_ints[e]] = m
-                    m -= 1
-                    to_process.data.as_ints[s] = ep.data.as_ints[e]
-                    s += 1
-            e = vp.data.as_ints[e]
+    return image
 
-    if k != m:
-        # non transitive case (relabel naively the remaining components)
-        for e in range(n):
-            if relabelling.data.as_ints[e] == -1:
-                relabelling.data.as_ints[e] = k
-                k += 1
-                if ep.data.as_ints[e] != e:
-                    relabelling.data.as_ints[ep.data.as_ints[e]] = m
-                    m -= 1
 
-    return relabelling
-
-def perm_relabel_on_edges(array.array ep, array.array r, int n=-1, int m=-1):
+def perm_relabel_on_edges(array.array r, int ne=-1):
     r"""
     INPUT:
 
-    - ep - edge permutation
+    - ``r`` - relabelling permutation on half edges (list of length n)
 
-    - r - relabelling permutation on half edges (list of length n)
+    - ``ne`` - number of edges
 
-    - n - num half edges
-
-    - m - num edges
-
-    OUTPUT: list of length m
+    OUTPUT: two lists of length m
 
     EXAMPLES::
 
@@ -1583,18 +1737,22 @@ def perm_relabel_on_edges(array.array ep, array.array r, int n=-1, int m=-1):
         sage: perm_relabel_on_edges(ep, r, 9, 7)
         array('i', [3, 0, 5, 4, 6, 2, 1])
     """
-    cdef array.array rr = array.clone(ep, m, False)
+    if ne == -1:
+        if len(r) % 2:
+            raise ValueError("invalid input")
+        ne = len(r) // 2
+    if len(r) < 2 * ne:
+        raise ValueError("invalid input")
 
+    cdef array.array rr = array.clone(r, ne, False)  # permutation
+    cdef array.array ss = array.clone(r, ne, False)  # signs
     cdef int i, j, k
-    for i in range(m):
-        if ep[i] < i:
-            raise ValueError("not in canonical form")
-        j = r[i]
-        k = r[ep[i]]
-        if (j >= m and k >= m):
-            raise ValueError("relabelling not preserving canonical form")
-        if j < k:
-            rr[i] = j
-        else:
-            rr[i] = k
-    return rr
+
+    for i in range(ne):
+        j = r.data.as_ints[2 * i]
+        jj = r.data.as_ints[2 * i + 1]
+        if jj != -1 and (j ^ 1 != jj):
+            raise ValueError("invalid relabelling permutation r={}".format(r))
+        rr.data.as_ints[i] = j // 2
+        ss.data.as_ints[i] = -1 if j % 2 else 1
+    return rr, ss

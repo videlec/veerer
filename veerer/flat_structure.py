@@ -108,8 +108,8 @@ class FlatVeeringTriangulation(Triangulation):
         FlatVeeringTriangulation(Triangulation("(0,2,1)(3,~0,4)(5,6,~1)"), [(-27, -67), (-47, 51), (74, 16), (34, -36), (-61, -31), (22, 79), (-69, -28), (47, -51), (27, 67)])
     """
     def _set_data_pointers(self):
-        self._bdry = self._data[0]
-        self._holonomies = self._data[1]
+        self._bdry = self._half_edges_data[0]
+        self._holonomies = self._half_edges_data[1]
 
     def __init__(self, triangulation, holonomies=None, base_ring=None, mutable=False, check=True):
         if not isinstance(triangulation, Triangulation):
@@ -124,41 +124,43 @@ class FlatVeeringTriangulation(Triangulation):
             self._translation = triangulation._translation
         else:
             if base_ring is None:
-                S = Sequence([vector(v) for v in holonomies])
+                S = Sequence([vector(v) for v in holonomies if v is not None])
                 self._V = S.universe()
                 self._K = self._V.base_ring()
-                holonomies = list(S)
             else:
                 self._K = base_ring
                 self._V = VectorSpace(self._K, 2)
-                holonomies = [self._V(v) for v in holonomies]
+            holonomies = [self._V(v) if v is not None else None for v in holonomies]
 
             if self._K not in _Fields:
                 self._K = self._K.fraction_field()
                 self._V = self._V.change_ring(self._K)
-                holonomies = [v.change_ring(self._K) for v in holonomies]
+                holonomies = [v.change_ring(self._K) if v is not None else None for v in holonomies]
 
-            n = triangulation._n
+            n = 2 * triangulation._ne
             m = triangulation.num_edges()
             ep = triangulation._ep
 
             if len(holonomies) == m:
-                for e in range(m):
-                    E = ep[e]
-                    if e != E and E < m:
-                        raise ValueError("edge perm not in standard form")
-                holonomies.extend([-holonomies[ep[e]] for e in range(m,n)])
+                new_holonomies = []
+                for e, h in enumerate(holonomies):
+                    new_holonomies.append(h)
+                    if vp[2 * e + 1] != -1:
+                        new_holonomies.append(-h)
+                    else:
+                        new_holonomies.append(None)
+                holonomies = new_holonomies
             if len(holonomies) != n:
                 raise ValueError('wrong number of vectors')
 
-        Constellation.__init__(self, triangulation._n, triangulation._vp[:], triangulation._ep[:], triangulation._fp[:], (triangulation._bdry[:], holonomies), True, False)
+        Constellation.__init__(self, triangulation._ne, triangulation._vp[:], triangulation._fp[:], (triangulation._bdry[:], holonomies), (), True, False)
 
-        cols = [vec_slope(self._holonomies[e]) for e in range(self._n)]
+        cols = [vec_slope(self._holonomies[2 * e]) for e in range(self._ne)]
         if isinstance(triangulation, VeeringTriangulation):
             # check that colours are compatible
             for e in range(triangulation.num_edges()):
-                tcol = triangulation.edge_colour(e)
-                scol = self.edge_colour(e)
+                tcol = triangulation.edge_colour(2 * e)
+                scol = self.edge_colour(2 * e)
                 if scol == PURPLE or scol == GREEN:
                     continue
                 if tcol != scol:
@@ -170,11 +172,11 @@ class FlatVeeringTriangulation(Triangulation):
         if ans:
             # translation surface (Abelian differential)
             # fix holonomies so that
-            # holonomies[ep[e]] = - holonomies[e]
+            # holonomies[ep(e)] = - holonomies[e]
             self._translation = True
             ep = self._ep
             for e, right in enumerate(cert):
-                E = ep[e]
+                E = ep(e)
                 if right != (self._holonomies[e][0] > 0):
                     self._holonomies[e] = -self._holonomies[e]
                 if right != (self._holonomies[E][0] < 0):
@@ -251,17 +253,13 @@ class FlatVeeringTriangulation(Triangulation):
         return Triangulation.is_flippable(self, e) and self.colours_about_edge(e) == [BLUE, RED, BLUE, RED]
 
     def forward_flippable_edges(self):
-        ep = self._ep
-        n = self._n
-        return [e for e in range(n) if e <= ep[e] and self.is_forward_flippable(e)]
+        return [2 * e for e in range(self._ne) if self.is_forward_flippable(2 * e)]
 
     def is_backward_flippable(self, e):
         return Triangulation.is_flippable(self, e) and self.colours_about_edge(e) == [RED, BLUE, RED, BLUE]
 
     def backward_flippable_edges(self):
-        ep = self._ep
-        n = self._n
-        return [e for e in range(n) if e <= ep[e] and self.is_backward_flippable(e)]
+        return [2 * e for e in range(self._ne) if self.is_backward_flippable(2 * e)]
 
     def swap(self, e):
         r"""
@@ -269,7 +267,7 @@ class FlatVeeringTriangulation(Triangulation):
         """
         if not self._mutable:
             raise ValueError("immutable flat veering triangulation; use a mutable copy instead")
-        E = self._ep[e]
+        E = self._ep(e)
         if e != E:
             Triangulation.swap(e)
             self._holonomies[e], self._holonomies[E] = self._holonomies[E], self._holonomies[e]
@@ -346,7 +344,7 @@ class FlatVeeringTriangulation(Triangulation):
         return FlatVeeringTriangulation(T, vectors, K)
 
     def to_veering_triangulation(self):
-        return VeeringTriangulation(self, [self.edge_colour(e) for e in range(self._n)])
+        return VeeringTriangulation(self, [self.edge_colour(2 * e) for e in range(self._ne)])
 
     def to_pyflatsurf(self):
         if not self._translation:
@@ -376,20 +374,20 @@ class FlatVeeringTriangulation(Triangulation):
         """
         Triangulation._check(self, error)
 
-        n = self.num_half_edges()
-        ep = self.edge_permutation(copy=False)
+        ne = self._ne
+        ep = self._ep
         vectors = self._holonomies
-        if len(vectors) != n:
+        if len(vectors) != 2 * ne:
             raise error("invalid list of vectors")
 
-        for a in range(n):
-            A = ep[a]
+        for a in range(self._ne):
+            A = ep(a)
             u = vectors[a]
             v = vectors[A]
             if u != v and u != -v:
-                raise error('ep[%s] = %s but vec[%s] = %s' % (a, u, A, v))
+                raise error('ep(%s) = %s but vec[%s] = %s' % (a, u, A, v))
 
-        for a,b,c in self.faces():
+        for a, b, c in self.faces():
             va = vectors[a]
             vb = vectors[b]
             vc = vectors[c]
@@ -401,9 +399,8 @@ class FlatVeeringTriangulation(Triangulation):
                         (a, b, c))
 
         if self._translation:
-            for e in range(self.num_edges()):
-                E = ep[e]
-                assert self._holonomies[e] == -self._holonomies[E]
+            for e in range(self._ne):
+                assert self._holonomies[2 * e] == -self._holonomies[2 * e + 1]
 
     def copy(self, mutable=None):
         if mutable is None:
@@ -414,9 +411,8 @@ class FlatVeeringTriangulation(Triangulation):
             return self
 
         res = FlatVeeringTriangulation.__new__(FlatVeeringTriangulation)
-        res._n = self._n
+        res._ne = self._ne
         res._vp = self._vp[:]
-        res._ep = self._ep[:]
         res._fp = self._fp[:]
         res._mutable = mutable
         res._V = self._V
@@ -424,7 +420,8 @@ class FlatVeeringTriangulation(Triangulation):
         res._holonomies = [v.__copy__() for v in self._holonomies]
         res._translation = self._translation
         res._bdry = self._bdry[:]
-        res._data = (res._bdry, res._holonomies)
+        res._half_edges_data = (res._bdry, res._holonomies)
+        res._edges_data = ()
         return res
 
     def edge_colour(self, e):
@@ -493,7 +490,7 @@ class FlatVeeringTriangulation(Triangulation):
         if not self.is_forward_flippable(e):
             raise ValueError("invalid edge")
 
-        E = self._ep[e]
+        E = self._ep(e)
         if e == E:
             # folded edge: two possible choices
             #

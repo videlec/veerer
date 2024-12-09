@@ -308,7 +308,7 @@ class Automaton:
             sage: A.run()
             0
             sage: list(A.sources())
-            [VeeringTriangulation("(0,~3,2)(1,3,~2)(~1:2,~0:2)", "RRBR")]
+            [VeeringTriangulation("(0,1,2)(~0,~1,3)(~2:2,~3:2)", "RBRR")]
             sage: set(A.sources()) == set(vt for vt in A if vt.is_strebel(HORIZONTAL))
             True
         """
@@ -334,7 +334,7 @@ class Automaton:
             sage: A.run()
             0
             sage: list(A.sinks())
-            [VeeringTriangulation("(0,~3,2)(1,3,~2)(~1:2,~0:2)", "RRRB")]
+            [VeeringTriangulation("(0,1,2)(~0,~1,3)(~2:2,~3:2)", "BRRR")]
             sage: set(A.sinks()) == set(vt for vt in A if vt.is_strebel(VERTICAL))
             True
 
@@ -346,7 +346,7 @@ class Automaton:
             sage: A.run()
             0
             sage: list(A.sinks())
-            [StrebelGraph("(0,~1:1,~0,1:1)")]
+            [StrebelGraph("(0,1:1,~0,~1:1)")]
         """
         return self._graph.sinks()
 
@@ -1057,20 +1057,24 @@ class ReducedCoreAutomaton(Automaton):
         a, b, c, d = state.square_about_edge(e)
 
         # assertions to be removed
-        assert state._colouring[a] == RED, (a, colour_to_string(state._colouring[a]))
-        assert state._colouring[b] == BLUE, (b, colour_to_string(state._colouring[b]))
-        assert state._colouring[c] == RED, (c, colour_to_string(state._colouring[c]))
-        assert state._colouring[d] == BLUE, (d, colour_to_string(state._colouring[d]))
+        cola = state._colouring[a // 2]
+        colb = state._colouring[b // 2]
+        colc = state._colouring[c // 2]
+        cold = state._colouring[d // 2]
+        cole = state._colouring[e // 2]
+
+        assert cola == RED, (a, cola)
+        assert colb == BLUE, (b, colb)
+        assert colc == RED, (c, colc)
+        assert cold == BLUE, (d, cold)
 
         if col == BLUE:
             if state.is_forward_flippable(b):
                 recolorings.append((b, BLUE))
-                state._colouring[b] = PURPLE
-                state._colouring[state._ep[b]] = PURPLE
+                state._colouring[b // 2] = PURPLE
             if b != d and state.is_forward_flippable(d):
                 recolorings.append((d, BLUE))
-                state._colouring[d] = PURPLE
-                state._colouring[state._ep[d]] = PURPLE
+                state._colouring[d // 2] = PURPLE
 
             # assertions to be removed
             if CHECK:
@@ -1081,12 +1085,10 @@ class ReducedCoreAutomaton(Automaton):
         elif col == RED:
             if state.is_forward_flippable(a):
                 recolorings.append((a, RED))
-                state._colouring[a] = PURPLE
-                state._colouring[state._ep[a]] = PURPLE
+                state._colouring[a // 2] = PURPLE
             if a != c and state.is_forward_flippable(c):
                 recolorings.append((c, RED))
-                state._colouring[c] = PURPLE
-                state._colouring[state._ep[c]] = PURPLE
+                state._colouring[c // 2] = PURPLE
 
             if CHECK:
                 assert not state.is_forward_flippable(e)
@@ -1097,8 +1099,7 @@ class ReducedCoreAutomaton(Automaton):
 
     def _flip_back(self, state, e, recolorings, check=CHECK):
         for ee, ccol in recolorings:
-            state._colouring[ee] = ccol
-            state._colouring[state._ep[ee]] = ccol
+            state._colouring[ee // 2] = ccol
         state.flip_back(e, PURPLE, check=CHECK)
 
     def _out_neighbors(self, state):
@@ -1423,19 +1424,19 @@ class DelaunayStrebelAutomaton(Automaton):
         ....:     n_s = sum(isinstance(state, StrebelGraph) for state in DS)
         ....:     n_d = sum(isinstance(state, VeeringTriangulation) for state in DS)
         ....:     print(n_s, n_d)
-        StrebelGraph("(0,~1)(1,~0)")
+        StrebelGraph("(0,~1)(~0,1)")
         Delaunay-Strebel automaton with 9 states
         1 8
-        StrebelGraph("(0:2,~1)(1,~0)")
+        StrebelGraph("(0:2,~1)(~0,1)")
         Delaunay-Strebel automaton with 23 states
         3 20
-        StrebelGraph("(0:2,~1)(1,~0:2)")
+        StrebelGraph("(0:2,~1)(~0:2,1)")
         Delaunay-Strebel automaton with 14 states
         2 12
-        StrebelGraph("(0,~1)(1)(~0)")
+        StrebelGraph("(0,~1)(~0)(1)")
         Delaunay-Strebel automaton with 5 states
         1 4
-        StrebelGraph("(0:2,~1)(1)(~0)")
+        StrebelGraph("(0:2,~1)(~0)(1)")
         Delaunay-Strebel automaton with 17 states
         3 14
         StrebelGraph("(0,~0,~1:1,1)")
@@ -1447,10 +1448,10 @@ class DelaunayStrebelAutomaton(Automaton):
         StrebelGraph("(0,2,~0,~1)(1)(~2)")
         Delaunay-Strebel automaton with 32 states
         2 30
-        StrebelGraph("(0,2,~1)(1)(~2,~0)")
+        StrebelGraph("(0,2,~1)(~0,~2)(1)")
         Delaunay-Strebel automaton with 51 states
         1 50
-        StrebelGraph("(0:2,2,~1)(1,~0)(~2)")
+        StrebelGraph("(0:2,2,~1)(~0,1)(~2)")
         Delaunay-Strebel automaton with 120 states
         6 114
 

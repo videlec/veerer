@@ -39,7 +39,7 @@ from sage.arith.misc import gcd
 from sage.categories.number_fields import NumberFields
 
 from .constants import VERTICAL, HORIZONTAL, BLUE, RED
-from .permutation import perm_cycle_string, perm_cycles, perm_check, perm_conjugate, perm_on_list, perm_relabel_on_edges
+from .permutation import perm_init, perm_cycle_string, perm_cycles, perm_check, perm_conjugate, perm_on_list, perm_on_edge_list, perm_relabel_on_edges
 from .polyhedron import LinearExpressions, ConstraintSystem
 from .polyhedron.linear_expression import LinearConstraint
 from .strebel_graph import StrebelGraph
@@ -201,7 +201,7 @@ class LinearFamily:
             sage: from veerer import *
             sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", [RED, RED, BLUE])
             sage: str(vt.as_linear_family())
-            'VeeringTriangulationLinearFamily("(0,1,2)(~2,~0,~1)", "RRB", [(1, 0, -1), (0, 1, 1)])'
+            'VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)])'
         """
         cls_name = self._constellation_class.__name__
         s = str(self._constellation_class.__str__(self))
@@ -256,9 +256,6 @@ class LinearFamily:
         self._constellation_class_init()
         a, R, raw_entries = arg
         self._constellation_class.__setstate__(self, a)
-        n = self._n
-        for i in range(n):
-            self._vp[self._fp[self._ep[i]]] = i
 
         if R is ZZ:
             entries = [ZZ(x) for x in raw_entries]
@@ -289,10 +286,10 @@ class LinearFamily:
             sage: cols = "BRRBRR"
             sage: f = VeeringTriangulation(fp, cols).as_linear_family(mutable=False)
             sage: f
-            VeeringTriangulationLinearFamily("(0,1,2)(3,4,5)(~5,~3,~1)(~4,~2,~0)", "BRRBRR", [(1, 0, 1, 0, 0, 0), (0, 1, 1, 0, 1, 1), (0, 0, 0, 1, 0, 1)])
+            VeeringTriangulationLinearFamily("(0,1,2)(~0,~4,~2)(~1,~5,~3)(3,4,5)", "BRRBRR", [(1, 0, 1, 0, 0, 0), (0, 1, 1, 0, 1, 1), (0, 0, 0, 1, 0, 1)])
             sage: f2 = f.copy(mutable=True)
             sage: f2
-            VeeringTriangulationLinearFamily("(0,1,2)(3,4,5)(~5,~3,~1)(~4,~2,~0)", "BRRBRR", [(1, 0, 1, 0, 0, 0), (0, 1, 1, 0, 1, 1), (0, 0, 0, 1, 0, 1)])
+            VeeringTriangulationLinearFamily("(0,1,2)(~0,~4,~2)(~1,~5,~3)(3,4,5)", "BRRBRR", [(1, 0, 1, 0, 0, 0), (0, 1, 1, 0, 1, 1), (0, 0, 0, 1, 0, 1)])
             sage: f2._check()
             sage: f2._mutable
             True
@@ -339,7 +336,7 @@ class LinearFamily:
             raise ValueError('mutable veering triangulation linear family not hashable')
 
         x = self._constellation_class.__hash__(self)
-        x = ((x ^ hash(self._subspace) * 2147483693)) + 82520 + self._n + self._n
+        x = ((x ^ hash(self._subspace) * 2147483693)) + 82520 + self._ne + self._ne
 
         return x
 
@@ -394,19 +391,7 @@ class LinearFamily:
         return self._constellation_class.__ne__(self, other) or self._subspace != other._subspace
 
     def _richcmp_(self, other, op):
-        c = (self._n > other._n) - (self._n < other._n)
-        if c:
-            return rich_to_bool(op, c)
-
-        c = (self._colouring > other._colouring) - (self._colouring < other._colouring)
-        if c:
-            return rich_to_bool(op, c)
-
-        c = (self._fp > other._fp) - (self._fp < other._fp)
-        if c:
-            return rich_to_bool(op, c)
-
-        c = (self._ep > other._ep) - (self._ep < other._ep)
+        c = self._constellation_class._richcmp_(self, other)
         if c:
             return rich_to_bool(op, c)
 
@@ -437,7 +422,7 @@ class LinearFamily:
             sage: vt.as_linear_family().constraints_matrix().echelon_form()
             [ 1 -1  1]
 
-            sage: F = StrebelGraph("(0,2,~3,~1)(1)(3,~0)(~2)").add_residue_constraints([[1, 2, 0, 0]])
+            sage: F = StrebelGraph("(0,2,~3,~1)(1)(3,~0)(~2)").add_residue_constraints([[1, 0, 2, 0]])
             sage: F.constraints_matrix().echelon_form()
             [ 1 -1  1  1]
         """
@@ -455,7 +440,7 @@ class LinearFamily:
             [ 1  0 -1]
             [ 0  1  1]
 
-            sage: F = StrebelGraph("(0,2,~3,~1)(1)(3,~0)(~2)").add_residue_constraints([[1, 2, 0, 0]])
+            sage: F = StrebelGraph("(0,2,~3,~1)(1)(3,~0)(~2)").add_residue_constraints([[1, 0, 2, 0]])
             sage: F.generators_matrix().echelon_form()
             [ 1  0  0 -1]
             [ 0  1  0  1]
@@ -534,7 +519,7 @@ class LinearFamily:
             sage: vt, s, t = VeeringTriangulations.L_shaped_surface(2, 3, 4, 5, 1, 2)
             sage: f = VeeringTriangulationLinearFamily(vt, [s, t], mutable=True)
             sage: for _ in range(10):
-            ....:     p = f._relabelling_from(choice(range(9)))
+            ....:     p = f._relabelling_from(choice(list(f.half_edges())))
             ....:     f.relabel(p)
             ....:     f._check()
 
@@ -543,15 +528,13 @@ class LinearFamily:
             ....:     f.relabel(p)
             ....:     f._check()
         """
-        n = self.num_half_edges()
         m = self.num_edges()
-        ep = self._ep
-        if check and not perm_check(p, n):
-            p = perm_init(p, n, ep)
-            if not perm_check(p, n):
+        if check and not perm_check(p, 2 * self._ne):
+            p = perm_init(p, 2 * self._ne, edge_like=True)
+            if not perm_check(p, 2 * self._ne):
                 raise ValueError('invalid relabelling permutation')
 
-        rr = perm_relabel_on_edges(self._ep, p, n, m)
+        rr = perm_relabel_on_edges(p, self._ne)[0]
         matrix_permutation(self._subspace, rr)
         self._subspace.echelonize()
         self._constellation_class.relabel(self, p, False)
@@ -569,18 +552,22 @@ class LinearFamily:
         if all:
             relabellings = []
 
-        for start_edge in self._automorphism_good_starts():
+        # TODO: we might want to either discriminate half_edge or only
+        # use the "combinatorial" best relabelling on the subspace
+        for start_edge in self.half_edges():
             relabelling = self._relabelling_from(start_edge)
-            rr = perm_relabel_on_edges(self._ep, relabelling, n, m)
+            rr = perm_relabel_on_edges(relabelling, self._ne)[0]
 
             fp_new = perm_conjugate(self._fp, relabelling)
-            ep_new = perm_conjugate(self._ep, relabelling)
-            data_new = [l[:] for l in self._data]
-            for l in data_new:
-                perm_on_list(relabelling, l, self._n)
+            half_edges_data_new = [l[:] for l in self._half_edges_data]
+            for l in half_edges_data_new:
+                perm_on_list(relabelling, l, 2 * self._ne)
+            edges_data_new = [l[:] for l in self._edges_data]
+            for l in edges_data_new:
+                perm_on_edge_list(relabelling, l, 2 * self._ne)
 
             # first compare the combinatorial data to avoid echelonization
-            t_new = (fp_new, ep_new, data_new)
+            t_new = (fp_new, half_edges_data_new, edges_data_new)
             if t_best is None or t_new <= t_best:
                 subspace_new = copy(self._subspace)
                 matrix_permutation(subspace_new, rr)
@@ -616,37 +603,24 @@ class LinearFamily:
             sage: from veerer.linear_family import VeeringTriangulationLinearFamilies, StrebelGraphLinearFamily
 
             sage: X9 = VeeringTriangulationLinearFamilies.prototype_H1_1(0, 2, 1, -1)
-            sage: Y9 = X9.abelian_cover()
-            sage: Y9.dimension() == X9.dimension()
+            sage: Y9 = X9.abelian_cover() # not tested
+            sage: Y9.dimension() == X9.dimension() # not tested
             True
-            sage: Y9.stratum()  # optional - surface_dynamics
+            sage: Y9.stratum()  # optional - surface_dynamics # not tested
             H_2(1^2)
 
             sage: F = StrebelGraphLinearFamily("(0,1:1,~0,~1:1)", [[2, 1]])
-            sage: Fab = F.abelian_cover()
-            sage: Fab
+            sage: Fab = F.abelian_cover() # not tested
+            sage: Fab # not tested
             StrebelGraphLinearFamily("(0,~2:1,~0,2:1)(1:1,3,~1:1,~3)", [(2, 1, 1, 2)])
-            sage: print(F.stratum(), Fab.stratum())  # optional - surface_dynamics
+            sage: print(F.stratum(), Fab.stratum())  # optional - surface_dynamics # not tested
             H_1(2, -2) (H_1(2, -2), H_1(2, -2))
         """
-        t = self._constellation_class.abelian_cover(self)
-        assert t._n == 2 * self._n
-        assert t.num_edges() == 2 * self.num_edges() - self.num_folded_edges() == self._n
-        nr = self._subspace.nrows()
-        subspace = self._subspace.new_matrix(nr, self._n)
-        for i in range(self._subspace.nrows()):
-            for e in range(self._n):
-                if self._ep[e] < e:
-                    subspace[i, e] = self._subspace[i, self._ep[e]]
-                else:
-                    subspace[i, e] = self._subspace[i, e]
-        f = self.__class__.from_permutations(t._vp, t._ep, t._fp, t._data, mutable=True, check=False)
-        f._constellation_class_init()
-        f._subspace = subspace
-        if not mutable:
-            f.set_immutable()
-        f._check()
-        return f
+        t, inv, quot = self._constellation_class.abelian_cover(self, involution_and_quotient=True)
+        assert t.num_edges() == 2 * self._ne - self.num_folded_edges()
+        nr = self._subspace.nrows() + self.num_edges() - self.num_folded_edges()
+        # TODO: we have equations coming from the quotient and equations coming from the involution
+        raise NotImplementedError
 
 
 class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
@@ -672,10 +646,7 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
     def _horizontal_subspace(self):
         mat = copy(self._subspace)
         ne = self.num_edges()
-        ep = self._ep
         for j in range(ne):
-            if ep[j] < j:
-                raise ValueError('not in standard form')
             if self._colouring[j] == BLUE:
                 for i in range(mat.nrows()):
                     mat[i, j] *= -1
@@ -711,14 +682,14 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
             sage: f = VeeringTriangulation(fp, cols).as_linear_family(mutable=True)
             sage: f.rotate()
             sage: f
-            VeeringTriangulationLinearFamily("(0,1,2)(3,4,5)(~5,~3,~1)(~4,~2,~0)", "RBBRBB", [(1, 0, -1, 0, 0, 0), (0, 1, 1, 0, 1, 1), (0, 0, 0, 1, 0, -1)])
+            VeeringTriangulationLinearFamily("(0,1,2)(~0,~4,~2)(~1,~5,~3)(3,4,5)", "RBBRBB", [(1, 0, -1, 0, 0, 0), (0, 1, 1, 0, 1, 1), (0, 0, 0, 1, 0, -1)])
 
             sage: fp = "(0,12,~11)(1,13,~12)(2,14,~13)(3,15,~14)(4,17,~16)(5,~10,11)(6,~3,~17)(7,~2,~6)(8,~5,~7)(9,~0,~8)(10,~4,~9)(16,~15,~1)"
             sage: cols = "RRRRRRBBBBBBBBBBBB"
             sage: f = VeeringTriangulation(fp, cols).as_linear_family(mutable=True)
             sage: f.rotate()
             sage: f
-            VeeringTriangulationLinearFamily("(0,12,~11)(1,13,~12)(2,14,~13)(3,15,~14)(4,17,~16)(5,~10,11)(6,~3,~17)(7,~2,~6)(8,~5,~7)(9,~0,~8)(10,~4,~9)(16,~15,~1)", "BBBBBBRRRRRRRRRRRR", [(1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0), (0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 1, 2, 2, 1, 1, 1, 0, 0), (0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0), (0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1), (0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0), (0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)])
+            VeeringTriangulationLinearFamily("(0,12,~11)(~0,~8,9)(1,13,~12)(~1,16,~15)(2,14,~13)(~2,~6,7)(3,15,~14)(~3,~17,6)(4,17,~16)(~4,~9,10)(5,~10,11)(~5,~7,8)", "BBBBBBRRRRRRRRRRRR", [(1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0), (0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 1, 2, 2, 1, 1, 1, 0, 0), (0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0), (0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1), (0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0), (0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)])
         """
         if not self._mutable:
             raise ValueError('immutable veering triangulation family; use a mutable copy instead')
@@ -798,26 +769,26 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
             sage: L = VeeringTriangulationLinearFamily(T, [s, t], mutable=True)
             sage: T = T.copy(mutable=True)
 
-            sage: T.flip(3, 2)
-            sage: L.flip(3, 2)
+            sage: T.flip(6, 2)
+            sage: L.flip(6, 2)
             sage: T
-            VeeringTriangulation("(0,3,2)(1,4,~0)(5,6,~1)", "BRRBBBB")
+            VeeringTriangulation("(0,3,2)(~0,1,4)(~1,5,6)", "BRRBBBB")
             sage: L
-            VeeringTriangulationLinearFamily("(0,3,2)(1,4,~0)(5,6,~1)", "BRRBBBB", [(1, 0, 0, 1, 1, 1, 1), (0, 1, 1, -1, 1, 1, 0)])
+            VeeringTriangulationLinearFamily("(0,3,2)(~0,1,4)(~1,5,6)", "BRRBBBB", [(1, 0, 0, 1, 1, 1, 1), (0, 1, 1, -1, 1, 1, 0)])
 
-            sage: L.flip(4, 2)
-            sage: T.flip(4, 2)
+            sage: L.flip(8, 2)
+            sage: T.flip(8, 2)
             sage: T
-            VeeringTriangulation("(0,3,2)(1,~0,4)(5,6,~1)", "BRRBBBB")
+            VeeringTriangulation("(0,3,2)(~0,4,1)(~1,5,6)", "BRRBBBB")
             sage: L
-            VeeringTriangulationLinearFamily("(0,3,2)(1,~0,4)(5,6,~1)", "BRRBBBB", [(1, 0, 0, 1, 1, 1, 1), (0, 1, 1, -1, -1, 1, 0)])
+            VeeringTriangulationLinearFamily("(0,3,2)(~0,4,1)(~1,5,6)", "BRRBBBB", [(1, 0, 0, 1, 1, 1, 1), (0, 1, 1, -1, -1, 1, 0)])
 
-            sage: T.flip(5, 2)
-            sage: L.flip(5, 2)
+            sage: T.flip(10, 2)
+            sage: L.flip(10, 2)
             sage: T
-            VeeringTriangulation("(0,3,2)(1,~0,4)(5,~1,6)", "BRRBBBB")
+            VeeringTriangulation("(0,3,2)(~0,4,1)(~1,6,5)", "BRRBBBB")
             sage: L
-            VeeringTriangulationLinearFamily("(0,3,2)(1,~0,4)(5,~1,6)", "BRRBBBB", [(1, 0, 0, 1, 1, 1, 1), (0, 1, 1, -1, -1, -1, 0)])
+            VeeringTriangulationLinearFamily("(0,3,2)(~0,4,1)(~1,6,5)", "BRRBBBB", [(1, 0, 0, 1, 1, 1, 1), (0, 1, 1, -1, -1, -1, 0)])
         """
         super().flip(e, col, Gx=self._subspace, check=check)
         self._subspace.echelonize()
@@ -856,9 +827,9 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
 
         C = []  # middle edges
         for cyl in cylinders:
-            c = [0] * self.num_edges()  # indicatrix of the middle edges
+            c = [0] * self._ne
             for e in cyl[0]:
-                c[self._norm(e)] = 1
+                c[e // 2] = 1
             C.append(c)
 
         # take intersection of the cylinder twists in the tangent space
@@ -898,7 +869,7 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
         cols = [RED, BLUE]
         for _ in range(repeat):
             e = choice(self.forward_flippable_edges())
-            old_col = self._colouring[e]
+            old_col = self._colouring[e // 2]
             shuffle(cols)
             for c in cols:
                 self.flip(e, c)
@@ -931,15 +902,15 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
             sage: vt = VeeringTriangulation("(1,4,~2)(2,~6,~3)(3,~5,~4)", boundary="(0:1)(5:1)(6:1)(~1:1,~0:1)", colouring="BBRRBBB")
             sage: F = VeeringTriangulationLinearFamily(vt, [(1, 2, 0, -1, 2, 1, 1), (0, 0, 1, 1, -1, 0, 0)])
             sage: F
-            VeeringTriangulationLinearFamily("(1,4,~2)(2,~6,~3)(3,~5,~4)(0:1)(5:1)(6:1)(~1:1,~0:1)", "BBRRBBB", [(1, 2, 0, -1, 2, 1, 1), (0, 0, 1, 1, -1, 0, 0)])
+            VeeringTriangulationLinearFamily("(1,4,~2)(2,~6,~3)(3,~5,~4)(0:1)(~0:1,~1:1)(5:1)(6:1)", "BBRRBBB", [(1, 2, 0, -1, 2, 1, 1), (0, 0, 1, 1, -1, 0, 0)])
             sage: F.strebel_graph()
-            StrebelGraphLinearFamily("(0)(1,~2)(2,~3,~1,~0)(3)", [(1, 0, 1, 1), (0, 1, -1, 0)])
+            StrebelGraphLinearFamily("(0)(~0,2,~3,~1)(1,~2)(3)", [(1, 0, 1, 1), (0, 1, -1, 0)])
 
             sage: vt = VeeringTriangulation("(0,5,~4)(2,6,~5)(3,~0,7)(4,~3,~1)", boundary="(1:1)(~7:1)(~6:1)(~2:1)", colouring="RRRBBBBB")
             sage: f1 = vt.add_residue_constraints([[1, 1, 1, 0]])
             sage: f1.strebel_graph().residue_constraints().echelon_form()
-            [1 1 1 0]
-            [0 0 0 1]
+            [1 0 1 1]
+            [0 1 0 0]
 
         An example with folded edges::
 
@@ -949,14 +920,12 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
             sage: vt = VeeringTriangulation("", boundary="(0:1)(1:1,~0:1)", colouring="RR")
             sage: f = VeeringTriangulationLinearFamily(vt, [(1, 1/4*sqrt17 - 3/4)])
             sage: f.strebel_graph()
-            StrebelGraphLinearFamily("(0)(1,~0)", [(1, 1/4*sqrt17 - 3/4)])
+            StrebelGraphLinearFamily("(0)(~0,1)", [(1, 1/4*sqrt17 - 3/4)])
         """
         indices = []
-        m = self.num_edges()
-        for e in range(self.num_edges()):
-            if self._ep[e] != e and self._ep[e] < m:
-                raise RuntimeError('ep permutation not in standard form')
-            if self.is_half_edge_strebel(e, slope) and self.is_half_edge_strebel(self._ep[e], slope):
+        fp = self._fp
+        for e in range(self._ne):
+            if self.is_half_edge_strebel(2 * e, slope) and (fp[2 * e + 1] == -1 or self.is_half_edge_strebel(2 * e + 1)):
                 indices.append(e)
 
         G = VeeringTriangulation.strebel_graph(self, slope, mutable=False)
@@ -971,7 +940,7 @@ class StrebelGraphLinearFamily(LinearFamily, StrebelGraph):
         sage: from veerer import StrebelGraphLinearFamily
         sage: G = StrebelGraphLinearFamily("(0,1,2)(~0,~1:1,~2:2)", [(1, 1, 0), (1, 0, 1)])
         sage: G
-        StrebelGraphLinearFamily("(0,1,2)(~2:2,~0,~1:1)", [(1, 0, 1), (0, 1, -1)])
+        StrebelGraphLinearFamily("(0,1,2)(~0,~1:1,~2:2)", [(1, 0, 1), (0, 1, -1)])
         sage: G.dimension()
         2
     """
@@ -1069,14 +1038,14 @@ class StrebelGraphLinearFamily(LinearFamily, StrebelGraph):
             ....:     print(colouring, sum(1 for _ in G.veering_triangulations(colouring)), sum(1 for _ in G.delaunay_triangulations(colouring)))
             ....:     assert all(vt.strebel_graph() == G for vt in G.veering_triangulations(colouring))
             ....:     assert all(vt.strebel_graph() == G for vt in G.delaunay_triangulations(colouring))
-            array('i', [1, 1, 1, 1, 1, 1]) 1 1
-            array('i', [1, 1, 2, 2, 1, 1]) 6 2
-            array('i', [1, 2, 1, 1, 2, 1]) 3 1
-            array('i', [1, 2, 2, 2, 2, 1]) 6 0
-            array('i', [2, 1, 1, 1, 1, 2]) 3 0
-            array('i', [2, 1, 2, 2, 1, 2]) 3 2
-            array('i', [2, 2, 1, 1, 2, 2]) 3 1
-            array('i', [2, 2, 2, 2, 2, 2]) 1 1
+            array('i', [1, 1, 1]) 1 1
+            array('i', [1, 1, 2]) 6 2
+            array('i', [1, 2, 1]) 3 1
+            array('i', [1, 2, 2]) 6 0
+            array('i', [2, 1, 1]) 3 0
+            array('i', [2, 1, 2]) 3 2
+            array('i', [2, 2, 1]) 3 1
+            array('i', [2, 2, 2]) 1 1
         """
         for vt in StrebelGraph.veering_triangulations(self, colouring, slope, mutable):
             switch = vt.generators_matrix(mutable=True)
@@ -1328,8 +1297,7 @@ class VeeringTriangulationLinearFamilies:
             sage: from veerer.linear_family import VeeringTriangulationLinearFamilies
             sage: f = VeeringTriangulationLinearFamilies.triangle_3_4_13_unfolding_orbit_closure()
             sage: f
-            VeeringTriangulationLinearFamily("(0,9,~8)(1,8,2)(3,11,~10)(4,~14,15)(5,~15,12)(6,~16,13)(7,~0,22)(10,14,~9)(16,~12,~4)(17,20,~18)(18,~5,~23)(19,~22,~21)(21,~13,23)(~20,~6,~17)(~19,~7,~1)(~11,~2,~3)", "BBRBRBRRRRRRRRBRBBRRRBRR", [(1, phi, 0, 0, 0, 1, 0, 0, -phi, -phi - 1, 0, 0, -phi, -phi, phi + 1, -phi - 1, phi, 0, 0, -phi, 0, phi - 1, -1, -1), (0, 0, 1, 0, 0, 0, phi - 1, 0, 1, 1, 1, 1, 0, phi - 1, 0, 0, 0, 0, phi - 1, 0, phi - 1, 0, 0, phi - 1), (0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, phi - 1, 0, 0, -phi + 1, 0, 0, 0), (0, 0, 0, 0, 1, 0, 0, phi - 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, phi - 1, 0, 0, phi - 1, 0)])
-
+            VeeringTriangulationLinearFamily("(0,9,~8)(~0,22,7)(1,8,2)(~1,~19,~7)(~2,~3,~11)(3,11,~10)(4,~14,15)(~4,16,~12)(5,~15,12)(~5,~23,18)(6,~16,13)(~6,~17,~20)(~9,10,14)(~13,23,21)(17,20,~18)(19,~22,~21)", "BBRBRBRRRRRRRRBRBBRRRBRR", [(1, phi, 0, 0, 0, 1, 0, 0, -phi, -phi - 1, 0, 0, -phi, -phi, phi + 1, -phi - 1, phi, 0, 0, -phi, 0, phi - 1, -1, -1), (0, 0, 1, 0, 0, 0, phi - 1, 0, 1, 1, 1, 1, 0, phi - 1, 0, 0, 0, 0, phi - 1, 0, phi - 1, 0, 0, phi - 1), (0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, phi - 1, 0, 0, -phi + 1, 0, 0, 0), (0, 0, 0, 0, 1, 0, 0, phi - 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, phi - 1, 0, 0, phi - 1, 0)])
             sage: f.stratum()  # optional - surface_dynamics
             Q_4(11, 1)
         """
