@@ -175,6 +175,9 @@ class Automaton:
 
         self._setup(**extra_kwds)
 
+    def is_connected(self):
+        return self._graph.is_connected()
+
     def _check(self):
         r"""
         Some consistency checks.
