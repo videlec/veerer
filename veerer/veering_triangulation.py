@@ -246,9 +246,6 @@ class VeeringTriangulation(Triangulation):
     def base_ring(self):
         return ZZ
 
-    def veering_triangulation(self):
-        return self
-
     def right_wedges(self, slope=VERTICAL):
         r"""
         Return the (vertical or horizontal) right sides of the wedges in this veering triangulation.
@@ -1252,7 +1249,7 @@ class VeeringTriangulation(Triangulation):
                 # NOTE: the code below could be called by a VeeringTriangulationLinearFamily
                 # for which the subgraph code is broken
                 # see https://github.com/flatsurf/veerer/issues/54
-                G = VeeringTriangulation.subgraph(self.veering_triangulation(), comp)
+                G = VeeringTriangulation.subgraph(self.constellation(), comp)
                 ans += 2 * G.genus() - 2 + (G.is_holomorphic() and G.is_abelian())
         return ans
 
@@ -1693,54 +1690,6 @@ class VeeringTriangulation(Triangulation):
         transp = {RED: BLUE, BLUE: RED, GREEN: GREEN, PURPLE: PURPLE}
         for i in range(self._ne):
             self._colouring[i] = transp[self._colouring[i]]
-
-    # TODO: finish this!!
-    def automorphism_quotient(self, aut):
-        r"""
-        Return the canonical triangulation of the quotient.
-
-        (vertex fixed, edge fixed, faces fixed)
-
-        EXAMPLES::
-
-            sage: from veerer import *
-
-            sage: p = "(0,~1,2)(~0,1,~3)(4,~5,3)(~4,6,~2)(7,~6,8)(~7,5,~9)(10,~11,9)(~10,11,~8)"
-            sage: cols = 'BRBBBRRBBBBR'
-            sage: T = VeeringTriangulation(p, cols)
-        """
-        raise NotImplementedError
-        nb_verts = 0  # vertices stabilized
-        nb_faces = 0  # faces stabilized
-        nb_edges = 0  # edges stabilized
-
-        n = self._n # ???
-        ep = self._triangulation.edge_permutation()
-
-        # edges
-        nb_edges = sum(aut[e] == ep[e] or aut[e] == e for e in range(n))
-
-        # vertices
-        verts, edge_to_vert = perm_cycles(self._vp)
-        for i,v in enumerate(verts):
-            if edge_to_vert[aut[v[0]]] == i:
-                # deg does not change
-                nb_edges += 1
-            else:
-                # deg is wrapped around
-                pass
-
-        # faces
-        faces, edge_to_face = perm_cycles(self._fp)
-        for i,f in enumerate(faces):
-            nb_faces += edge_to_face[aut[f[0]]] == i
-
-        return (nb_verts, nb_edges, nb_faces)
-
-        colours = self._colouring_string()
-        fp = perm_base64_str(self._fp)
-        ep = perm_base64_str(self._ep)
-        return colours + '_' + fp + '_' + ep
 
     def flip(self, e, col, Lx=None, Gx=None, reduced=None, check=True):
         r"""
@@ -2475,8 +2424,8 @@ class VeeringTriangulation(Triangulation):
             raise ValueError('invalid slope argument; must be VERTICAL or HORIZONTAL')
 
         for i, f in enumerate(self.boundary_faces()):
-            for e in f:
-                r[i, e // 2] += orientations[e]
+            for h in f:
+                r[i, h // 2] += orientations[h]
 
         return r
 
@@ -4427,7 +4376,7 @@ class VeeringTriangulation(Triangulation):
 
         return parallel_families
 
-    def degeneration(self, edges_low=None, edges_up=None, mutable=False):
+    def degeneration(self, edges_low=None, edges_up=None, mutable=False, check=True):
         r"""
         Return the veering triangulation obtained by blowing-up the given subset of ``edges``.
 
@@ -4435,7 +4384,7 @@ class VeeringTriangulation(Triangulation):
 
         EXAMPLES::
 
-            sage: from veerer import VeeringTriangulation
+            sage: from veerer import VeeringTriangulation, VeeringTriangulationLinearFamily
 
         Horizontal degeneration (cylinder blowup)::
 
@@ -4476,11 +4425,18 @@ class VeeringTriangulation(Triangulation):
             sage: f_low.stratum()  # optional - surface_dynamics
             H_0(0^2, -2)
 
-        An example related to parallel cylinder degeneration in the gothic locus::
+        Examples related to parallel cylinder degeneration in the gothic locus::
 
             sage: vt = VeeringTriangulation("(0,13,~21)(1,3,~2)(2,9,~3)(4,20,~5)(5,~26,~6)(6,~19,~7)(7,~16,~8)(8,~10,~9)(10,15,~11)(11,24,~12)(12,~14,~13)(14,~25,~15)(16,18,~17)(17,26,~18)(19,25,~20)(21,23,~22)(22,~24,~23)(~4,~1,~0)", "RBBRBRBBRBBRBBRBBBRRBBBRBBB")
             sage: _, f_low = vt.degeneration(edges_up=[1, 2, 4, 6, 7, 9, 10, 12, 13, 15, 16, 17, 20, 21, 22, 24, 25, 26], mutable=True)
             sage: f_low.set_canonical_labels()
+
+        TESTS:
+
+        This example used to not work::
+
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2:2,~3:2)", "BRRR")
+            sage: vt.degeneration([0], [1, 2, 3])
         """
         # We distinguish three kinds of triangles
         # - up triangles: when the three edges are in the up partition
@@ -4510,8 +4466,11 @@ class VeeringTriangulation(Triangulation):
             edges_low = set(edges_low)
             edges_up = set(edges_up)
 
-        if not edges_low or not edges_up or edges_low.intersection(edges_up) or edges_low.union(edges_up) != set(range(m)):
-            raise ValueError('invalid arguments: edges_low={} edges_up={}'.format(edges_low, edges_up))
+        if check:
+            edges_low = set(self._check_edge(e) for e in edges_low)
+            edges_up = set(self._check_edge(e) for e in edges_up)
+            if not edges_low or not edges_up or edges_low.intersection(edges_up) or edges_low.union(edges_up) != set(range(m)):
+                raise ValueError('invalid arguments: edges_low={} edges_up={}'.format(edges_low, edges_up))
 
         half_edges_up = set(2 * e for e in edges_up).union(2 * e + 1 for e in edges_up if vp[2 * e + 1] != -1)
         half_edges_low = set(2 * e for e in edges_low).union(2 * e + 1 for e in edges_low if vp[2 * e + 1] != -1)
@@ -4724,6 +4683,16 @@ class VeeringTriangulation(Triangulation):
         # TODO: also return relabelling and horiz/vert nodes data
         return (f_up, f_low)
 
+    def horizontal_degeneration_up_edges_subsets(self):
+        for col in [RED, BLUE]:
+            for cyl_family in self.parallel_cylinders(col):
+                edges = set()
+                for cyl in cyl_family[0]:
+                    for i, j in enumerate(cyl):
+                        if j:
+                            edges.add(i)
+                yield tuple(sorted(edges))
+
     def codimension_one_horizontal_degenerations(self, mutable=False, mapping=False):
         r"""
         Return codimension one horizontal degenerations.
@@ -4747,16 +4716,10 @@ class VeeringTriangulation(Triangulation):
         """
         if mapping:
             raise NotImplementedError
-        for col in [RED, BLUE]:
-            for cyl_family in self.parallel_cylinders(col):
-                edges = []
-                for cyl in cyl_family[0]:
-                    for i, j in enumerate(cyl):
-                        if j:
-                            edges.append(i)
-                yield self.degeneration(edges_up=edges, mutable=mutable)
+        for edges in self.horizontal_degeneration_up_edges_subsets():
+            yield self.degeneration(edges_up=edges, mutable=mutable)
 
-    def vertical_degeneration_edge_subsets(self):
+    def vertical_degeneration_low_edges_subsets(self):
         r"""
         Iterate through subsets of admissible edge degenerations of given complex codimension ``codim``.
 
@@ -4767,7 +4730,7 @@ class VeeringTriangulation(Triangulation):
             sage: from veerer import VeeringTriangulation, VeeringTriangulationLinearFamily
 
             sage: vt = VeeringTriangulation("(0,8,~7)(1,3,~2)(2,10,~3)(4,6,~5)(5,11,~6)(7,~9,~8)(9,~11,~10)(~4,~1,~0)", "RRBRBBRRBRRB")
-            sage: list(vt.vertical_degeneration_edge_subsets())
+            sage: list(vt.vertical_degeneration_low_edges_subsets())
             [(2,),
              (6,),
              (8,),
@@ -4780,11 +4743,11 @@ class VeeringTriangulation(Triangulation):
              (4, 5, 6, 8, 11)]
 
             sage: vt = VeeringTriangulation("(0,1,2)(3,4,5)(6,7,8)(~0,~7,~5)(~3,~4,~2)(~6,~1,~8)", "RRBRRBRRB")
-            sage: list(vt.vertical_degeneration_edge_subsets())
+            sage: list(vt.vertical_degeneration_low_edges_subsets())
             [(8,), (2, 3, 4, 5)]
 
             sage: vt = VeeringTriangulation("(0,~7,6)(1,~5,~2)(2,4,~3)(3,11,~4)(5,10,~6)(7,9,~8)(8,~10,~9)(~11,~1,~0)", "RBRBRRBRBRRR")
-            sage: list(vt.vertical_degeneration_edge_subsets())
+            sage: list(vt.vertical_degeneration_low_edges_subsets())
             [(1,), (3,), (6,), (8,), (1, 3), (1, 6), (3, 8), (6, 8), (1, 3, 6), (1, 6, 8)]
         """
         cone = self.delaunay_cone()
@@ -4797,9 +4760,9 @@ class VeeringTriangulation(Triangulation):
         cylinders = {}
         for middle, bot, top, _ in itertools.chain(self.cylinders(RED), self.cylinders(BLUE)):
             # NOTE: each cylinder is a quadruple (middle, bottom, top, folded)
-            middle = [e // 2 for e in middle]
-            bot = [e // 2 for e in bot]
-            top = [e // 2 for e in top]
+            middle = [h // 2 for h in middle]
+            bot = [h // 2 for h in bot]
+            top = [h // 2 for h in top]
             cylinders[frozenset(bot)] = set().union(top, middle)
             cylinders[frozenset(top)] = set().union(bot, middle)
 
@@ -4811,10 +4774,8 @@ class VeeringTriangulation(Triangulation):
 
             done = False
             while not done:
-                # print('new loop')
                 vanishing_cone = vanishing_cone.add_constraints(cs)
 
-                # print('current cone dimension={}'.format(vanishing_cone.affine_dimension()))
                 vanishing_indices = [True] * (2 * ne)
                 for r in vanishing_cone.rays():
                     for i in range(2 * ne):
@@ -4824,24 +4785,22 @@ class VeeringTriangulation(Triangulation):
                 for i in range(ne):
                     num = vanishing_indices[i] + vanishing_indices[ne + i]
                     if num == 0:
-                        # print('i={} in Eup'.format(i))
                         pass
                     elif num == 1:
-                        # print('i={} partial vanishing'.format(i))
                         cs.insert(x[i] == 0)
                         cs.insert(y[i] == 0)
                         done = False
                         vanishing_edges.add(i)
                     elif num == 2:
-                        # print('i={} in Elow'.format(i))
                         vanishing_edges.add(i)
 
                 # exclude horizontal degenerations
                 for bdry, forced in cylinders.items():
                     if bdry.issubset(vanishing_edges) and not forced.issubset(vanishing_edges):
+                        for i in forced.difference(vanishing_edges):
+                            cs.insert(x[i] == 0)
+                            cs.insert(y[i] == 0)
                         vanishing_edges.update(forced)
-                        for e in forced.difference(vanishing_edges):
-                            cs.add_edge(e)
                         done = False
 
             return frozenset(vanishing_edges), vanishing_cone
@@ -4892,8 +4851,31 @@ class VeeringTriangulation(Triangulation):
              (H_1(0^2), H_0(1^2, -2^2)),
              (H_1(0), H_1(1^2, -2)),
              (H_1(0), H_1(1^2, -2))]
+
+        TESTS:
+
+        This example used to be wrong::
+
+            sage: from veerer import VeeringTriangulation, VeeringTriangulationLinearFamily
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,3,4)(~1,5,6)(~2,7,8)(~3,~5,9)(~4,10,~8)(~6,11,12)(~7,13,14)(~9,15,16)(~10,~12,17)(~11,18,19)(~13,~15,20)(~14,~16,21)(~17,22,23)(~18,24,~20)(~19,25,26)(~21,~26,~23)(~22,~24,~25)", "BRRRRBRRBRRRBBRRBRBRRRRBRBR")
+            sage: subspace = [(1, 0, 1, 0, 1, 0, 0, 0, -1, 0, 0, 0, 0, -2, 2, 2, 2, 0, -1, 1, 0, 0, 0, 0, 1, 1, 0),
+            ....:             (0, 1, 1, 0, 0, 0, 1, 2, 1, 0, 1, 1, 0, 2, 0, 0, 0, 1, 1, 0, 2, 0, 1, 0, 1, 0, 0),
+            ....:             (0, 0, 0, 1, 1, 0, 0, -1, -1, 1, 0, 0, 0, -2, 1, 1, 0, 0, -1, 1, -1, 1, 0, 0, 0, 0, 1),
+            ....:             (0, 0, 0, 0, 0, 1, -1, 1, 1, -1, 1, 1, 2, 2, -1, -1, 0, -1, 1, 0, 1, -1, 0, 1, 0, 0, 0)]
+            sage: vt = f = VeeringTriangulationLinearFamily(vt, subspace)
+            sage: assert all(f_up is not None for f_up in f.codimension_one_vertical_degenerations())
+            sage: half_edges = set(f.half_edges())
+            sage: for edges_low in f.vertical_degeneration_low_edges_subsets():
+            ....:     print(edges_low, tuple(sorted(half_edges.difference(edges_low))))
+            (0, 16, 25) (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 23, 24, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53)
+            (5, 12, 23) (0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53)
+            (8, 13, 18) (0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 17, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53)
+            (0, 8, 13, 16, 18, 25) (1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 17, 19, 20, 21, 22, 23, 24, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53)
+            sage: for edges_up in f.horizontal_degeneration_up_edges_subsets():
+            ....:     print(tuple(sorted(half_edges.difference(edges_up))), edges_up)
+            (0, 5, 8, 12, 13, 16, 18, 23, 25, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53) (1, 2, 3, 4, 6, 7, 9, 10, 11, 14, 15, 17, 19, 20, 21, 22, 24, 26)
         """
-        for edges in self.vertical_degeneration_edge_subsets():
+        for edges in self.vertical_degeneration_low_edges_subsets():
             yield self.degeneration(edges_low=edges, mutable=mutable)
 
     def is_half_edge_strebel(self, e, slope=VERTICAL, check=True):

@@ -27,17 +27,18 @@ Common base claas for class:~veerer.triangulation.Triangulations and :class:~vee
 # ****************************************************************************
 
 import collections
+import itertools
 import numbers
 from array import array
 
 from sage.structure.richcmp import op_LT, op_LE, op_EQ, op_NE, op_GT, op_GE, rich_to_bool
 
-from .permutation import (perm_init, perm_check, perm_cycles,
+from .permutation import (perm_init, perm_check, perm_cycles, perm_on_array, perm_on_edge_array,
                           perm_invert, perm_conjugate, perm_cycle_string, perm_cycles_lengths,
                           perm_cycles_to_string, perm_on_list, perm_on_edge_list, perm_cycle_type,
                           perm_num_cycles, str_to_cycles, str_to_cycles_and_data, perm_compose, perm_from_base64_str,
                           uint_base64_str, uint_from_base64_str, perm_base64_str,
-                          perms_are_transitive, perms_orbits, edge_relabelling_from)
+                          perms_are_transitive, perms_orbits, perm_edge_orbits, edge_relabelling_from)
 
 
 class Constellation:
@@ -62,7 +63,15 @@ class Constellation:
         else:
             self._vp = vp
 
-        self._fp = fp
+        if fp is None:
+            fp = self._fp = array('i', [-1] * (2 * ne))
+            for i in range(2 * ne):
+                if vp[i] == -1:
+                    continue
+                ii = vp[i] ^ 1 if vp[i] != -1 else vp[i]
+                fp[ii] = i
+        else:
+            self._fp = fp
 
         self._half_edges_data = half_edges_data
         self._edges_data = edges_data
@@ -333,6 +342,17 @@ class Constellation:
             raise ValueError("invalid half-edge h={}; the underlying edges is folded".format(h))
         return h
 
+    def _check_edge(self, e):
+        if not isinstance(e, numbers.Integral):
+            raise TypeError("invalid edge {}".format(e))
+        e = int(e)
+        if e < 0 or e >= self._ne:
+            raise ValueError("edge number out of range e={}".format(e))
+        return e
+
+    def constellation(self):
+        return self
+
     def to_string(self):
         r"""
         Serialize this triangulation as a string.
@@ -497,27 +517,62 @@ class Constellation:
             raise TypeError
         return self._ne != other._ne or self._fp != other._fp or self._half_edges_data != other._half_edges_data or self._edges_data != other._edges_data
 
-    def _richcmp_(self, other, op):
+    def _cmp_(self, other):
         r"""
-        Compare ``self`` and ``other`` according to the operator ``op``.
+        TESTS::
+
+            sage: import itertools
+            sage: from veerer import Triangulation
+            sage: ts = [Triangulation("(0,1,2)"), Triangulation("(0:1,1:1,2:1)"), Triangulation("(0:1,1:1,2:2)"), Triangulation("(0,1,2)(~0,~1,~2)"), Triangulation("(0,1,2)(~0,~1,~2)"), Triangulation("(0,~0,1)(~1,2,~2)")]
+            sage: for t1, t2 in itertools.product(ts, repeat=2):
+            ....:     c1 = t1._cmp_(t2)
+            ....:     c2 = t2._cmp_(t1)
+            ....:     assert c1 == -c2
+            ....:     assert (c1 == 0) == (t1 == t2)
         """
-        if type(self) != type(other):
-            raise TypeError
+        if type(self) is not type(other):
+            raise TypeError("can not compare {} with {}".format(type(self).__name__, type(other).__name__))
 
         c = (self._ne > other._ne) - (self._ne < other._ne)
         if c:
-            return rich_to_bool(op, c)
+            return c
 
         c = (self._fp > other._fp) - (self._fp < other._fp)
         if c:
-            return rich_to_bool(op, c)
+            return c
 
         c = (self._half_edges_data > other._half_edges_data) - (self._half_edges_data < other._half_edges_data)
         if c:
-            return rich_to_bool(op, c)
+            return c
 
         c = (self._edges_data > other._edges_data) - (self._edges_data < other._edges_data)
-        return rich_to_bool(op, c)
+        return c
+
+    def _richcmp_(self, other, op):
+        r"""
+        Compare ``self`` and ``other`` according to the operator ``op``.
+
+        EXMAPLES::
+
+            sage: import itertools
+            sage: from veerer import Triangulation
+            sage: ts = [Triangulation("(0,1,2)"), Triangulation("(0:1,1:1,2:1)"), Triangulation("(0:1,1:1,2:2)"), Triangulation("(0,1,2)(~0,~1,~2)"), Triangulation("(0,1,2)(~0,~1,~2)"), Triangulation("(0,~0,1)(~1,2,~2)")]
+            sage: for t1, t2 in itertools.product(ts, repeat=2):
+            ....:     if t1 == t2:
+            ....:         assert (t1 <= t2)
+            ....:         assert (t1 >= t2)
+            ....:         assert not (t1 < t2)
+            ....:         assert not (t1 > t2)
+            ....:     else:
+            ....:         assert (t1 < t2) + (t2 < t1) == 1
+            ....:         assert (t1 > t2) + (t2 > t1) == 1
+            ....:         assert (t1 < t2) == (t1 <= t2)
+            ....:         assert (t1 > t2) == (t1 >= t2)
+        """
+        if type(self) is not type(other):
+            raise TypeError("can not compare {} with {}".format(type(self).__name__, type(other).__name__))
+
+        return rich_to_bool(op, self._cmp_(other))
 
     def __lt__(self, other):
         return self._richcmp_(other, op_LT)
@@ -672,6 +727,22 @@ class Constellation:
         return self._vp[self._fp[e]]
 
     def face_permutation(self, copy=True):
+        r"""
+        Return the face permutation.
+
+        EXAMPLES::
+
+            sage: from veerer import Triangulation
+            sage: T = Triangulation("(0,3,5)(1,~3,2)(~2,4,~5)(~4,~1,~0)")
+            sage: T.face_permutation()
+            array('i', [6, 9, 7, 1, 2, 8, 10, 4, 11, 3, 0, 5])
+
+        If the triangulation has folded edges, then the face permutation is only partial::
+
+            sage: T = Triangulation("(0,1,2)(~0,3,4)")
+            sage: T.face_permutation()
+            array('i', [2, 6, 4, -1, 0, -1, 8, -1, 1, -1])
+        """
         if copy:
             return self._fp[:]
         else:
@@ -875,14 +946,14 @@ class Constellation:
 
     def connected_components(self):
         r"""
-        Return the connected components as a list of lists of half-edges.
+        Return the connected components as a list of lists of edges.
 
         EXAMPLES::
 
             sage: from veerer import Triangulation
             sage: T = Triangulation("(0,1,3)(~0,~1,~3)(2,4,5)(~2,~4,~5)")
             sage: T.connected_components()
-            [[0, 1, 2, 3, 6, 7], [4, 5, 8, 9, 10, 11]]
+            [[0, 1, 3], [2, 4, 5]]
 
         To construct the triangulation induced on each connected component, one can
         use the method :meth:`subgraph`::
@@ -893,48 +964,61 @@ class Constellation:
             sage: T.subgraph(c1)
             Triangulation("(0,1,2)(~0,~1,~2)")
         """
-        return perms_orbits((self._vp, self._fp), 2 * self._ne)
+        return perm_edge_orbits(self._vp, self._ne)
 
-    def subgraph(self, half_edges, mapping=False, mutable=False, check=True):
+    def subgraph(self, edges, mutable=False, check=True):
         r"""
-        Return the subgraph of this constellation induced on ``half_edges``.
+        Return the subgraph of this constellation induced on ``edges``.
 
-        Note that ``half_edges`` must be invariant under the edge permutation.
+        The numbering used on the returned subgraph corresponds to
+        the order of ``edges`` given as input.
+
+        EXAMPLES::
+
+            sage: from veerer import StrebelGraph
+            sage: t = StrebelGraph("(0,1,2)(~0,3,4)(~1,~3,5)(~2,~5,6)(~7,~6,7)")
+            sage: t.subgraph([0, 3, 5])
+            StrebelGraph("(0,~1,2,~2)(~0,1)")
+            sage: t.subgraph([5, 0, 3])  # isomorphic graph
+            StrebelGraph("(0,~0,1,~2)(~1,2)")
+
+        Note that the result might not be connected::
+
+            sage: t.subgraph([1, 6])
+            StrebelGraph("(0,~0)(1)(~1)")
         """
         if check:
-            half_edges = [self._check_half_edge(e) for e in half_edges]
-            S = set(half_edges)
-            if len(S) != len(half_edges):
-                raise ValueError('redundant half_edges')
-            if any(self._ep(e) not in S for e in S):
-                raise ValueError('half_edges not stable under the edge permutation')
+            edges = [self._check_edge(e) for e in edges]
+            S = set(edges)
+            if len(S) != len(edges):
+                raise ValueError('redundant edges')
 
-        n = len(half_edges)
-        relabel = [None] * (2 * self._ne)
-        for i, j in enumerate(half_edges):
-            relabel[j] = i
-        vp = array('i', [-1] * n)
-        ep = array('i', [-1] * n)
+        ne = len(edges)
+        relabel = [-1] * (2 * self._ne)
+        half_edges = []
+        for i, j in enumerate(edges):
+            relabel[2 * j] = 2 * i
+            relabel[2 * j + 1] = 2 * i + 1
+            half_edges.append(2 * j)
+            half_edges.append(2 * j + 1)
+        vp = array('i', [-1] * (2 * len(edges)))
 
-        for e_induced, e_orig in enumerate(half_edges):
-            ep[e_induced] = relabel[self._ep(e_orig)]
-
-            e = self._vp[e_orig]
-            while relabel[e] is None:
-                e = self._vp[e]
-            vp[e_induced] = relabel[e]
+        for h in half_edges:
+            if self._vp[h] == -1:
+                continue
+            h_image = self._vp[h]
+            while relabel[h_image] == -1:
+                h_image = self._vp[h_image]
+            vp[relabel[h]] = relabel[h_image]
 
         half_edges_data = []
         for l in self._half_edges_data:
-            half_edges_data.append(array('i', [l[e] for e in half_edges]))
-
-        edges = [e // 2 for e in half_edges if e % 2 == 0]
+            half_edges_data.append(array('i', [l[h] for h in half_edges]))
         edges_data = []
         for l in self._edges_data:
             edges_data.append(array('i', [l[e] for e in edges]))
 
-        output = self.__class__.from_permutations(vp, None, half_edges_data, edges_data, mutable=mutable, check=True)
-        return (output, relabel) if mapping else output
+        return self.__class__.from_permutations(vp, None, half_edges_data, edges_data, mutable=mutable, check=True)
 
     def connected_components_subgraphs(self, mutable=False):
         r"""
@@ -948,7 +1032,7 @@ class Constellation:
              [Triangulation("(0,1,2)(~0,~1,~2)"), Triangulation("(0,1,2)(~0,~1,~2)")]
         """
         for comp in self.connected_components():
-            yield self.subgraph(comp)
+            yield self.subgraph(comp, mutable=mutable)
 
     def swap(self, e, check=True):
         r"""
@@ -1091,7 +1175,7 @@ class Constellation:
             VeeringTriangulation("(0,~1,~2)(~0,1,2)", "RBB")
             sage: T._check()
 
-        Composing relabellings and permutation composition::
+        Composing relabellings and permutation composition (from left to right)::
 
             sage: from veerer.permutation import perm_compose, perm_random_centralizer
             sage: fp = "(0,16,~15)(1,19,~18)(2,22,~21)(3,21,~20)(4,20,~19)(5,23,~22)(6,18,~17)(7,17,~16)(8,~1,~23)(9,~2,~8)(10,~3,~9)(11,~4,~10)(12,~5,~11)(13,~6,~12)(14,~7,~13)(15,~0,~14)"
@@ -1139,12 +1223,106 @@ class Constellation:
         self._vp = perm_conjugate(self._vp, p)
         self._fp = perm_conjugate(self._fp, p)
         for l in self._half_edges_data:
-            perm_on_list(p, l, n)
+            perm_on_array(l, l, p, n)
 
         for l in self._edges_data:
-            perm_on_edge_list(p, l, n)
+            perm_on_edge_array(l, l, p, n)
 
         self._check()
+
+    # TODO: consider listing all quotients by looking at blocks under the monodromy group
+    def automorphism_quotient(self, mapping=False, mutable=False, check=True):
+        r"""
+        Return the quotient under the automorphism group.
+
+        EXAMPLES::
+
+            sage: from veerer import *
+
+        Veering triangulation example::
+
+            sage: vt = VeeringTriangulation("(0,1,2)(3,4,~0)(5,6,~1)(7,~2,8)(9,~3,~6)(10,~7,~4)(11,~5,12)(13,14,~8)(15,~9,16)(17,18,~10)(19,~17,~11)(20,~13,~12)(21,~14,~18)(22,~21,~15)(23,24,~16)(25,~23,~19)(26,~20,~25)(~26,~24,~22)", "RBBRBRBRRBRBBRBBRRBRRRBBRRB")
+            sage: len(vt.automorphisms())
+            2
+            sage: qvt = vt.automorphism_quotient()
+            sage: qvt
+            VeeringTriangulation("(0,1,2)(~0,3,4)(~1,5,6)(~2,8,7)(~3,~6,9)(~4,10,~7)(~5,12,11)(~8,13,~12)(~10,14,~11)", "RBBRBRBRRBRBBRR")
+            sage: (vt.stratum(), qvt.stratum())  # optional - surface_dynamics
+            (H_4(2^3), Q_1(1^3, -1^3))
+
+            sage: vt.automorphism_quotient(mapping=True)
+            (VeeringTriangulation("(0,1,2)(~0,3,4)(~1,5,6)(~2,8,7)(~3,~6,9)(~4,10,~7)(~5,12,11)(~8,13,~12)(~10,14,~11)", "RBBRBRBRRBRBBRR"),
+             array('i', [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 18, 20, 21, 22, 23, 24, 25, 26, 26, 25, 24, 13, 12, 7, 6, 28, 28, 23, 22, 21, 20, 17, 16, 11, 10, 3, 2, 8, 9, 1, 0, 15, 14, 5, 4]))
+
+        Strebel graph example::
+
+            sage: sg = StrebelGraph("(0,~0,~1)(1,2,~2)")
+            sage: sg.automorphism_quotient()
+            StrebelGraph("(0,~0,1)")
+        """
+        return self.quotient(perms_orbits(self.automorphisms()), mapping, mutable, check)
+
+    def quotient(self, blocks, mapping=False, mutable=False, check=True):
+        if check:
+            if not all(blocks):
+                raise ValueError("each block must be non empty")
+            blocks = [[self._check_half_edge(h) for h in block] for block in blocks]
+            half_edges = set().union(*blocks)
+            if half_edges != set(self.half_edges()):
+                raise ValueError("invalid blocks")
+            for block in blocks:
+                for l in self._half_edges_data:
+                    if len(set(l[h] for h in block)) != 1:
+                        raise ValueError("block must be constant on half-edges data")
+                    if len(set(l[h // 2] for h in block)) != 1:
+                        raise ValueError("block must be constant on edges data")
+
+        half_edge_to_block = [-1] * (2 * self._ne)
+        for i, block in enumerate(blocks):
+            for j in block:
+                half_edge_to_block[j] = i
+
+        if check:
+            for block in blocks:
+                if len(set(half_edge_to_block[self._vp[h]] for h in block)) != 1:
+                    raise ValueError("invalid blocks")
+                if len(set(half_edge_to_block[self._fp[h]] for h in block)) != 1:
+                    raise ValueError("invalid blocks")
+
+        ne = 0
+        block_relabelling = {-1: -1}
+        for e in range(self._ne):
+            i = half_edge_to_block[2 * e]
+            if i in block_relabelling:
+                continue
+            block_relabelling[i] = 2 * ne
+            if self._vp[2 * e + 1] != -1:
+                ii = half_edge_to_block[2 * e + 1]
+                if ii in block_relabelling:
+                    assert i == ii  # folding
+                else:
+                    block_relabelling[ii] = 2 * ne + 1
+            ne += 1
+
+        vp = array('i', [-1] * (2 * ne))
+        fp = array('i', [-1] * (2 * ne))
+        half_edges_data = [array('i', [0] * (2 * ne)) for _ in self._half_edges_data]
+        edges_data = [array('i', [0] * ne) for _ in self._edges_data]
+        for i, block in enumerate(blocks):
+            h = block[0]
+            ii = half_edge_to_block[self._vp[h]]
+            vp[block_relabelling[i]] = block_relabelling[ii]
+
+            ii = half_edge_to_block[self._fp[h]]
+            fp[block_relabelling[i]] = block_relabelling[ii]
+
+            for ldest, lsrc in zip(half_edges_data, self._half_edges_data):
+                ldest[block_relabelling[i]] = lsrc[h]
+            for ldest, lsrc in zip(edges_data, self._edges_data):
+                ldest[block_relabelling[i] // 2] = lsrc[h // 2]
+
+        quotient = self.from_permutations(vp, fp, half_edges_data, edges_data, mutable, check)
+        return (quotient, array('i', [block_relabelling[half_edge_to_block[h]] for h in range(2 * self._ne)])) if mapping else quotient
 
     def _relabelling_from(self, root):
         r"""
@@ -1205,14 +1383,16 @@ class Constellation:
         """
         root = self._check_half_edge(root)
         relabelling = array('i', [-1] * (2 * self._ne))
-        last = edge_relabelling_from(relabelling, self._fp, self._ne * 2, root, 0)
+        fp_new = array('i', [-1] * (2 * self._ne))
+        last = edge_relabelling_from(relabelling, fp_new, self._fp, self._ne * 2, root, 0)
+        assert fp_new == perm_conjugate(self._fp, relabelling), (fp_new, perm_conjugate(self._fp, relabelling))
         if last // 2 != self._ne:
             raise ValueError("non-connected constellation")
         return relabelling
 
     def automorphisms(self):
         r"""
-        Return the list of automorphisms of this triangulation.
+        Return the list of automorphisms of this constellation.
 
         The output is a list of arrays that are permutations acting on the set
         of half edges.
@@ -1245,10 +1425,6 @@ class Constellation:
             sage: A = V.automorphisms()
             sage: len(A)
             4
-            sage: S = V.copy(mutable=True)
-            sage: for a in A:
-            ....:     S.relabel(a)
-            ....:     assert S == V
 
         Examples with boundaries::
 
@@ -1266,17 +1442,38 @@ class Constellation:
 
             sage: s = StrebelGraph("(0,3,7,~6,~2,1)(2,5,~4,~3,~1,~0)(4,8,~5)(6,~8,~7)")
             sage: f = StrebelGraphLinearFamily(s, [(2, 0, 0, 0, 1, 0, 1, 0, 2), (0, 2, 0, 0, 0, 1, 0, 1, 2), (0, 0, 1, 1, 0, 0, 0, 0, 2)])
+            sage: len(s.automorphisms())
+            2
             sage: len(f.automorphisms())
             2
-        """
-        if self.is_connected():
-            best_relabellings = self.best_relabelling(all=True)[0]
-            p0 = perm_invert(best_relabellings[0])
-            return [perm_compose(p, p0) for p in best_relabellings]
-        else:
-            raise NotImplementedError
 
-    def best_relabelling(self, all=False):
+        A non-connected example::
+
+            sage: t = Triangulation("(0,1,3)(2,4,~4)(~2,5,~5)(6,7,8)")
+            sage: len(t.automorphisms())
+            36
+
+        TESTS::
+
+            sage: examples = []
+            sage: examples.append(Triangulation("(0,~1,2)(~0,1,~3)(4,~5,3)(~4,6,~2)(7,~6,8)(~7,5,~9)(10,~11,9)(~10,11,~8)"))
+            sage: examples.append(Triangulation("(0,8,~7)(1,9,~0)(2,10,~1)(3,11,~2)(4,12,~3)(5,13,~4)(6,14,~5)(7,15,~6)"))
+            sage: examples.append(Triangulation("(0,1,2)", boundary="(~0:1)(~1:1)(~2:1)"))
+            sage: examples.append(Triangulation("(0,1,3)(2,4,~4)(~2,5,~5)(6,7,8)"))
+
+            sage: examples.append(StrebelGraph("(0,3,7,~6,~2,1)(2,5,~4,~3,~1,~0)(4,8,~5)(6,~8,~7)"))
+            sage: for G in examples:
+            ....:     H = G.copy(mutable=True)
+            ....:     for a in G.automorphisms():
+            ....:         assert H == G
+            ....:         H.relabel(a)
+            ....:         assert H == G, (G, H, a)
+        """
+        best_relabellings = self.best_relabelling(return_all=True)[0]
+        p0 = perm_invert(best_relabellings[0])
+        return [perm_compose(p, p0) for p in best_relabellings]
+
+    def best_relabelling(self, return_all=False):
         r"""
         Return a pair ``(r, data)`` where ``r`` is a relabelling that
         brings this constellation to the canonical one.
@@ -1289,85 +1486,188 @@ class Constellation:
             sage: examples = []
             sage: triangles = "(0,~1,2)(~0,1,~3)(4,~5,3)(~4,6,~2)(7,~6,8)(~7,5,~9)(10,~11,9)(~10,11,~8)"
             sage: examples.append(Triangulation(triangles, mutable=True))
+            sage: examples.append(Triangulation("(0,1,3)(2,4,~4)(~2,5,~5)(6,7,8)", mutable=True))
             sage: fp = "(0,~1,2)(~0,1,~3)(4,~5,3)(~4,6,~2)(7,~6,8)(~7,5,~9)(10,~11,9)(~10,11,~8)"
             sage: cols = "BRBBBRRBBBBR"
             sage: examples.append(VeeringTriangulation(fp, cols, mutable=True))
+            sage: fp = "(0,16,~15)(1,19,~18)(2,22,~21)(3,21,~20)(4,20,~19)(5,23,~22)(6,18,~17)(7,17,~16)(8,~1,~23)(9,~2,~8)(10,~3,~9)(11,~4,~10)(12,~5,~11)(13,~6,~12)(14,~7,~13)(15,~0,~14)"
+            sage: cols = "RRRRRRRRBBBBBBBBBBBBBBBB"
+            sage: examples.append(VeeringTriangulation(fp, cols, mutable=True))
+            sage: examples.append(StrebelGraph("(0,6,~5,~3,~1,4,~4,2,~2)(1)(3,~0)(5)(~6)", mutable=True))
             sage: examples.append(StrebelGraph("(0,6,~5,~3,~1,4,~4:3,2,~2:3)(1:2)(3:2,~0)(5:2)(~6)", mutable=True))
 
             sage: for G in examples:
             ....:     print(G)
-            ....:     r, (fp, half_edges_data, edges_data) = G.best_relabelling()
+            ....:     r, fp, half_edges_data, edges_data = G.best_relabelling()
             ....:     for _ in range(10):
             ....:         p = perm_random_centralizer(G.edge_permutation())
             ....:         G.relabel(p)
-            ....:         r2, (fp2, half_edges_data2, edges_data2) = G.best_relabelling()
+            ....:         r2, fp2, half_edges_data2, edges_data2 = G.best_relabelling()
             ....:         assert fp2 == fp, G
-            ....:         assert half_edges_data2 == half_edges_data, G
-            ....:         assert edges_data2 == edges_data, G
+            ....:         assert half_edges_data2 == half_edges_data, (G, half_edges_data2, half_edges_data)
+            ....:         assert edges_data2 == edges_data, (G, edges_data2, edges_data)
             Triangulation("(0,~1,2)(~0,1,~3)(~2,~4,6)(3,4,~5)(5,~9,~7)(~6,8,7)(~8,~10,11)(9,10,~11)")
+            Triangulation("(0,1,3)(2,4,~4)(~2,5,~5)(6,7,8)")
             VeeringTriangulation("(0,~1,2)(~0,1,~3)(~2,~4,6)(3,4,~5)(5,~9,~7)(~6,8,7)(~8,~10,11)(9,10,~11)", "BRBBBRRBBBBR")
+            VeeringTriangulation("(0,16,~15)(~0,~14,15)(1,19,~18)(~1,~23,8)(2,22,~21)(~2,~8,9)(3,21,~20)(~3,~9,10)(4,20,~19)(~4,~10,11)(5,23,~22)(~5,~11,12)(6,18,~17)(~6,~12,13)(7,17,~16)(~7,~13,14)", "RRRRRRRRBBBBBBBBBBBBBBBB")
+            StrebelGraph("(0,6,~5,~3,~1,4,~4,2,~2)(~0,3)(1)(5)(~6)")
             StrebelGraph("(0,6,~5,~3,~1,4,~4:3,2,~2:3)(~0,3:2)(1:2)(5:2)(~6)")
         """
+        ne = self._ne
+        n = 2 * ne
+
         if not self.is_connected():
             # each compoent is labelled with consecutive half-edge labels
             # we use canonical labels for each of them, and then use a total ordering on the components
-            component_number = [-1] * self._n
-            relabel = [-1] * self._n
-            components = []
-            for cc_num, cc in enumerate(self.connected_components()):
-                # relabel_local is a partial map: {edges in self} -> {edges in image}
-                vt, relabel_local = self.subgraph(cc, mapping=True, mutable=True)
-                r, _ = vt.best_relabelling()
-                vt.relabel(r)
-                for i, j in enumerate(relabel_local):
-                    if j is None:
-                        continue
-                    component_number[i] = cc_num
-                    relabel[i] = r[j]
-                components.append((vt, cc_num))
+            components = {}
+            for cc in self.connected_components():
+                # TODO: set check to False
+                comp = self.subgraph(cc, check=True)
+                relabelling_best, fp_best, half_edges_data_best, edges_data_best = comp.best_relabelling(return_all=return_all)
 
-            components.sort()
-            # now glue permutations and relabelling
-            # TODO: the edge permutation will not be in canonical form!!!!!
+                comp_hashable = [fp_best.tobytes()]
+                comp_hashable.extend(data.tobytes() for data in half_edges_data_best)
+                comp_hashable.extend(data.tobytes() for data in edges_data_best)
+                comp_hashable = tuple(comp_hashable)
+                if comp_hashable not in components:
+                    components[comp_hashable] = []
+                if return_all:
+                    data = (cc, relabelling_best[0], relabelling_best, fp_best, half_edges_data_best, edges_data_best)
+                else:
+                    data = (cc, relabelling_best, None, fp_best, half_edges_data_best, edges_data_best)
+
+                components[comp_hashable].append(data)
+
+            relabelling_best = array('i', [-1] * n)
+            fp_best = array('i', [-1] * n)
+            half_edges_data_best = array('i', [0] * n)
+            edges_data_best = array('i', [0] * n)
+
             shift = 0
-            vp = array('i', [-1] * self._n)
-            fp = array('i', [-1] * self._n)
-            for (vt, cc_num) in components:
-                for e in range(vt._n):
-                    vp[shift + e] = shift + vt._vp[e]
-                    fp[shift + e] = shift + vt._fp[e]
+            for comp_hashable in sorted(components):
+                value = components[comp_hashable]
+                for comp, comp_relabelling_best, _, _, _, _ in components[comp_hashable]:
+                    # NOTE: elements in comp are edges, not half-edges
+                    for i, j in enumerate(comp):
+                        i0 = comp_relabelling_best[2 * i]
+                        i1 = comp_relabelling_best[2 * i + 1]
+                        relabelling_best[2 * j] = shift + i0
+                        relabelling_best[2 * j + 1] = shift + i1
+                    shift += 2 * len(comp)
 
-        n = 2 * self._ne
-        fp = self._fp
+            fp_best = perm_conjugate(self._fp, relabelling_best)
+            half_edges_data_best = [l[:] for l in self._half_edges_data]
+            for ldest, lsrc in zip(half_edges_data_best, self._half_edges_data):
+                perm_on_array(ldest, lsrc, relabelling_best, n)
+            edges_data_best = [l[:] for l in self._edges_data]
+            for ldest, lsrc in zip(edges_data_best, self._edges_data):
+                perm_on_edge_array(ldest, lsrc, relabelling_best, n)
 
-        best = None
-        if all:
+            if not return_all:
+                return (relabelling_best, fp_best, half_edges_data_best, edges_data_best)
+
+            relabellings = []
+            for oc in itertools.product(*[itertools.permutations(components[comp_hashable]) for comp_hashable in sorted(components)]):
+                # run through all permutations of isomorphic components
+                comps = [data[0] for isom_comps in oc for data in isom_comps]
+                for comp_relabellings in itertools.product(*[data[2] for isom_comps in oc for data in isom_comps]):
+                    # run through products available relabellings
+                    relabelling = array('i', [-1] * n)
+                    shift = 0
+                    for comp, comp_relabelling in zip(comps, comp_relabellings):
+                        # NOTE: elements in comp are edges, not half-edges
+                        for i, j in enumerate(comp):
+                            i0 = comp_relabelling[2 * i]
+                            i1 = comp_relabelling[2 * i + 1]
+                            relabelling[2 * j] = shift + i0
+                            relabelling[2 * j + 1] = shift + i1
+                        shift += 2 * len(comp)
+                    relabellings.append(relabelling)
+
+            return (relabellings, fp_best, half_edges_data_best, edges_data_best)
+
+        else:
+            # connected case
+            fp = self._fp
+            half_edges_data = self._half_edges_data
+            edges_data = self._edges_data
             relabellings = []
 
-        for start_edge in self.half_edges():
-            if fp[start_edge] == -1:
-                continue
-            relabelling = self._relabelling_from(start_edge)
+            relabelling_new = array('i', [-1] * n)
+            relabelling_best = array('i', [-1] * n)
+            fp_new = array('i', [-1] * n)
+            fp_best = array('i', [-1] * n)
+            half_edges_data_new = [l[:] for l in half_edges_data]
+            half_edges_data_best = [l[:] for l in half_edges_data]
+            edges_data_new = [l[:] for l in edges_data]
+            edges_data_best = [l[:] for l in edges_data]
+            k_half_edges = len(half_edges_data)
+            k_edges = len(edges_data)
 
-            fp_new = perm_conjugate(fp, relabelling)
-            half_edges_data_new = [l[:] for l in self._half_edges_data]
-            for l in half_edges_data_new:
-                perm_on_list(relabelling, l, 2 * self._ne)
-            edges_data_new = [l[:] for l in self._edges_data]
-            for l in edges_data_new:
-                perm_on_edge_list(relabelling, l, 2 * self._ne)
+            half_edges = self.half_edges()
+            edge_relabelling_from(relabelling_best, fp_best, self._fp, 2 * ne, next(half_edges), 0)
+            for i in range(k_half_edges):
+                perm_on_array(half_edges_data_best[i], half_edges_data[i], relabelling_best, 2 * ne)
+            for i in range(k_edges):
+                perm_on_edge_array(edges_data_best[i], edges_data[i], relabelling_best, 2 * ne)
 
-            T = (fp_new, half_edges_data_new, edges_data_new)
-            if best is None or T < best:
-                best_relabelling = relabelling
-                best = T
-                if all:
-                    del relabellings[:]
-                    relabellings.append(relabelling)
-            elif all and T == best:
-                relabellings.append(relabelling)
+            if return_all:
+                relabellings.append(relabelling_best[:])
 
-        return (relabellings, best) if all else (best_relabelling, best)
+            for start_half_edge in half_edges:
+                # reinitialize relabelling_new as intended by edge_relabelling_from
+                for i in range(n):
+                    relabelling_new[i] = fp_new[i] = -1
+                end_image = edge_relabelling_from(relabelling_new, fp_new, self._fp, n, start_half_edge, 0)
+                assert end_image == 2 * ne, (end_image, ne)
+                assert sum(x == -1 for x in fp_new) == sum(x == -1 for x in self._fp)
+                assert all(x != -1 for x in relabelling_new)
+
+                c = 0
+                if fp_new < fp_best:
+                    # no need to compare anything else
+                    c = -1
+                elif fp_new > fp_best:
+                    # no need to go further
+                    c = 1
+                    continue
+
+                for i in range(k_half_edges):
+                    perm_on_array(half_edges_data_new[i], half_edges_data[i], relabelling_new, 2 * ne)
+                    if not c:
+                        if half_edges_data_new[i] < half_edges_data_best[i]:
+                            c = -1
+                        elif half_edges_data_new[i] > half_edges_data_best[i]:
+                            c = 1
+                            break
+                if c == 1:
+                    continue
+
+                for i in range(k_edges):
+                    perm_on_edge_array(edges_data_new[i], edges_data[i], relabelling_new, 2 * ne)
+                    if not c:
+                        if edges_data_new[i] < edges_data_best[i]:
+                            c = -1
+                        elif edges_data_new[i] > edges_data_best[i]:
+                            c = 1
+                            break
+                if c == 1:
+                    continue
+
+                # at this stage either c=0 and relabelling is identical or c=-1 and we found something better
+                if c == -1:
+                    fp_best, fp_new = fp_new, fp_best
+                    relabelling_best, relabelling_new = relabelling_new, relabelling_best
+                    half_edges_data_best, half_edges_data_new = half_edges_data_new, half_edges_data_best
+                    edges_data_best, edges_data_new = edges_data_new, edges_data_best
+                    if return_all:
+                        relabellings.clear()
+                        relabellings.append(relabelling_best[:])
+                elif return_all:
+                    assert c == 0
+                    relabellings.append(relabelling_new[:])
+
+            return (relabellings, fp_best, half_edges_data_best, edges_data_best) if return_all else (relabelling_best, fp_best, half_edges_data_best, edges_data_best)
 
     def set_canonical_labels(self):
         r"""
@@ -1390,8 +1690,12 @@ class Constellation:
         if not self._mutable:
             raise ValueError('immutable triangulation; use a mutable copy instead')
 
-        r, _ = self.best_relabelling()
-        self.relabel(r, check=False)
+        r, fp_best, half_edges_data_best, edges_data_best = self.best_relabelling()
+        self._fp = fp_best
+        self._vp = perm_conjugate(self._vp, r)
+        self._half_edges_data = half_edges_data_best
+        self._edges_data = edges_data_best
+        self._set_data_pointers()
 
     def iso_sig(self):
         r"""
@@ -1508,10 +1812,10 @@ class Constellation:
         if self._non_isom_easy(other):
             return (False, None) if certificate else False
 
-        r1, data1 = self.best_relabelling()
-        r2, data2 = other.best_relabelling()
+        r1, fp1, half_edges_data1, edges_data1 = self.best_relabelling()
+        r2, fp2, half_edges_data2, edges_data2 = other.best_relabelling()
 
-        if data1 != data2:
+        if fp1 != fp2 or half_edges_data1 != half_edges_data2 or edges_data1 != edges_data2:
             return (False, None) if certificate else False
         elif certificate:
             return (True, perm_compose(r1, perm_invert(r2)))

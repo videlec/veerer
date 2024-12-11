@@ -710,8 +710,8 @@ class StrebelGraph(Constellation):
         orientations = [1 if x else -1 for x in orientations]
 
         for i, f in enumerate(self.faces()):
-            for e in f:
-                r[i, e // 2] += orientations[e]
+            for h in f:
+                r[i, h // 2] += orientations[h]
 
         return r
 

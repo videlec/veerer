@@ -39,6 +39,7 @@ from sage.arith.misc import gcd
 from sage.categories.number_fields import NumberFields
 
 from .constants import VERTICAL, HORIZONTAL, BLUE, RED
+from .constellation import Constellation
 from .permutation import perm_init, perm_cycle_string, perm_cycles, perm_check, perm_conjugate, perm_on_list, perm_on_edge_list, perm_relabel_on_edges
 from .polyhedron import LinearExpressions, ConstraintSystem
 from .polyhedron.linear_expression import LinearConstraint
@@ -117,8 +118,8 @@ def subspace_cmp(subspace1, subspace2, check=True):
         return False
 
     base_ring = cm.common_parent(subspace1.base_ring(), subspace2.base_ring())
-    subspace1 = subspace1.echelon_form()
-    subspace2 = subspace2.echelon_form()
+    # subspace1 = subspace1.echelon_form()
+    # subspace2 = subspace2.echelon_form()
     for r1, r2 in zip(subspace1, subspace2):
         c = (r1 > r2) - (r1 < r2)
         if c:
@@ -275,6 +276,24 @@ class LinearFamily:
         if not self._mutable:
             self._subspace.set_immutable()
 
+    def constellation(self, mutable=False):
+        r"""
+        Return the underlying combinatorial veering triangulation or Strebel graph.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation, StrebelGraph
+
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: vt.as_linear_family().constellation() == vt
+            True
+
+            sage: sg = StrebelGraph("(0,1:1,2,~1,~0,~2)")
+            sage: sg.as_linear_family().constellation() == sg
+            True
+        """
+        return Constellation.copy(self, mutable, cls=self._constellation_class)
+
     def copy(self, mutable=None, cls=None):
         r"""
         Return a copy of this linear family.
@@ -391,7 +410,7 @@ class LinearFamily:
         return self._constellation_class.__ne__(self, other) or self._subspace != other._subspace
 
     def _richcmp_(self, other, op):
-        c = self._constellation_class._richcmp_(self, other)
+        c = self._constellation_class._cmp_(self, other)
         if c:
             return rich_to_bool(op, c)
 
@@ -539,51 +558,66 @@ class LinearFamily:
         self._subspace.echelonize()
         self._constellation_class.relabel(self, p, False)
 
-    def best_relabelling(self, all=False):
+    def best_relabelling(self, return_all=False):
         r"""
         Return the smallest relabelling of this linear family.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation, StrebelGraph, VeeringTriangulationLinearFamily, StrebelGraphLinearFamily
+
+
+            sage: f = VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~7,10,11)(~8,13,14)(~9,~13,~14)(~10,~11,~12)(~2:1,~6:1,8:1,5:1)(~3:1,6:1,9:1,~5:1)(4:1,12:1)(~4:1,7:1)", "RBBBBBBBBBRBBRB", [(1, 0, -1, -1, 0, 0, 0, -2, -1, -1, 2, 0, -2, 1, 0), (0, 1, 1, 1, 0, 0, 0, 2, 1, 1, 0, 2, 2, 0, 1), (0, 0, 0, 0, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0)])
+            sage: len(f.best_relabelling(return_all=True)[0])
+            8
+
+            sage: f = StrebelGraphLinearFamily("(0,2,3,1,5,6)(~0,~5,7,~8,~2,~6)(~1,4,~3)(~4,~7,8)", [(2, 1, 0, 0, 2, 0, 0, 0, 1), (0, 0, 1, 0, 2, 1, 0, 0, 0), (0, 0, 0, 1, 2, 0, 2, 1, 0)])
+            sage: len(f.best_relabelling(return_all=True)[0])
+            2
         """
-        n = self.num_half_edges()
-        m = self.num_edges()
+        ne = self._ne
+        n = 2 * ne
+        relabellings, fp_best, half_edges_data_best, edges_data_best = self.constellation().best_relabelling(return_all=True)
 
-        t_best = None
-        subspace_best = None
-        best_relabelling = None
-        if all:
-            relabellings = []
+        subspace_best = copy(self._subspace)
+        relabelling_best = relabellings[0]
+        r = perm_relabel_on_edges(relabelling_best, ne)[0]
+        matrix_permutation(subspace_best, r)
+        subspace_best.echelonize()
+        if return_all:
+            family_relabellings = [relabelling_best]
 
-        # TODO: we might want to either discriminate half_edge or only
-        # use the "combinatorial" best relabelling on the subspace
-        for start_edge in self.half_edges():
-            relabelling = self._relabelling_from(start_edge)
-            rr = perm_relabel_on_edges(relabelling, self._ne)[0]
+        for i in range(1, len(relabellings)):
+            relabelling_new = relabellings[i]
+            subspace_new = copy(self._subspace)
+            r = perm_relabel_on_edges(relabelling_new, ne)[0]
+            matrix_permutation(subspace_new, r)
+            subspace_new.echelonize()
+            if subspace_new < subspace_best:
+                relabelling_best = relabelling_new
+                subspace_best = subspace_new
+                if return_all:
+                    family_relabellings.clear()
+                    family_relabellings.append(relabelling_new)
+            elif return_all and subspace_new == subspace_best:
+                family_relabellings.append(relabelling_new)
 
-            fp_new = perm_conjugate(self._fp, relabelling)
-            half_edges_data_new = [l[:] for l in self._half_edges_data]
-            for l in half_edges_data_new:
-                perm_on_list(relabelling, l, 2 * self._ne)
-            edges_data_new = [l[:] for l in self._edges_data]
-            for l in edges_data_new:
-                perm_on_edge_list(relabelling, l, 2 * self._ne)
+        return (family_relabellings, fp_best, half_edges_data_best, edges_data_best, subspace_best) if return_all else (relabelling_best, fp_best, half_edges_data_best, edges_data_best, subspace_best)
 
-            # first compare the combinatorial data to avoid echelonization
-            t_new = (fp_new, half_edges_data_new, edges_data_new)
-            if t_best is None or t_new <= t_best:
-                subspace_new = copy(self._subspace)
-                matrix_permutation(subspace_new, rr)
-                subspace_new.echelonize()
-                subspace_new.set_immutable()
-                if subspace_best is None or (t_new < t_best or (t_new == t_best and subspace_new < subspace_best)):
-                    t_best = t_new
-                    subspace_best = subspace_new
-                    best_relabelling = relabelling
-                    if all:
-                        del relabellings[:]
-                        relabellings.append(relabelling)
-                elif all and t_new == t_best and subspace_new == subspace_best:
-                    relabellings.append(relabelling)
+    def set_canonical_labels(self):
+        r"""
+        Set labels in a canonical way in its automorphism class.
+        """
+        if not self._mutable:
+            raise ValueError('immutable triangulation; use a mutable copy instead')
 
-        return (relabellings, t_best + (subspace_best,)) if all else (best_relabelling, t_best + (subspace_best,))
+        r, fp_best, half_edges_data_best, edges_data_best, subspace_best = self.best_relabelling()
+        self._fp = fp_best
+        self._vp = perm_conjugate(self._vp, r)
+        self._half_edges_data = half_edges_data_best
+        self._edges_data = edges_data_best
+        self._set_data_pointers()
+        self._subspace = subspace_best
 
     def _non_isom_easy(self, other):
         return (self._constellation_class._non_isom_easy(self, other) or
@@ -622,6 +656,35 @@ class LinearFamily:
         # TODO: we have equations coming from the quotient and equations coming from the involution
         raise NotImplementedError
 
+    def quotient(self, blocks, mapping=False, mutable=False, check=True):
+        r"""
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation, VeeringTriangulationLinearFamily
+            sage: vt = VeeringTriangulation("(0,1,2)(3,4,~0)(5,6,~1)(7,~2,8)(9,~3,~6)(10,~7,~4)(11,~5,12)(13,14,~8)(15,~9,16)(17,18,~10)(19,~17,~11)(20,~13,~12)(21,~14,~18)(22,~21,~15)(23,24,~16)(25,~23,~19)(26,~20,~25)(~26,~24,~22)", "RBBRBRBRRBRBBRBBRRBRRRBBRRB")
+            sage: subspace = [(1, 0, -1, 0, -1, 0, 0, 0, 1, 0, 1, -1, -1, 0, -1, 0, 0, 0, -1, 1, 1, 0, 0, -1, 1, 0, -1),
+            ....:        (0, 1, 1, 0, 0, 1, 2, 0, -1, 2, 0, 0, 1, 0, 1, 2, 0, 0, 0, 0, -1, 1, 1, 0, 0, 0, 1),
+            ....:        (0, 0, 0, 1, 1, 1, 1, 0, 0, 0, -1, 1, 2, 2, 2, 1, 1, 0, 1, -1, 0, 1, 0, 1, 0, 0, 0),
+            ....:        (0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 1, 2, 1, 0, 0, 2, 1, 1, 1, 0, 0, 0, 0, 1, 0)]
+            sage: f = VeeringTriangulationLinearFamily(vt, subspace)
+            sage: f.automorphism_quotient()
+            VeeringTriangulationLinearFamily("(0,1,2)(~0,3,4)(~1,5,6)(~2,8,7)(~3,~6,9)(~4,10,~7)(~5,12,11)(~8,13,~12)(~10,14,~11)", "RBBRBRBRRBRBBRR", [(1, 0, -1, 0, -1, 0, 0, 0, 1, 0, 1, -1, -1, 0, 0), (0, 1, 1, 0, 0, 1, 2, 0, -1, 2, 0, 0, 1, 0, 0), (0, 0, 0, 1, 1, 1, 1, 0, 0, 0, -1, 1, 2, 2, 0), (0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 1, 2, 2)])
+        """
+        constellation_quotient, mapping = self.constellation().quotient(blocks, True, mutable, check)
+
+        if check:
+            for block in blocks:
+                for gen in self._subspace.rows():
+                    if len(set(gen[h // 2] for h in block)) != 1:
+                        raise ValueError("invalid blocks")
+
+        subspace = matrix(self.base_ring(), self._subspace.nrows(), constellation_quotient._ne)
+        for i in range(self._subspace.nrows()):
+            for block in blocks:
+                subspace[i, mapping[block[0]] // 2] = self._subspace[i, block[0] // 2]
+
+        return self.__class__(constellation_quotient, subspace)
+
 
 class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
     r"""
@@ -630,18 +693,6 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
     """
     __slots__ = ['_constellation_class', '_subspace']
 
-    def veering_triangulation(self, mutable=False):
-        r"""
-        Return the underlying veering triangulation.
-
-        EXAMPLES::
-
-            sage: from veerer import VeeringTriangulation
-            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
-            sage: vt.as_linear_family().veering_triangulation() == vt
-            True
-        """
-        return VeeringTriangulation.copy(self, mutable, cls=VeeringTriangulation)
 
     def _horizontal_subspace(self):
         mat = copy(self._subspace)

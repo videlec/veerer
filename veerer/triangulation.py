@@ -327,7 +327,7 @@ class Triangulation(Constellation):
             sage: Triangulation("(0)")
             Traceback (most recent call last):
             ...
-            ValueError: non-trianglular internal face starting at half-edge i=0
+            ValueError: non-triangular internal face starting at half-edge i=0
 
             sage: from array import array
             sage: fp = array('i', [2,-1,4,-1,0,-1])
@@ -355,7 +355,7 @@ class Triangulation(Constellation):
                 if any(self._bdry[i] for i in face):
                     raise error('invalid boundary data')
                 if len(face) != 3:
-                    raise error('non-trianglular internal face starting at half-edge i={}'.format(self._half_edge_string(i)))
+                    raise error('non-triangular internal face starting at half-edge i={}'.format(self._half_edge_string(i)))
 
     def to_flipper(self):
         r"""
@@ -598,6 +598,7 @@ class Triangulation(Constellation):
         """
         ne = self.num_edges()
         ep = self._ep
+        fp = self._fp
 
         assert m.nrows() == ne
         try:
@@ -606,16 +607,11 @@ class Triangulation(Constellation):
             V = m._row_ambient_module()
 
         # boundary condition
-        half_edges_to_edges = perm_dense_cycles(self._ep, 2 * self._ne)
         for F in self.faces():
             v = V.zero()
             for h in F:
-                e = half_edges_to_edges[h]
-                if ep[h] > h:
-                    v += m[e]
-                elif ep[h] < h:
-                    v -= m[e]
-                else:
+                e = h // 2
+                if fp[2 * e + 1] == -1:
                     # folded edge condition
                     # NOTE: it is stupid to keep all these zeros in
                     # the matrix! We should label the folded edges
@@ -623,7 +619,11 @@ class Triangulation(Constellation):
                     # though we can allow non-zero stuff assuming
                     # that the half edge is oriented toward the pole
                     assert m[e].is_zero()
-            assert v.is_zero()
+                elif h % 2 == 0:
+                    v += m[e]
+                else:
+                    v -= m[e]
+            assert v.is_zero(), (self, F, v)
 
     # TODO: also compute the intersection pairing!
     def homology_matrix(self):
@@ -647,28 +647,28 @@ class Triangulation(Constellation):
         from sage.matrix.constructor import matrix
         from sage.rings.integer_ring import ZZ
 
-        ep = self._ep
+        fp = self._fp
         nf = self.num_faces()
         ne = self.num_edges()
         nfe = self.num_folded_edges()
         m = matrix(ZZ, nf + nfe, ne)
 
         # face equations
-        half_edges_to_edges = perm_dense_cycles(self._ep, 2 * self._ne)
         for i, f in enumerate(self.faces()):
             for h in f:
-                e = half_edges_to_edges[h]
-                if ep[h] == h:
+                e = h // 2
+                if fp[2 * e + 1] == -1:
                     continue
-                elif ep[h] < h:
+                elif h % 2 == 0:
                     m[i, e] -= 1
                 else:
                     m[i, e] += 1
 
         # force the folded edge to have coefficient zero
-        for j, edge in enumerate(self.edges()):
-            if len(edge) == 1:
-                m[i, j] = 1
+        i = nf
+        for e in range(self._ne):
+            if fp[2 * e + 1] == -1:
+                m[i, e] = 1
                 i += 1
 
         # compute and check
@@ -676,7 +676,7 @@ class Triangulation(Constellation):
         self._check_homology_matrix(hom)
         return hom
 
-    def flip_homological_action(self, h, m, twist=False):
+    def flip_homological_action(self, h, m, twist=False, check=True):
         r"""
         Multiply the matrix ``m`` on the left by the homology action of
         the flip of the half-edge ``h``.
@@ -745,12 +745,15 @@ class Triangulation(Constellation):
         ne = self.num_edges()
         assert m.nrows() == ne
         ep = self._ep
+        fp = self._fp
 
-        if not twist and ep[h] == h:
+        if check:
+            h = self._check_half_edge(h)
+
+        if not twist and ep(h) == h:
             return
 
-        half_edges_to_edges = perm_dense_cycles(self._ep, 2 * self._ne)
-        eh = half_edges_to_edges[h]
+        eh = h // 2
 
         a, b, c, d = self.square_about_edge(h)
         # v_e use to be v_c + v_d and becomes v_d + v_a
@@ -772,10 +775,10 @@ class Triangulation(Constellation):
         #   swap_rows(i, j)
         #   add_multiple_of_row(i, j, s)
 
-        A = ep[a]
-        D = ep[d]
-        ea = half_edges_to_edges[a]
-        ed = half_edges_to_edges[d]
+        A = a if fp[a ^ 1] == -1 else a ^ 1
+        D = d if fp[d ^ 1] == -1 else d ^ 1
+        ea = a // 2
+        ed = d // 2
         if twist:
             m[eh] = m[ea] + m[ed]
         else:
@@ -827,15 +830,14 @@ class Triangulation(Constellation):
             ....:     T.relabel(p)
             ....:     T._check_homology_matrix(A)
         """
-        n = 2 * self._ne
-        ne = self.num_edges()
-        ep = self.edge_permutation()
+        ne = self._ne
+        n = 2 * ne
         if check and not perm_check(p, n):
-            p = perm_init(p, 2 * self._ne, edge_like=True)
+            p = perm_init(p, 2 * ne, edge_like=True)
             if not perm_check(p, n):
                 raise ValueError('invalid relabeling permutation')
 
-        r, s = perm_relabel_on_edges(ep, p, 2 * self._ne)
+        r, s = perm_relabel_on_edges(p, ne)
         q = perm_invert(r, ne)
         seen = [False] * ne
 
@@ -844,9 +846,9 @@ class Triangulation(Constellation):
                 continue
 
             seen[e0] = True
-            e = q[e0]
+            e = ee = q[e0]
             while not seen[e]:
-                assert e < ne
+                assert 0 <= e < ne
                 seen[e] = True
 
                 ee = q[e]
@@ -854,11 +856,12 @@ class Triangulation(Constellation):
                 if s[e] * s[ee] == -1 and not twist:
                     m[e] *= -1
 
-                e = ee
+                e, ee = ee, e
 
+            assert e == e0
             # one more sign change?
-            if s[e0] == -1 and not twist:
-                m[e0] *= -1
+            if s[e] * s[ee] == -1 and not twist:
+                m[e] *= -1
 
     def is_flippable(self, e, check=True):
         r"""
