@@ -4554,6 +4554,7 @@ class VeeringTriangulation(Triangulation):
                     col = colouring[ee // 2]
                     e = fp[e]
                 fp_up[relabelling_up[e]] = relabelling_up[ee]
+                angle_excess_up[relabelling_up[e]] = excess
 
             vt_up = VeeringTriangulation.from_permutations(None, fp_up, (angle_excess_up,), (colouring_up,), mutable=mutable)
 
