@@ -963,7 +963,7 @@ class CoreAutomaton(Automaton):
         state = state.copy(mutable=True)
         for e in state.forward_flippable_edges():
             for col in (BLUE, RED):
-                old_col = state.colour(e)
+                old_col = state.edge_colour(e)
                 state.flip(e, col, check=CHECK)
                 if state.edge_has_curve(e):
                     new_state = state.copy(mutable=True)
@@ -976,7 +976,7 @@ class CoreAutomaton(Automaton):
         state = state.copy(mutable=True)
         for e in state.backward_flippable_edges():
             for col in (BLUE, RED):
-                old_col = state.colour(e)
+                old_col = state.edge_colour(e)
                 state.flip_back(e, col, check=CHECK)
                 if state.edge_has_curve(e):
                     new_state = state.copy(mutable=True)
@@ -1264,7 +1264,7 @@ class DelaunayAutomaton(Automaton):
         Run through the list of out neighbors.
         """
         for edges, col in state.delaunay_flips(backend=self._backend):
-            assert all(state.colour(e) == state.colour(edges[0]) for e in edges)
+            assert all(state.edge_colour(e) == state.edge_colour(edges[0]) for e in edges)
             out_neighbor = state.copy(mutable=True)
             for e in edges:
                 out_neighbor.flip(e, col, check=CHECK)
@@ -1281,7 +1281,7 @@ class DelaunayAutomaton(Automaton):
         Run through the list of in neighbors.
         """
         for edges, col in state.backward_delaunay_flips(backend=self._backend):
-            assert all(state.colour(e) == state.colour(edges[0]) for e in edges)
+            assert all(state.edge_colour(e) == state.edge_colour(edges[0]) for e in edges)
             in_neighbor = state.copy(mutable=True)
             for e in edges:
                 in_neighbor.flip_back(e, col, check=CHECK)
@@ -1549,7 +1549,7 @@ class DelaunayStrebelAutomaton(Automaton):
                 if self._verbosity >= 2:
                     print('[_out_neighbors] forward_flips')
                 for edges, col in flips:
-                    assert all(state.colour(e) == state.colour(edges[0]) for e in edges)
+                    assert all(state.edge_colour(e) == state.edge_colour(edges[0]) for e in edges)
                     out_neighbor = state.copy(mutable=True)
                     for e in edges:
                         out_neighbor.flip(e, col, check=CHECK)

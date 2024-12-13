@@ -820,22 +820,22 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
             sage: L = VeeringTriangulationLinearFamily(T, [s, t], mutable=True)
             sage: T = T.copy(mutable=True)
 
-            sage: T.flip(6, 2)
-            sage: L.flip(6, 2)
+            sage: T.flip(3, 2)
+            sage: L.flip(3, 2)
             sage: T
             VeeringTriangulation("(0,3,2)(~0,1,4)(~1,5,6)", "BRRBBBB")
             sage: L
             VeeringTriangulationLinearFamily("(0,3,2)(~0,1,4)(~1,5,6)", "BRRBBBB", [(1, 0, 0, 1, 1, 1, 1), (0, 1, 1, -1, 1, 1, 0)])
 
-            sage: L.flip(8, 2)
-            sage: T.flip(8, 2)
+            sage: L.flip(4, 2)
+            sage: T.flip(4, 2)
             sage: T
             VeeringTriangulation("(0,3,2)(~0,4,1)(~1,5,6)", "BRRBBBB")
             sage: L
             VeeringTriangulationLinearFamily("(0,3,2)(~0,4,1)(~1,5,6)", "BRRBBBB", [(1, 0, 0, 1, 1, 1, 1), (0, 1, 1, -1, -1, 1, 0)])
 
-            sage: T.flip(10, 2)
-            sage: L.flip(10, 2)
+            sage: T.flip(5, 2)
+            sage: L.flip(5, 2)
             sage: T
             VeeringTriangulation("(0,3,2)(~0,4,1)(~1,6,5)", "BRRBBBB")
             sage: L

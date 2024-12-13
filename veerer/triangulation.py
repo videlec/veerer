@@ -280,7 +280,7 @@ class Triangulation(Constellation):
         sage: Triangulation("(0,1,2)(~0,~1,~2)", boundary={"~0": 1, "~1": 1, "~2": 0})
         Traceback (most recent call last):
         ...
-        ValueError: invalid boundary data
+        ValueError: invalid boundary data array('i', [0, 1, 0, 1, 0, 0])
 
     """
     __slots__ = ['_bdry']
@@ -676,10 +676,10 @@ class Triangulation(Constellation):
         self._check_homology_matrix(hom)
         return hom
 
-    def flip_homological_action(self, h, m, twist=False, check=True):
+    def flip_homological_action(self, e, m, twist=False, check=True):
         r"""
         Multiply the matrix ``m`` on the left by the homology action of
-        the flip of the half-edge ``h``.
+        the flip of the edge ``e``.
 
         The matrix ``m`` must have ``ne`` rows and each column represents a
         vector in cohomology (possibly twisted for quadratic differentials).
@@ -729,7 +729,7 @@ class Triangulation(Constellation):
             sage: w = [1,1,1,1,0,0]
             sage: A = matrix(ZZ, 3, 6, [u,v,w]).transpose()
             sage: B = copy(A)
-            sage: for i in (0, 4, 2, 6):
+            sage: for i in (0, 2, 1, 3):
             ....:     T.flip_homological_action(i, B)
             ....:     T.flip(i)
             ....:     T._check_homology_matrix(B)
@@ -742,20 +742,21 @@ class Triangulation(Constellation):
             [0 1 0]
             [1 1 1]
         """
+        if check:
+            e = self._check_edge(e)
+        h = 2 * e
+
         ne = self.num_edges()
         assert m.nrows() == ne
         ep = self._ep
         fp = self._fp
-
-        if check:
-            h = self._check_half_edge(h)
 
         if not twist and ep(h) == h:
             return
 
         eh = h // 2
 
-        a, b, c, d = self.square_about_edge(h)
+        a, b, c, d = self.square_about_half_edge(h)
         # v_e use to be v_c + v_d and becomes v_d + v_a
         # v<----------u     v<----------u
         # |     a    ^^     |^    a     ^
@@ -865,7 +866,7 @@ class Triangulation(Constellation):
 
     def is_flippable(self, e, check=True):
         r"""
-        Check whether the half-edge e is flippable.
+        Check whether the edge ``e`` is flippable.
 
         EXAMPLES::
 
@@ -874,11 +875,9 @@ class Triangulation(Constellation):
             sage: T = Triangulation("(0,1,2)(~0,~2,4)(~1,3,~3)")
             sage: T.is_flippable(0)
             True
-            sage: T.is_flippable(1)
-            True
-            sage: T.is_flippable(6)
+            sage: T.is_flippable(3)
             False
-            sage: T.is_flippable(8)
+            sage: T.is_flippable(4)
             True
 
         A torus with boundary::
@@ -886,53 +885,57 @@ class Triangulation(Constellation):
             sage: t = Triangulation("(0,2,1)(3,~1,~0)", boundary="(~3:1,~2:1)")
             sage: t.is_flippable(0)
             True
-            sage: t.is_flippable(2)
+            sage: t.is_flippable(1)
             True
-            sage: t.is_flippable(4)
+            sage: t.is_flippable(2)
             False
-            sage: t.is_flippable(5)
+            sage: t.is_flippable(3)
             False
         """
         if check:
-            e = self._check_half_edge(e)
-        E = self._ep(e)
-        a = self._fp[e]
+            h = self._check_half_edge(2 * e)
+        else:
+            h = 2 * e
+        H = self._ep(h)
+        a = self._fp[h]
         b = self._fp[a]
-        return not self._bdry[e] and not self._bdry[E] and a != E and b != E
+        return not self._bdry[h] and not self._bdry[H] and a != H and b != H
 
     def flippable_edges(self):
         r"""
+        Return the list of flippable edges.
+
         EXAMPLES::
 
             sage: from veerer import *
 
             sage: T = Triangulation("(0,1,2)(~0,~1,~2)")
             sage: T.flippable_edges()
-            [0, 2, 4]
+            [0, 1, 2]
             sage: V = VeeringTriangulation(T, [RED, RED, BLUE])
             sage: V.flippable_edges()
-            [0, 2]
+            [0, 1]
 
             sage: T = Triangulation("(0,1,2)(~0,3,4)(~1,~2)(~3,~4)", {"~1": 1, "~2": 1, "~3": 1, "~4": 1})
             sage: T.flippable_edges()
             [0]
         """
-        return [e for e in range(0, 2 * self._ne, 2) if self.is_flippable(e)]
+        return [e for e in range(self._ne) if self.is_flippable(e)]
 
-    def square_about_edge(self, e, check=True):
+    def square_about_half_edge(self, h, check=True):
         r"""
-        Return the four edges that makes ``e`` the diagonal of a quadrilateral.
+        Return the four half-edges that makes ``h`` the diagonal of a quadrilateral.
 
         EXAMPLES::
 
             sage: from veerer import Triangulation
 
             sage: T = Triangulation("(0,1,2)(~0,~1,~2)")
-            sage: T.square_about_edge(0)
+            sage: T.square_about_half_edge(0)
             (2, 4, 3, 5)
 
             sage: T = Triangulation("(0,1,2)")
-            sage: T.square_about_edge(0)
+            sage: T.square_about_half_edge(0)
             (2, 4, 2, 4)
         """
         # x<----------x
@@ -940,7 +943,7 @@ class Triangulation(Constellation):
         # |         / |
         # |        /  |
         # |       /   |
-        # |b    e/   d|
+        # |b    h/   d|
         # |     /     |
         # |    /      |
         # |   /       |
@@ -950,20 +953,19 @@ class Triangulation(Constellation):
         # x---------->x
 
         if check:
-            e = self._check_half_edge(e)
+            h = self._check_half_edge(h)
 
-        E = self._ep(e)
-        if check and (self._bdry[e] or self._bdry[E]):
+        H = self._ep(h)
+        if check and (self._bdry[h] or self._bdry[H]):
             raise ValueError('non internal edge')
 
-        a = self._fp[e]
+        a = self._fp[h]
         b = self._fp[a]
-        c = self._fp[E]
+        c = self._fp[H]
         d = self._fp[c]
 
         return a, b, c, d
 
-    # TODO: e would better be an edge rather than a half-edge
     def flip(self, e, check=True):
         r"""
         Flip the edge ``e``.
@@ -996,7 +998,7 @@ class Triangulation(Constellation):
             sage: t.flip(2)
             Traceback (most recent call last):
             ...
-            ValueError: can not flip non internal half-edge 2
+            ValueError: can not flip non internal edge 2
         """
         # v<----------u     v<----------u
         # |     a    ^^     |^    a     ^
@@ -1016,17 +1018,18 @@ class Triangulation(Constellation):
             raise ValueError('immutable triangulation; use a mutable copy instead')
 
         if check:
-            e = self._check_half_edge(e)
+            e = self._check_edge(e)
+        h = 2 * e
 
-        E = self._ep(e)
-        if self._bdry[e] or self._bdry[E]:
-            raise ValueError('can not flip non internal half-edge %s' % e)
+        H = self._ep(h)
+        if self._bdry[h] or self._bdry[H]:
+            raise ValueError('can not flip non internal edge %s' % e)
 
-        a = self._fp[e]
+        a = self._fp[h]
         b = self._fp[a]
-        if a == E or b == E:
-            raise ValueError('half-edge %s is not flippable' % e)
-        c = self._fp[E]
+        if a == H or b == H:
+            raise ValueError('edge %s is not flippable' % e)
+        c = self._fp[H]
         d = self._fp[c]
 
         A = self._ep(a)
@@ -1035,22 +1038,21 @@ class Triangulation(Constellation):
         D = self._ep(d)
 
         # fix face perm and cycles
-        self._fp[e] = b
+        self._fp[h] = b
         self._fp[b] = c
-        self._fp[c] = e
-        self._fp[a] = E
-        self._fp[E] = d
+        self._fp[c] = h
+        self._fp[a] = H
+        self._fp[H] = d
         self._fp[d] = a
 
         # fix vertex perm
         self._vp[a] = D
-        self._vp[b] = E
-        self._vp[E] = A
+        self._vp[b] = H
+        self._vp[H] = A
         self._vp[c] = B
-        self._vp[d] = e
-        self._vp[e] = C
+        self._vp[d] = h
+        self._vp[h] = C
 
-    # TODO: e would better be an edge rather than a half-edge
     def flip_back(self, e, check=True):
         r"""
         Flip back the edge ``e``.
@@ -1065,10 +1067,10 @@ class Triangulation(Constellation):
             sage: T == T0
             True
 
+            sage: T.flip(0)
             sage: T.flip(1)
-            sage: T.flip(2)
-            sage: T.flip_back(2)
             sage: T.flip_back(1)
+            sage: T.flip_back(0)
             sage: T == T0
             True
 
@@ -1097,18 +1099,19 @@ class Triangulation(Constellation):
             raise ValueError('immutable triangulation; use a mutable copy instead')
 
         if check:
-            e = self._check_half_edge(e)
+            h = self._check_edge(e)
+        h = 2 * e
 
-        E = self._ep(e)
+        H = self._ep(h)
 
-        if self._bdry[e] or self._bdry[E]:
-            raise ValueError('can not flip non-internal half-edge %s' % e)
+        if self._bdry[h] or self._bdry[H]:
+            raise ValueError('can not flip non-internal half-edge %s' % h)
 
-        a = self._fp[e]
+        a = self._fp[h]
         b = self._fp[a]
-        if a == E or b == E:
-            raise ValueError('half-edge %s is not flippable' % e)
-        c = self._fp[E]
+        if a == H or b == H:
+            raise ValueError('edge %s is not flippable' % e)
+        c = self._fp[H]
         d = self._fp[c]
 
         A = self._ep(a)
@@ -1117,20 +1120,20 @@ class Triangulation(Constellation):
         D = self._ep(d)
 
         # fix face perm and cycles
-        self._fp[e] = d
+        self._fp[h] = d
         self._fp[d] = a
-        self._fp[a] = e
+        self._fp[a] = h
         self._fp[b] = c
-        self._fp[c] = E
-        self._fp[E] = b
+        self._fp[c] = H
+        self._fp[H] = b
 
         # fix vertex perm
         self._vp[a] = D
-        self._vp[b] = e
-        self._vp[e] = A
+        self._vp[b] = h
+        self._vp[h] = A
         self._vp[c] = B
-        self._vp[d] = E
-        self._vp[E] = C
+        self._vp[d] = H
+        self._vp[H] = C
 
     def conjugate(self):
         r"""
