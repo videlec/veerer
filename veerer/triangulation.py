@@ -350,10 +350,10 @@ class Triangulation(Constellation):
             i = face[0]
             if self._bdry[i]:
                 if not all(self._bdry[i] for i in face):
-                    raise error('invalid boundary data')
+                    raise error('invalid boundary data {}'.format(self._bdry))
             else:
                 if any(self._bdry[i] for i in face):
-                    raise error('invalid boundary data')
+                    raise error('invalid boundary data {}'.format(self._bdry))
                 if len(face) != 3:
                     raise error('non-triangular internal face starting at half-edge i={}'.format(self._half_edge_string(i)))
 
@@ -1186,25 +1186,6 @@ class Triangulation(Constellation):
         from .cover import TriangulationCover
         return TriangulationCover(self, c, mutable=mutable, check=check)
 
-    def _check_xy(self, x, y):
-        if len(x) == self.num_edges():
-            xx = []
-            for i, edge in enumerate(self.edges()):
-                for j in edge:
-                    xx.append(x[i])
-            x = xx
-        elif len(x) != self._n or any(a < 0 for a in x):
-            raise ValueError('invalid argument x')
-        if len(y) == self.num_edges():
-            yy = []
-            for i, edge in enumerate(self.edges()):
-                for j in edge:
-                    yy.append(y[i])
-            y = yy
-        elif len(y) != self._n or any(a < 0 for a in y):
-            raise ValueError('invalid argument y')
-        return (x, y)
-
     def colouring_from_xy(self, x, y, check=True):
         r"""
         Return the veering colouring associated with the holonomy data ``x`` and ``y``.
@@ -1229,38 +1210,42 @@ class Triangulation(Constellation):
         """
         from .constants import BLUE, RED, PURPLE, GREEN
 
-        if check:
-            x, y = self._check_xy(x, y)
-
         def check_set_colouring(colouring, e, col):
             if colouring[e] is None:
                 colouring[e] = col
             elif colouring[e] != col:
                 raise ValueError('inconsistent colouring between x and y for edge e={}'.format(e))
 
+        if len(x) != self._ne or len(y) != self._ne:
+            raise ValueError("x (={}) and y (={}) must have length the number of edges (={})".format(x, y, self._ne))
+
         colouring = [None] * self._ne
         faces = perm_cycles(self._fp, True, 2 * self._ne)
         ep = self._ep
         for face in faces:
             a, b, c = face
-            x_degenerate = (x[a] == 0) + (x[b] == 0) + (x[c] == 0)
+            ea = a // 2
+            eb = b // 2
+            ec = c // 2
+            x_degenerate = (x[ea] == 0) + (x[eb] == 0) + (x[ec] == 0)
             if x_degenerate == 0:
-                if x[a] == x[b] + x[c]:
+                if x[ea] == x[eb] + x[ec]:
                     xlarge = 0
-                elif x[b] == x[c] + x[a]:
+                elif x[eb] == x[ec] + x[ea]:
                     xlarge = 1
-                elif x[c] == x[a] + x[b]:
+                elif x[ec] == x[ea] + x[eb]:
                     xlarge = 2
                 else:
-                    raise ValueError('inconsistent x data for triangle {}'.format(face))
+                    raise ValueError('inconsistent x data for triangle {} with x[{}]={}, x[{}]={} and x[{}]={}'.format(face,
+                                            a, x[ea], b, x[eb], c, x[ec]))
                 check_set_colouring(colouring, face[(xlarge + 1) % 3] // 2, BLUE)
                 check_set_colouring(colouring, face[(xlarge + 2) % 3] // 2, RED)
             elif x_degenerate == 1:
-                if x[a] == 0:
+                if x[ea] == 0:
                     xvert = 0
-                elif x[b] == 0:
+                elif x[eb] == 0:
                     xvert = 1
-                elif x[c] == 0:
+                elif x[ec] == 0:
                     xvert = 2
                 check_set_colouring(colouring, face[xvert] // 2, GREEN)
                 check_set_colouring(colouring, face[(xvert + 1) % 3] // 2, RED)
@@ -1268,24 +1253,25 @@ class Triangulation(Constellation):
             else:
                 raise ValueError('inconsistent x data for triangle {}'.format(face))
 
-            y_degenerate = (y[a] == 0) + (y[b] == 0) + (y[c] == 0)
+            y_degenerate = (y[ea] == 0) + (y[eb] == 0) + (y[ec] == 0)
             if y_degenerate == 0:
-                if y[a] == y[b] + y[c]:
+                if y[ea] == y[eb] + y[ec]:
                     ylarge = 0
-                elif y[b] == y[c] + y[a]:
+                elif y[eb] == y[ec] + y[ea]:
                     ylarge = 1
-                elif y[c] == y[a] + y[b]:
+                elif y[ec] == y[ea] + y[eb]:
                     ylarge = 2
                 else:
-                    raise ValueError('inconsistent y data for triangle {}'.format(face))
+                    raise ValueError('inconsistent y data for triangle {} with y[{}]={}, y[{}]={} and y[{}]={}'.format(face,
+                                        a, y[ea], b, y[eb], c, y[ec]))
                 check_set_colouring(colouring, face[(ylarge + 1) % 3] // 2, RED)
                 check_set_colouring(colouring, face[(ylarge + 2) % 3] // 2, BLUE)
             elif y_degenerate == 1:
-                if y[a] == 0:
+                if y[ea] == 0:
                     yhor = 0
-                elif y[b] == 0:
+                elif y[eb] == 0:
                     yhor = 1
-                elif y[c] == 0:
+                elif y[ec] == 0:
                     yhor = 2
                 check_set_colouring(colouring, face[yhor], ep, PURPLE)
                 check_set_colouring(colouring, face[(yhor + 1) % 3] // 2, BLUE)
