@@ -56,7 +56,7 @@ from .misc import flipper_edge, flipper_edge_perm, flipper_nf_to_sage, flipper_n
 from .triangulation import Triangulation
 from .veering_triangulation import VeeringTriangulation
 from .flat_structure import FlatVeeringTriangulation
-from .flat_structure import vec_slope
+from .flat_structure import slope
 
 _Fields = Fields()
 
@@ -184,7 +184,8 @@ class FlatVeeringTriangulationLayout(object):
             self._triangulation._holonomies[i] = self._triangulation._V((sx * v[0], sy * v[1]))
 
     def _edge_slope(self, e):
-        return vec_slope(self._triangulation._holonomies[e])
+        e = self._check_edge(e)
+        return slope(self._x[e], self._y[e])
 
     def __repr__(self):
         if self._pos is None:
