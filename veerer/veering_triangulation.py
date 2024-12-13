@@ -1390,6 +1390,16 @@ class VeeringTriangulation(Triangulation):
             sage: T = VeeringTriangulation([(0,1,2), (-1,-2,-3)], [PURPLE, BLUE, RED])
             sage: [T.is_forward_flippable(e) for e in range(0, 6, 2)]
             [True, False, False]
+
+            sage: faces = "(0,4,3)(1,~3,5)(2,6,~4)"
+            sage: x = (2, 6, 3, 4, 2, 2, 1)
+            sage: y = (10, 2, 3, 4, 6, 2, 3)
+            sage: cols = "BBRBRRB"
+            sage: fl = FlatVeeringTriangulation(faces, cols, x, y)
+            sage: fl.is_forward_flippable(2)
+            True
+            sage: fl.is_forward_flippable(6)
+            False
         """
         if check:
             e = self._check_half_edge(e)
@@ -1756,8 +1766,8 @@ class VeeringTriangulation(Triangulation):
             sage: T.flip(6, 2, Gx=Gx)
             sage: T.flip(8, 2, Gx=Gx)
             sage: T.flip(10, 2, Gx=Gx)
-            sage: T._set_switch_conditions(T._tt_check, Gx.row(0), VERTICAL)
-            sage: T._set_switch_conditions(T._tt_check, Gx.row(1), VERTICAL)
+            sage: T._set_switch_conditions(T._constraint_check, Gx.row(0), VERTICAL)
+            sage: T._set_switch_conditions(T._constraint_check, Gx.row(1), VERTICAL)
 
             sage: T, s, t = VeeringTriangulations.L_shaped_surface(2, 3, 4, 5, 1, 2)
             sage: T = T.copy(mutable=True)
@@ -1765,8 +1775,8 @@ class VeeringTriangulation(Triangulation):
             sage: flip_sequence = [(6, 2), (8, 1), (10, 2), (12 , 2), (10, 1), (2, 1), (10, 1)]
             sage: for e, col in flip_sequence:
             ....:     T.flip(e, col, Gx=Gx)
-            ....:     T._set_switch_conditions(T._tt_check, Gx.row(0), VERTICAL)
-            ....:     T._set_switch_conditions(T._tt_check, Gx.row(1), VERTICAL)
+            ....:     T._set_switch_conditions(T._constraint_check, Gx.row(0), VERTICAL)
+            ....:     T._set_switch_conditions(T._constraint_check, Gx.row(1), VERTICAL)
         """
         if not self._mutable:
             raise ValueError('immutable veering triangulation; use a mutable copy instead')
@@ -2512,8 +2522,8 @@ class VeeringTriangulation(Triangulation):
             sage: T.flip(6, 2, Gx=Gx)
             sage: T.flip(8, 2, Gx=Gx)
             sage: T.flip(10, 2, Gx=Gx)
-            sage: T._set_switch_conditions(T._tt_check, Gx.row(0), VERTICAL)
-            sage: T._set_switch_conditions(T._tt_check, Gx.row(1), VERTICAL)
+            sage: T._set_switch_conditions(T._constraint_check, Gx.row(0), VERTICAL)
+            sage: T._set_switch_conditions(T._constraint_check, Gx.row(1), VERTICAL)
             sage: Gx.echelon_form()
             [ 1  0  0  1  1  1  1]
             [ 0  1  1 -1 -1 -1  0]
@@ -2620,8 +2630,6 @@ class VeeringTriangulation(Triangulation):
             if self._colouring[e] != ZERO:
                 cs.insert(L.element_class(L, {shift + e: one}, zero) >= zero, check=False)
 
-    _set_subspace_constraints_fast = _set_train_track_constraints_fast
-
     def _set_switch_conditions(self, insert, x, slope=VERTICAL):
         r"""
         These are the linear parts of the train-track equations
@@ -2702,9 +2710,9 @@ class VeeringTriangulation(Triangulation):
                                   'horizontal' if slope == HORIZONTAL else 'vertical'))
 
     @staticmethod
-    def _tt_check(x):
+    def _constraint_check(x, error=AssertionError):
         if not x:
-            raise AssertionError("does not satisfy train-track constraints")
+            raise error("does not satisfy train-track constraints")
 
     def train_track_switch_constraints(self, slope=VERTICAL):
         r"""
@@ -2780,8 +2788,8 @@ class VeeringTriangulation(Triangulation):
         This can also be used to check that a given vector satisfies the train-track
         equations::
 
-            sage: T._set_train_track_constraints(T._tt_check, [2,1,1], HORIZONTAL, False, False)
-            sage: T._set_train_track_constraints(T._tt_check, [1,1,1], HORIZONTAL, False, False)
+            sage: T._set_train_track_constraints(T._constraint_check, [2,1,1], HORIZONTAL, False, False)
+            sage: T._set_train_track_constraints(T._constraint_check, [1,1,1], HORIZONTAL, False, False)
             Traceback (most recent call last):
             ...
             AssertionError: does not satisfy train-track constraints
@@ -2789,8 +2797,8 @@ class VeeringTriangulation(Triangulation):
         Check equations with folded edges (that are "counted twice")::
 
             sage: T = VeeringTriangulation("(0,2,3)(~0,1,4)(~1,5,6)", [BLUE, RED, RED, BLUE, BLUE, BLUE, BLUE])
-            sage: T._set_train_track_constraints(T._tt_check, [0,1,1,1,1,1,0], VERTICAL, False, False)
-            sage: T._set_train_track_constraints(T._tt_check, [1,2,3,4,3,7,5], VERTICAL, False, False)
+            sage: T._set_train_track_constraints(T._constraint_check, [0,1,1,1,1,1,0], VERTICAL, False, False)
+            sage: T._set_train_track_constraints(T._constraint_check, [1,2,3,4,3,7,5], VERTICAL, False, False)
         """
         if slope == VERTICAL:
             POS = BLUE
@@ -2822,6 +2830,11 @@ class VeeringTriangulation(Triangulation):
                 insert(x[e] >= 0)
             else:
                 insert(x[e] >= low_bound)
+
+    # For veering triangulation, the only constraints on coordinates come from the
+    # train-track switch equation (or triangle equalities)
+    _set_subspace_constraints = _set_train_track_constraints
+    _set_subspace_constraints_fast = _set_train_track_constraints_fast
 
     def _set_delaunay_constraints_fast(self, cs, L):
         zero = L.base_ring().zero()
@@ -3215,18 +3228,18 @@ class VeeringTriangulation(Triangulation):
             sage: T, s, t = VeeringTriangulations.L_shaped_surface(1, 1, 1, 1)
             sage: Gx = matrix(QQ, 2, [s, t])
             sage: Gy = T._complexify_generators(Gx)
-            sage: T._set_switch_conditions(T._tt_check, Gx.row(0), VERTICAL)
-            sage: T._set_switch_conditions(T._tt_check, Gx.row(1), VERTICAL)
-            sage: T._set_switch_conditions(T._tt_check, Gy.row(0), HORIZONTAL)
-            sage: T._set_switch_conditions(T._tt_check, Gy.row(1), HORIZONTAL)
+            sage: T._set_switch_conditions(T._constraint_check, Gx.row(0), VERTICAL)
+            sage: T._set_switch_conditions(T._constraint_check, Gx.row(1), VERTICAL)
+            sage: T._set_switch_conditions(T._constraint_check, Gy.row(0), HORIZONTAL)
+            sage: T._set_switch_conditions(T._constraint_check, Gy.row(1), HORIZONTAL)
 
             sage: T, s, t = VeeringTriangulations.L_shaped_surface(2, 3, 4, 5, 1, 2)
             sage: Gx = matrix(QQ, 2, [s, t])
             sage: Gy = T._complexify_generators(Gx)
-            sage: T._set_switch_conditions(T._tt_check, Gx.row(0), VERTICAL)
-            sage: T._set_switch_conditions(T._tt_check, Gx.row(1), VERTICAL)
-            sage: T._set_switch_conditions(T._tt_check, Gy.row(0), HORIZONTAL)
-            sage: T._set_switch_conditions(T._tt_check, Gy.row(1), HORIZONTAL)
+            sage: T._set_switch_conditions(T._constraint_check, Gx.row(0), VERTICAL)
+            sage: T._set_switch_conditions(T._constraint_check, Gx.row(1), VERTICAL)
+            sage: T._set_switch_conditions(T._constraint_check, Gy.row(0), HORIZONTAL)
+            sage: T._set_switch_conditions(T._constraint_check, Gy.row(1), HORIZONTAL)
         """
         if Gx.ncols() != self._ne:
             raise ValueError
@@ -3273,53 +3286,15 @@ class VeeringTriangulation(Triangulation):
                     Ly[i, j] *= -1
         return Ly
 
-    def _flat_structure_from_train_track_lengths(self, VH, VV, base_ring=None, mutable=False, check=True):
+    def flat_structure(self, x, y, mutable=False, check=True):
         r"""
-        Return a flat structure from two vectors ``VH`` and ``VV``
-        satisfying the train track equations.
+        Return a flat structure from two coordinates ``x`` and ``y``.
         """
-        from sage.modules.free_module import FreeModule
-
-        if base_ring is None:
-            base_ring = self.base_ring()
-
-        assert len(VH) == len(VV) == self._ne
-        assert all(x >=0 for x in VH)
-        assert all(x >= 0 for x in VV)
-
-        self._set_train_track_constraints(self._tt_check, VH, HORIZONTAL, False, False)
-        self._set_train_track_constraints(self._tt_check, VV, VERTICAL, False, False)
-
-        V = FreeModule(base_ring, 2)
-        vectors = []
-        for i, (col, x, y) in enumerate(zip(self._colouring, VV, VH)):
-            if col == RED:
-                vectors.append(V((x, y)))
-            else:
-                vectors.append(V((x, -y)))
-            if self._fp[2 * i + 1] != -1:  # not folded
-                vectors.append(vectors[-1])
-            else:
-                vectors.append(None)
-
-        assert len(vectors) == 2 * self._ne
-
-        # get correct signs for each triangle
-        for i, j, k in self.faces():
-            if det2(vectors[i], vectors[j]) < 0:
-                vectors[j] = -vectors[j]
-            if det2(vectors[j], vectors[k]) < 0:
-                vectors[k] = -vectors[k]
-            if vectors[i] + vectors[j] + vectors[k]:
-                raise RuntimeError('bad vectors for %s:\n vec[%s] = %s\n vec[%s] = %s\n vec[%s] = %s' \
-                                   % (self.to_string(), self._edge_rep(i), vectors[i], self._edge_rep(j), \
-                                      vectors[j], self._edge_rep(k), vectors[k]))
-
-            if det2(vectors[k], vectors[i]) < 0:
-                raise RuntimeError
+        self._set_train_track_constraints(self._constraint_check, x, VERTICAL, False, False)
+        self._set_train_track_constraints(self._constraint_check, y, HORIZONTAL, False, False)
 
         from .flat_structure import FlatVeeringTriangulation
-        return FlatVeeringTriangulation(self, vectors, mutable=mutable, check=check)
+        return FlatVeeringTriangulation(self, x, y, mutable=mutable, check=check)
 
     def flat_structure_middle(self, backend=None):
         r"""
@@ -3371,7 +3346,7 @@ class VeeringTriangulation(Triangulation):
         VV = PV.rays()
         VV = [sum(v[i] for v in VV) for i in range(n)]
 
-        return self._flat_structure_from_train_track_lengths(VH, VV)
+        return self.flat_structure(VV, VH)
 
     def flat_structure_min(self, allow_degenerations=False):
         r"""
@@ -3412,7 +3387,7 @@ class VeeringTriangulation(Triangulation):
         assert VV.divisor() == 1
         VV = [Rational(c) for c in VV.coefficients()]
 
-        return self._flat_structure_from_train_track_lengths(VH, VV)
+        return self.flat_structure(VV, VH)
 
     def flat_structure_geometric_middle(self, backend=None):
         r"""
@@ -3432,7 +3407,7 @@ class VeeringTriangulation(Triangulation):
         VV = [sum(v[i] for v in r) for i in range(ne)]
         VH = [sum(v[ne + i] for v in r) for i in range(ne)]
 
-        return self._flat_structure_from_train_track_lengths(VH, VV)
+        return self.flat_structure(VV, VH)
 
     def zippered_rectangles(self, x, y, base_ring=None, check=True):
         r"""
@@ -4437,6 +4412,8 @@ class VeeringTriangulation(Triangulation):
 
             sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2:2,~3:2)", "BRRR")
             sage: vt.degeneration([0], [1, 2, 3])
+            (VeeringTriangulationLinearFamily("(0:2,~0:2)", "R", [(1)]),
+             VeeringTriangulationLinearFamily("(0:3)(~0:3)", "B", [(1)]))
         """
         # We distinguish three kinds of triangles
         # - up triangles: when the three edges are in the up partition
@@ -4544,17 +4521,25 @@ class VeeringTriangulation(Triangulation):
 
                 colouring_up[relabelling_up[e] // 2] = colouring[e // 2]
 
-                excess = bdry[e]
-                ee = fp[e]
+                # Compute the angle excess of the former edge e (named relabelling_up[e]
+                # in the upper veering triangulation). We simply apply the formula
+                #   new_angle_excess = sum(angle excesses of contracted edges) - length + alternations / 2
                 col = colouring[e // 2]
-                alternations = 0
+                excess = bdry[e]
+                alternations = 0  # number of alternations (including start and end)
+                length = 0  # number of edges that degenerate along the face
+                ee = fp[e]
                 while ee not in half_edges_up:
                     excess += bdry[ee]
                     alternations += colouring[ee // 2] != col
+                    length += 1
                     col = colouring[ee // 2]
-                    e = fp[e]
+                    ee = fp[ee]
+                alternations += colouring[ee // 2] != col
+                alternations -= colouring[ee // 2] != colouring[e // 2]  # alternation after degeneration
                 fp_up[relabelling_up[e]] = relabelling_up[ee]
-                angle_excess_up[relabelling_up[e]] = excess
+                assert alternations % 2 == 0
+                angle_excess_up[relabelling_up[e]] = excess - length + alternations // 2
 
             vt_up = VeeringTriangulation.from_permutations(None, fp_up, (angle_excess_up,), (colouring_up,), mutable=mutable)
 
@@ -4681,7 +4666,33 @@ class VeeringTriangulation(Triangulation):
 
         horizontal_nodes.sort()
 
-        # TODO: also return relabelling and horiz/vert nodes data
+        if f_up is not None:
+            # some additional checks for vertical degenerations
+            assert not self.is_abelian() or (f_up.is_abelian() and f_low.is_abelian())
+
+            angles = self.angles()
+            angles_deg = list(f_up.angles()) + list(f_low.angles())
+
+            for a in angles:
+                assert a in angles_deg
+                del angles_deg[angles_deg.index(a)]
+            assert all(a != 0 for a in angles_deg)
+            # angle=2pi (Abelian degree=0) <-> -2pi (Abelian degree=-2)
+            # angle=4pi (Abelian degree=1) <-> -4pi (Abelian degree=-3)
+            assert sorted(a for a in angles_deg if a > 0) == sorted(-a for a in angles_deg if a < 0)
+        else:
+            # some additional checks for horizontal degenerations
+            assert not self.is_abelian() or f_low.is_abelian()
+
+            angles = self.angles()
+            angles_deg = list(f_low.angles())
+
+            for a in angles:
+                assert a in angles_deg
+                del angles_deg[angles_deg.index(a)]
+            assert len(angles_deg) % 2 == 0 and all(a == 0 for a in angles_deg)
+
+       # TODO: also return relabelling and horiz/vert nodes data
         return (f_up, f_low)
 
     def horizontal_degeneration_up_edges_subsets(self):
@@ -4758,14 +4769,16 @@ class VeeringTriangulation(Triangulation):
         x = [L.variable(e) for e in range(ne)]
         y = [L.variable(ne + e) for e in range(ne)]
 
-        cylinders = {}
+        cylinders = collections.defaultdict(set)
         for middle, bot, top, _ in itertools.chain(self.cylinders(RED), self.cylinders(BLUE)):
             # NOTE: each cylinder is a quadruple (middle, bottom, top, folded)
             middle = [h // 2 for h in middle]
-            bot = [h // 2 for h in bot]
-            top = [h // 2 for h in top]
-            cylinders[frozenset(bot)] = set().union(top, middle)
-            cylinders[frozenset(top)] = set().union(bot, middle)
+            bot = frozenset(h // 2 for h in bot)
+            top = frozenset(h // 2 for h in top)
+            cylinders[bot].update(top)
+            cylinders[bot].update(middle)
+            cylinders[top].update(bot)
+            cylinders[top].update(middle)
 
         def completion(vanishing_edges, vanishing_cone):
             cs = ConstraintSystem(dim)
@@ -4863,7 +4876,7 @@ class VeeringTriangulation(Triangulation):
             ....:             (0, 1, 1, 0, 0, 0, 1, 2, 1, 0, 1, 1, 0, 2, 0, 0, 0, 1, 1, 0, 2, 0, 1, 0, 1, 0, 0),
             ....:             (0, 0, 0, 1, 1, 0, 0, -1, -1, 1, 0, 0, 0, -2, 1, 1, 0, 0, -1, 1, -1, 1, 0, 0, 0, 0, 1),
             ....:             (0, 0, 0, 0, 0, 1, -1, 1, 1, -1, 1, 1, 2, 2, -1, -1, 0, -1, 1, 0, 1, -1, 0, 1, 0, 0, 0)]
-            sage: vt = f = VeeringTriangulationLinearFamily(vt, subspace)
+            sage: f = VeeringTriangulationLinearFamily(vt, subspace)
             sage: assert all(f_up is not None for f_up in f.codimension_one_vertical_degenerations())
             sage: half_edges = set(f.half_edges())
             sage: for edges_low in f.vertical_degeneration_low_edges_subsets():
@@ -4875,6 +4888,15 @@ class VeeringTriangulation(Triangulation):
             sage: for edges_up in f.horizontal_degeneration_up_edges_subsets():
             ....:     print(tuple(sorted(half_edges.difference(edges_up))), edges_up)
             (0, 5, 8, 12, 13, 16, 18, 23, 25, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53) (1, 2, 3, 4, 6, 7, 9, 10, 11, 14, 15, 17, 19, 20, 21, 22, 24, 26)
+
+        Another example that used to be wrong::
+
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,5,~4)(~3,6,7)(4,8,~5)(~6,9,10)(~7,11,12)(~8,~10,~12)(~9,13,14)(~11,15,16)(~13,~14,17)(~15,~16,~17)", "RBBBRRRBBBRBRRRRBB")
+            sage: subspace = [(1, 0, -1, -1, 0, 1, 1, 0, -1, -1, 2, -1, 1, 1, 0, 1, 0, -1),
+            ....:             (0, 1, 1, 1, 0, -1, 1, 2, 1, 1, 0, 1, 1, -1, 0, 0, 1, 1),
+            ....:             (0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0)]
+            sage: f = VeeringTriangulationLinearFamily(vt, subspace)
+            sage: assert all(f_up.is_delaunay() and f_low.is_delaunay() for f_up, f_low in vt.codimension_one_vertical_degenerations())
         """
         for edges in self.vertical_degeneration_low_edges_subsets():
             yield self.degeneration(edges_low=edges, mutable=mutable)
@@ -5077,12 +5099,12 @@ class VeeringTriangulations:
             (0, 1, 1, 1, 1, 1, 0)
             sage: t
             (1, 0, 0, 1, 1, 1, 1)
-            sage: T._set_switch_conditions(T._tt_check, s, VERTICAL)
-            sage: T._set_switch_conditions(T._tt_check, t, VERTICAL)
+            sage: T._set_switch_conditions(T._constraint_check, s, VERTICAL)
+            sage: T._set_switch_conditions(T._constraint_check, t, VERTICAL)
 
             sage: T, s, t = VeeringTriangulations.L_shaped_surface(2, 3, 4, 5, 1, 2)
-            sage: T._set_switch_conditions(T._tt_check, s, VERTICAL)
-            sage: T._set_switch_conditions(T._tt_check, t, VERTICAL)
+            sage: T._set_switch_conditions(T._constraint_check, s, VERTICAL)
+            sage: T._set_switch_conditions(T._constraint_check, t, VERTICAL)
         """
         # Return the (quotient by the hyperelliptic involution of the) L-shaped surface
         # together with the equations of the GL2R deformation

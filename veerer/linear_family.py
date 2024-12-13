@@ -155,6 +155,12 @@ class LinearFamily:
 
     The subspace is given by generators.
     """
+    def _constellation_class_init(self):
+        bases = self.__class__.__bases__
+        if len(bases) != 2 or bases[0] != LinearFamily:
+            raise ValueError
+        self._constellation_class = bases[1]
+
     def __init__(self, *args, mutable=False, check=True):
         self._constellation_class_init()
 
@@ -174,12 +180,6 @@ class LinearFamily:
 
         if check:
             self._check(ValueError)
-
-    def _constellation_class_init(self):
-        bases = self.__class__.__bases__
-        if len(bases) != 2 or bases[0] != LinearFamily:
-            raise ValueError
-        self._constellation_class = bases[1]
 
     def _check(self, error=ValueError):
         self._constellation_class._check(self, error)
@@ -780,7 +780,7 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
         # test that elements satisfy the switch condition
         subspace = self._subspace
         for v in subspace.rows():
-            self._set_switch_conditions(self._tt_check, v, VERTICAL)
+            self._set_switch_conditions(self._constraint_check, v, VERTICAL)
 
     def train_track_polytope(self, slope=VERTICAL, low_bound=0, backend=None):
         r"""
