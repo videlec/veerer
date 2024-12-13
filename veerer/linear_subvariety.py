@@ -170,7 +170,6 @@ class IrreducibleRealLinearSubvariety:
 
         return [IrreducibleRealLinearSubvariety(graph) for graph in DS._graph.connected_components_subgraphs()]
 
-    # TODO: we do NOT get codimension one things with this method...
     def codimension_one_vertical_degenerations(self, level=None):
         r"""
         Return the list of codiemsnion one vertical degenerations as a list of Delauany-Strebel automata.
@@ -186,8 +185,15 @@ class IrreducibleRealLinearSubvariety:
             sage: deg_first # optional - surface_dynamics
             [Irreducible real linear subvariety of projective dimension 2 in [H_1(0), H_1(2, -2)],
              Irreducible real linear subvariety of projective dimension 2 in [H_1(0^2), H_0(2, -2^2)]]
-            sage: deg_second = sorted(set(L2 for L1 in deg_first for L2 in L1.codimension_one_vertical_degenerations())) # optional - surface_dynamics
-            sage: deg_second # optional - surface_dynamics
+            sage: deg_second = []
+            sage: for L1 in deg_first:  # optional - surface_dynamics
+            ....:     degs = sorted(L1.codimension_one_vertical_degenerations())
+            ....:     print(L1, degs)
+            Irreducible real linear subvariety of projective dimension 2 in [H_1(0), H_1(2, -2)] [Irreducible real linear subvariety of projective dimension 1 in [H_1(0), H_0(0^2, -2), H_0(2, -2^2)]]
+            Irreducible real linear subvariety of projective dimension 2 in [H_1(0^2), H_0(2, -2^2)] [Irreducible real linear subvariety of projective dimension 1 in [H_1(0), H_0(0^2, -2), H_0(2, -2^2)]]
+            ....:     deg_second.extend(degs)
+            sage: for L2 in deg_second:
+            ....:     assert not list(L2.codimension_one_vertical_degenerations())
         """
         if level is None:
             return [degeneration for level in self.levels() for degeneration in self.codimension_one_vertical_degenerations(level)]
@@ -198,7 +204,7 @@ class IrreducibleRealLinearSubvariety:
         for state in self.strebel_delaunay_graph(level):
             if isinstance(state, VeeringTriangulation):
                 for (f_up, f_low) in state.codimension_one_vertical_degenerations(mutable=True):
-                    assert f_up is not None
+                    assert f_up is not None, (state,)
                     # NOTE: the projectivization makes us loose one dimension
                     assert f_low.dimension() + f_up.dimension() == state.dimension()
                     assert f_low.is_delaunay()
