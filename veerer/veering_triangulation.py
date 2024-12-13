@@ -3310,7 +3310,7 @@ class VeeringTriangulation(Triangulation):
 
             sage: T = VeeringTriangulation("(0,1,2)", "RRB")
             sage: T.flat_structure_middle()
-            FlatVeeringTriangulation(Triangulation("(0,1,2)"), [(1, 2), None, (-2, -1), None, (1, -1), None])
+            FlatVeeringTriangulation("(0,1,2)", "RRB", (1, 2, 1), (2, 1, 1))
 
             sage: x = polygen(QQ)
             sage: K = NumberField(x^2 - x - 1, 'c0', embedding=(1+AA(5).sqrt())/2)
@@ -3322,13 +3322,13 @@ class VeeringTriangulation(Triangulation):
             ....:                 (0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, c0 - 1, c0 - 1, c0 - 1, -c0 + 1)]
             sage: F = VeeringTriangulationLinearFamily(T, deformations)
             sage: F.flat_structure_middle()
-            FlatVeeringTriangulation(Triangulation("(0,1,2)(~0,3,4)(~1,5,6)(~2,7,8)(~3,10,9)(~4,11,~8)(~5,12,13)(~6,14,15)(~7,~9,~14)(~10,16,~11)(~12,17,18)(~13,19,20)(~15,~18,~20)(~16,~17,~19)"), ...)
+            FlatVeeringTriangulation("(0,1,2)(~0,3,4)(~1,5,6)(~2,7,8)(~3,10,9)(~4,11,~8)(~5,12,13)(~6,14,15)(~7,~9,~14)(~10,16,~11)(~12,17,18)(~13,19,20)(~15,~18,~20)(~16,~17,~19)", ...)
 
             sage: from surface_dynamics import *              # optional - surface_dynamics
             sage: Q = Stratum({1:4, -1:4}, 2)                 # optional - surface_dynamics
             sage: CT = VeeringTriangulation.from_stratum(Q)   # optional - surface_dynamics
             sage: CT.flat_structure_middle()                  # optional - surface_dynamics
-            FlatVeeringTriangulation(Triangulation("(0,18,~17)(~0,19,~18)...(~7,~23,8)"), [(3, 3), (3, 3), ..., (-11, 1)])
+            FlatVeeringTriangulation("(0,18,~17)(~0,19,~18)...(~7,~23,8)", ... 5, 4, 3, 2, 1))
 
         TESTS::
 
@@ -3363,14 +3363,14 @@ class VeeringTriangulation(Triangulation):
             sage: Q = Stratum({1:4, -1:4}, 2)                # optional - surface_dynamics
             sage: CT = VeeringTriangulation.from_stratum(Q)  # optional - surface_dynamics
             sage: CT.flat_structure_min()                    # optional - surface_dynamics
-            FlatVeeringTriangulation(Triangulation("(0,18,~17)(~0,19,~18)...(~7,~23,8)"), [(3, 3), (3, 3), ..., (-11, 1)])
+            FlatVeeringTriangulation("(0,18,~17)(~0,19,~18)...(~7,~23,8)", ... 5, 4, 3, 2, 1))
 
         By allowing degenerations you can get a simpler solution but
         with some of the edges horizontal or vertical::
 
             sage: F = CT.flat_structure_min(True)                 # optional - surface_dynamics
             sage: F                                               # optional - surface_dynamics
-            FlatVeeringTriangulation(Triangulation("(0,18,~17)(~0,19,~18)...(~7,~23,8)"), [(3, 3), (3, 3), ..., (-11, 1)])
+            FlatVeeringTriangulation("(0,18,~17)(~0,19,~18)...(~7,~23,8)", ... 7, 4, 3, 2, 1, 0))
             sage: F.to_veering_triangulation()                    # optional - surface_dynamics
             VeeringTriangulation("(0,18,~17)(~0,19,~18)...(~7,~23,8)", "RRRRRRRRBBBBBBBBBGBBBBBP")
         """
@@ -3400,7 +3400,7 @@ class VeeringTriangulation(Triangulation):
 
             sage: T = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
             sage: T.flat_structure_geometric_middle()
-            FlatVeeringTriangulation(Triangulation("(0,1,2)(~0,~1,~2)"), [(4, 9), (-4, -9), (-9, -4), (9, 4), (5, -5), (-5, 5)])
+            FlatVeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB", (4, 9, 5), (9, 4, 5))
         """
         ne = self.num_edges()
         r = self.delaunay_cone(backend=backend).rays()
@@ -3481,7 +3481,8 @@ class VeeringTriangulation(Triangulation):
             raise ValueError('the construction is only valid for Abelian differentials')
 
         if check:
-            x, y = self._check_xy(x, y)
+            if len(x) != self._ne or len(y) != self._ne:
+                raise ValueError("x and y must have the same length as the number of edges (got {} and {} instead of {})".format(len(x), len(y), self._ne))
             if base_ring is None:
                 from sage.structure.sequence import Sequence
                 base_ring = Sequence(list(x) + list(y)).universe()
@@ -3516,8 +3517,8 @@ class VeeringTriangulation(Triangulation):
         # compute for each half-edge the label of the next separatrix
         left_wedges = []
         right_wedges = []
-        next_separatrix = [-1] * self._n
-        previous_separatrix = [-1] * self._n
+        next_separatrix = [-1] * (2 * self._ne)
+        previous_separatrix = [-1] * (2 * self._ne)
         i = 0
         for vertex in self.vertices():
             # find a blue half-edge after a down separatrix, that is
@@ -3525,15 +3526,19 @@ class VeeringTriangulation(Triangulation):
             # edge_orientations[a] == False and edge_orientations[b] == True
             a = vertex[0]
             b = vertex[1]
+            cola = colouring[a // 2]
+            colb = colouring[b // 2]
             while not edge_orientations[a] or edge_orientations[b]:
                 a = b
                 b = self.next_at_vertex(a)
-            assert colouring[a] == RED and colouring[b] == BLUE, (a, colouring[a], colouring[b])
+            cola = colouring[a // 2]
+            colb = colouring[b // 2]
+            assert cola == RED and colb == BLUE, (a, cola, colb)
             while previous_separatrix[b] == -1:
                 if i % 2 == 0:
-                    assert colouring[a] == RED and colouring[b] == BLUE, (i, a, colouring[a], b, colouring[b])
+                    assert cola == RED and colb == BLUE, (i, a, cola, b, colb)
                 else:
-                    assert colouring[a] == BLUE and colouring[b] == RED, (i, a, colouring[a], b, colouring[b])
+                    assert cola == BLUE and colb == RED, (i, a, cola, b, colb)
 
                 right_wedges.append(a)
                 left_wedges.append(b)
@@ -3541,20 +3546,27 @@ class VeeringTriangulation(Triangulation):
                 b = self.next_at_vertex(a)
                 previous_separatrix[a] = i
                 next_separatrix[a] = i + 1
-                while colouring[a] == colouring[b]:
+                cola = colouring[a // 2]
+                colb = colouring[b // 2]
+                while cola == colb:
                     previous_separatrix[b] = i
                     next_separatrix[b] = i + 1
                     a = b
                     b = self.next_at_vertex(a)
+                    cola = colouring[a // 2]
+                    colb = colouring[b // 2]
                 # colour change
                 i += 1
 
             # correct the last quadrant
-            assert colouring[a] == RED and colouring[b] == BLUE
+            cola = colouring[a // 2]
+            colb = colouring[b // 2]
+            assert cola == RED and colb == BLUE
             j = previous_separatrix[b]
-            while colouring[a] == RED:
+            while cola == RED:
                 next_separatrix[a] = j
                 a = self.previous_at_vertex(a)
+                cola = colouring[a // 2]
 
             # check that we did a multiple of 2pi
             assert i % 4 == 0
@@ -3562,15 +3574,15 @@ class VeeringTriangulation(Triangulation):
         assert all(x != -1 for x in next_separatrix)
         assert all(x != -1 for x in previous_separatrix)
         assert len(right_wedges) == len(left_wedges) == 2 * self.num_faces()
-        assert all(colouring[right_wedges[i]] == RED for i in range(0, 2 * self.num_faces(), 2))
-        assert all(colouring[right_wedges[i]] == BLUE for i in range(1, 2 * self.num_faces(), 2))
-        assert all(colouring[left_wedges[i]] == BLUE for i in range(0, 2 * self.num_faces(), 2))
-        assert all(colouring[left_wedges[i]] == RED for i in range(1, 2 * self.num_faces(), 2))
+        assert all(colouring[right_wedges[i] // 2] == RED for i in range(0, 2 * self.num_faces(), 2))
+        assert all(colouring[right_wedges[i] // 2] == BLUE for i in range(1, 2 * self.num_faces(), 2))
+        assert all(colouring[left_wedges[i] // 2] == BLUE for i in range(0, 2 * self.num_faces(), 2))
+        assert all(colouring[left_wedges[i] // 2] == RED for i in range(1, 2 * self.num_faces(), 2))
 
         # In order to have a consistent labelling between the triangles as provided by self.faces()
         # and the rectangles we compute the face index associated to each half-edge and use it
         # later to order the rectangles
-        half_edge_face_index = [-1] * self._n
+        half_edge_face_index = [-1] * (2 * self._ne)
         for i, face in enumerate(self.faces()):
             for e in face:
                 half_edge_face_index[e] = i
@@ -3582,11 +3594,11 @@ class VeeringTriangulation(Triangulation):
         rectangles = [None] * self.num_faces()
         for i in range(1, 2 * self.num_faces(), 2):
             l = left_wedges[i]
-            L = ep[l]
+            L = ep(l)
             r = right_wedges[i]
-            R = ep[r]
+            R = ep(r)
             e = self.next_in_face(r)
-            E = ep[e]
+            E = ep(e)
             assert self.next_in_face(e) == L
 
             # The rectangles are always built starting from the bottom left corner
@@ -3602,41 +3614,41 @@ class VeeringTriangulation(Triangulation):
             if i % 4 == 1:
                 # right rectangle
                 # bottom side
-                p0 = (next_separatrix[R], RIGHT, x[r])
-                if x[l] < x[r]:
+                p0 = (next_separatrix[R], RIGHT, x[r // 2])
+                if x[l // 2] < x[r // 2]:
                     # small case: x[l] = x[r] - x[e]
-                    p1 = (next_separatrix[R], RIGHT, x[e])
+                    p1 = (next_separatrix[R], RIGHT, x[e // 2])
                 else:
                     # big case: x[l] = x[r] + x[e]
-                    p1 = (previous_separatrix[e], LEFT, x[e])
+                    p1 = (previous_separatrix[e], LEFT, x[e // 2])
                 # right side
-                p2 = (next_separatrix[L], RIGHT, y[e])
-                p3 = (next_separatrix[L], RIGHT, y[l])
+                p2 = (next_separatrix[L], RIGHT, y[e // 2])
+                p3 = (next_separatrix[L], RIGHT, y[l // 2])
                 # top side
-                p4 = (next_separatrix[r], RIGHT, x[l])
+                p4 = (next_separatrix[r], RIGHT, x[l // 2])
                 p5 = (next_separatrix[r], RIGHT, 0)
                 # left side
                 p6 = (previous_separatrix[r], LEFT, 0)
-                p7 = (previous_separatrix[r], LEFT, y[r])
+                p7 = (previous_separatrix[r], LEFT, y[r // 2])
 
             else:
                 # bottom side
-                if x[r] < x[l]:
+                if x[r // 2] < x[l // 2]:
                     # small case: x[r] = x[l] - x[e]
-                    p0 = (previous_separatrix[L], LEFT, x[e])
+                    p0 = (previous_separatrix[L], LEFT, x[e // 2])
                 else:
                     # big case: x[r] = x[l] + x[e]
-                    p0 = (next_separatrix[E], RIGHT, x[e])
-                p1 = (previous_separatrix[L], LEFT, x[l])
+                    p0 = (next_separatrix[E], RIGHT, x[e // 2])
+                p1 = (previous_separatrix[L], LEFT, x[l // 2])
                 # right side
-                p2 = (next_separatrix[l], RIGHT, y[l])
+                p2 = (next_separatrix[l], RIGHT, y[l // 2])
                 p3 = (next_separatrix[l], RIGHT, 0)
                 # top side
                 p4 = (next_separatrix[r], LEFT, 0)
-                p5 = (next_separatrix[r], LEFT, x[r])
+                p5 = (next_separatrix[r], LEFT, x[r // 2])
                 # left side
-                p6 = (previous_separatrix[R], LEFT, y[r])
-                p7 = (previous_separatrix[R], LEFT, y[e])
+                p6 = (previous_separatrix[R], LEFT, y[r // 2])
+                p7 = (previous_separatrix[R], LEFT, y[e // 2])
 
             j = half_edge_face_index[r]
             rectangles[j] = (p0, p1, p2, p3, p4, p5, p6, p7)
