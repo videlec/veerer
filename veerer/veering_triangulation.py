@@ -28,6 +28,7 @@ representatives.
 # ****************************************************************************
 
 import collections
+import copy
 import itertools
 import numbers
 from random import choice, shuffle
@@ -732,6 +733,82 @@ class VeeringTriangulation(Triangulation):
 
     def is_meromorphic(self):
         return any(self._bdry)
+
+    def prime_components(self):
+        r"""
+        Return a prime_decomposition of this linear family.
+
+        The prime decomposition is coarser than the decomposition into
+        connected components. It is the finest partition so that the
+        constraints is a block-diagonal matrix. The result is a partition
+        of the edges as a list of lists.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation, VeeringTriangulationLinearFamily
+            sage: vt = VeeringTriangulation("(0,1,3)(2,4,5)", "RRRBBB")
+            sage: vt.prime_components()
+            [[0, 1, 3], [2, 4, 5]]
+
+            sage: f = VeeringTriangulationLinearFamily(vt, [[1, 1, 1, 0, 1, 0], [0, 1, 0, 1, 1, 1]])
+            sage: f.prime_components()
+            [[0, 1, 2, 3, 4, 5]]
+        """
+        ne = self._ne
+
+        ccs = self.connected_components()
+        if len(ccs) == 1:
+            return ccs
+
+        dependencies = matrix(ZZ, len(ccs))
+        edge_to_cc = array('i', [-1] * ne)
+        for cc_num, cc in enumerate(ccs):
+            dependencies[cc_num, cc_num] = 1
+            for i in cc:
+                edge_to_cc[i] = cc_num
+
+        constraints = self.constraints_matrix().echelon_form(include_zero_rows=False)
+
+        for cc_num, cc in enumerate(ccs):
+            relabelling = array('i', [-1] * ne)
+            relabelling_inv = array('i', [-1] * ne)
+            i1 = 0
+            i2 = len(cc)
+            for j in range(ne):
+                if j in cc:
+                    relabelling[j] = i1
+                    relabelling_inv[i1] = j
+                    i1 += 1
+                else:
+                    relabelling[j] = i2
+                    relabelling_inv[i2] = j
+                    i2 += 1
+            perm_constraints = copy.copy(constraints)
+            perm_on_list(perm_constraints, relabelling, swap=sage.matrix.matrix0.Matrix.swap_columns)
+            dependent_comps = set()
+            r = 0
+            while r < perm_constraints.nrows() and perm_constraints[r, :len(cc)]:
+                for i in range(len(cc), perm_constraints.ncols()):
+                    if perm_constraints[r, i]:
+                        dependencies[cc_num, edge_to_cc[relabelling_inv[i]]] = 1
+                r += 1
+
+        # claim: compute the partition (and check that we indeed get a partition)
+        assert dependencies.is_symmetric()
+        subgroups = set()
+        for row in dependencies.rows():
+            subgroups.add(frozenset(row.nonzero_positions()))
+        assert set().union(*subgroups) == set(range(len(ccs)))
+        assert sum(len(x) for x in subgroups) == len(ccs)
+
+        decomposition = []
+        for subgroup in subgroups:
+            comp = []
+            for cc_num in subgroup:
+                comp.extend(ccs[cc_num])
+            comp.sort()
+            decomposition.append(comp)
+        return sorted(decomposition)
 
     def vertex_angle(self, h):
         r"""
@@ -3225,6 +3302,9 @@ class VeeringTriangulation(Triangulation):
         from .automaton import DelaunayStrebelAutomaton
         if backward is None:
             backward = any(self._bdry)
+        components = self.prime_decomposition()
+        for comp in components:
+            pass
         A = DelaunayStrebelAutomaton(backward=backward, verbosity=verbosity, backend=backend)
         A.add_seed(self)
         if run:
