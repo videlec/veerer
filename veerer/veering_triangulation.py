@@ -35,6 +35,7 @@ from random import choice, shuffle
 from array import array
 import ppl
 
+from sage.sets.disjoint_set import DisjointSet
 from sage.structure.element import get_coercion_model, Matrix
 from sage.structure.richcmp import op_LT, op_LE, op_EQ, op_NE, op_GT, op_GE, rich_to_bool
 from sage.modules.free_module import FreeModule
@@ -48,7 +49,7 @@ from .misc import det2
 from .triangulation import face_boundary_init, Triangulation
 from .polyhedron import LinearExpressions, ConstraintSystem
 from .polyhedron.linear_expression import LinearConstraint
-from .polyhedron.linear_algebra import linear_form_project, vector_normalize
+from .polyhedron.linear_algebra import linear_form_project, vector_normalize, prime_decomposition
 
 cm = get_coercion_model()
 
@@ -734,9 +735,12 @@ class VeeringTriangulation(Triangulation):
     def is_meromorphic(self):
         return any(self._bdry)
 
+    def is_prime(self):
+        return len(self.prime_components()) == 1
+
     def prime_components(self):
         r"""
-        Return a prime_decomposition of this linear family.
+        Return the components of the prime_decomposition of this linear family.
 
         The prime decomposition is coarser than the decomposition into
         connected components. It is the finest partition so that the
@@ -754,61 +758,47 @@ class VeeringTriangulation(Triangulation):
             sage: f.prime_components()
             [[0, 1, 2, 3, 4, 5]]
         """
-        ne = self._ne
+        partition = DisjointSet(self._ne)
+        for comp in self.connected_components():
+            for i in range(1, len(comp)):
+                partition.union(comp[0], comp[i])
+        return [atom for atom, _ in prime_decomposition(self.constraints_matrix(), partition)]
 
-        ccs = self.connected_components()
-        if len(ccs) == 1:
-            return ccs
+    def prime_decomposition(self, mutable=False, check=True):
+        """
+        Return the prime decomposition of this veering triangulation or family.
 
-        dependencies = matrix(ZZ, len(ccs))
-        edge_to_cc = array('i', [-1] * ne)
-        for cc_num, cc in enumerate(ccs):
-            dependencies[cc_num, cc_num] = 1
-            for i in cc:
-                edge_to_cc[i] = cc_num
+        EXAMPLES::
 
-        constraints = self.constraints_matrix().echelon_form(include_zero_rows=False)
+            sage: from veerer import VeeringTriangulation, VeeringTriangulationLinearFamily
+            sage: vt = VeeringTriangulation("(0,1,3)(2,4,5)", "RRRBBB")
+            sage: vt.prime_decomposition()
+            [([0, 1, 3],
+              VeeringTriangulationLinearFamily("(0,1,2)", "RRB", [(1, 0, -1), (0, 1, 1)])),
+             ([2, 4, 5],
+              VeeringTriangulationLinearFamily("(0,1,2)", "RBB", [(1, 0, -1), (0, 1, 1)]))]
 
-        for cc_num, cc in enumerate(ccs):
-            relabelling = array('i', [-1] * ne)
-            relabelling_inv = array('i', [-1] * ne)
-            i1 = 0
-            i2 = len(cc)
-            for j in range(ne):
-                if j in cc:
-                    relabelling[j] = i1
-                    relabelling_inv[i1] = j
-                    i1 += 1
-                else:
-                    relabelling[j] = i2
-                    relabelling_inv[i2] = j
-                    i2 += 1
-            perm_constraints = copy.copy(constraints)
-            perm_on_list(perm_constraints, relabelling, swap=sage.matrix.matrix0.Matrix.swap_columns)
-            dependent_comps = set()
-            r = 0
-            while r < perm_constraints.nrows() and perm_constraints[r, :len(cc)]:
-                for i in range(len(cc), perm_constraints.ncols()):
-                    if perm_constraints[r, i]:
-                        dependencies[cc_num, edge_to_cc[relabelling_inv[i]]] = 1
-                r += 1
+            sage: f = VeeringTriangulationLinearFamily(vt, [[1, 1, 1, 0, 1, 0], [0, 1, 0, 1, 1, 1]])
+            sage: f.prime_decomposition()
+            [([0, 1, 2, 3, 4, 5],
+             VeeringTriangulationLinearFamily("(0,1,3)(2,4,5)", "RRRBBB", [(1, 0, 1, -1, 0, -1), (0, 1, 0, 1, 1, 1)]))]
 
-        # claim: compute the partition (and check that we indeed get a partition)
-        assert dependencies.is_symmetric()
-        subgroups = set()
-        for row in dependencies.rows():
-            subgroups.add(frozenset(row.nonzero_positions()))
-        assert set().union(*subgroups) == set(range(len(ccs)))
-        assert sum(len(x) for x in subgroups) == len(ccs)
+            sage: VeeringTriangulation("(0,1,2)(~0,~1,3)(~2:1,~4:1)(~3:1,4:1)", "BRRRR").prime_decomposition()
+            [([0, 1, 2, 3, 4],
+             VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2:1,~4:1)(~3:1,4:1)", "BRRRR", [(1, 0, 1, 1, 0), (0, 1, 1, 1, 0), (0, 0, 0, 0, 1)]))]
 
-        decomposition = []
-        for subgroup in subgroups:
-            comp = []
-            for cc_num in subgroup:
-                comp.extend(ccs[cc_num])
-            comp.sort()
-            decomposition.append(comp)
-        return sorted(decomposition)
+        """
+        from .linear_family import VeeringTriangulationLinearFamily
+        ans = []
+        gens = self.constraints_matrix().right_kernel_matrix()
+        partition = DisjointSet(self._ne)
+        for comp in self.connected_components():
+            for i in range(1, len(comp)):
+                partition.union(comp[0], comp[i])
+        for atom, subspace in prime_decomposition(gens, partition):
+            graph = self.constellation().subgraph(atom)
+            ans.append((atom, VeeringTriangulationLinearFamily(graph, subspace, mutable=mutable, check=check)))
+        return ans
 
     def vertex_angle(self, h):
         r"""
@@ -3212,9 +3202,15 @@ class VeeringTriangulation(Triangulation):
         return self.delaunay_cone(*args, **kwds)
 
     def linear_subvariety(self):
+        r"""
+        Return the linear subvariety generated by this family.
+
+        Note that if the family is not prime, its decomposition into prime
+        components is computed.
+        """
         from .linear_subvariety import IrreducibleRealLinearSubvariety
-        DS = self.delaunay_strebel_automaton()
-        return IrreducibleRealLinearSubvariety(DS._graph)
+        DS = [component.delaunay_strebel_automaton()._graph for atom, component in self.prime_decomposition()]
+        return IrreducibleRealLinearSubvariety(DS)
 
     def delaunay_automaton(self, run=True, backward=None, backend=None):
         r"""
@@ -3466,7 +3462,7 @@ class VeeringTriangulation(Triangulation):
             sage: F = CT.flat_structure_min(True)                 # optional - surface_dynamics
             sage: F                                               # optional - surface_dynamics
             FlatVeeringTriangulation("(0,18,~17)(~0,19,~18)...(~7,~23,8)", ... 7, 4, 3, 2, 1, 0))
-            sage: F.to_veering_triangulation()                    # optional - surface_dynamics
+            sage: F.constellation()                               # optional - surface_dynamics
             VeeringTriangulation("(0,18,~17)(~0,19,~18)...(~7,~23,8)", "RRRRRRRRBBBBBBBBBGBBBBBP")
         """
         VH = self.train_track_min_solution(HORIZONTAL, allow_degenerations=allow_degenerations)
