@@ -1715,6 +1715,9 @@ class VeeringTriangulation(Triangulation):
         r"""
         Apply the pi/2 rotation.
 
+        This amount to change the colouring (the combinatorics of the
+        triangulation remains unchanged).
+
         EXAMPLES::
 
             sage: from veerer import *
@@ -4283,7 +4286,17 @@ class VeeringTriangulation(Triangulation):
         return neighbours
 
     def random_forward_flip_sequence(self, length=1, relabel=False):
-        V = self.copy()
+        r"""
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,2,3)(1,4,~0)(5,6,~1)", "BRRBBBB")
+            sage: vt.random_forward_flip_sequence(5) # random
+            VeeringFlipSequence(VeeringTriangulation("(0,2,3)(~0,1,4)(~1,5,6)", "BRRBBBB"), "3B 4B 5B 6B 0R", "()")
+            sage: vt.random_forward_flip_sequence(5, relabel=True) # random
+            VeeringFlipSequence(VeeringTriangulation("(0,2,3)(~0,1,4)(~1,5,6)", "BRRBBBB"), "4B 5B 3R 2B 0B", "(0,~1)(~0,1)(2,6,3,5,4)(~2,~6,~3,~5,~4)")
+        """
+        V = self.copy(mutable=True)
         cols = [RED, BLUE]
         flips = []
         for _ in range(length):
@@ -4293,16 +4306,16 @@ class VeeringTriangulation(Triangulation):
             # TODO: this is a bit annoying. There should be a method to
             # test what are the valid colouring
             V.flip(e, col, reduced=False)
-            if not V.half_edge_has_curve(2 * e):
+            if not V.edge_has_curve(e):
                 col = BLUE if col == RED else RED
             V.flip_back(e, PURPLE)
             V.flip(e, col)
             flips.append((e, col))
 
         if relabel:
-            relabelling = perm_random_centralizer(self._ep)
+            relabelling = perm_random_centralizer(self.edge_permutation())
         else:
-            relabelling = perm_id(self._n)
+            relabelling = perm_id(2 * self._ne)
 
         from .flip_sequence import VeeringFlipSequence
         return VeeringFlipSequence(self, flips, relabelling)

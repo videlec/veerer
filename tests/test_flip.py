@@ -101,7 +101,7 @@ def test_flip_reduced(fp, cols, repeat):
         # actually do the flip
         V.flip(e, col, reduced=True)
         assert V.edge_has_curve(e)
-        assert V.forward_flippable_edges() == [e[0] for e in V.edges() if V.edge_colour(e[0]) == PURPLE], (V0, e, col)
+        assert V.forward_flippable_edges() == V.purple_edges(), (V0, e, col)
 
 if __name__ == '__main__':
     import sys

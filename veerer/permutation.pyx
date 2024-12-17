@@ -265,8 +265,10 @@ def perm_init(data, int n=-1, edge_like=False, partial=False):
                 return array.array('i', [])
         elif isinstance(data[0], (tuple, list)):
             return perm_from_cycles(data, n=n, edge_like=edge_like, partial=partial)
-        else:
+        elif n == -1 or (len(data) == n):
             return array.array('i', data)
+        else:
+            raise ValueError("invalid arguments (data={} n={})".format(data, n))
 
     if isinstance(data, str):
         c = str_to_cycles(data)
@@ -310,9 +312,22 @@ def perm_from_cycles(t, int n=-1, edge_like=False, partial=False):
         array('i', [6, 1, 3, 2, 4, 5, 0, 7])
         sage: perm_from_cycles([[1,-2], [0,3]], n=8, edge_like=True, partial=True)
         array('i', [6, -1, 3, 2, -1, -1, 0, -1])
+
+        sage: perm_from_cycles([], n=4)
+        array('i', [0, 1, 2, 3])
+        sage: perm_from_cycles([], n=4, edge_like=True)
+        array('i', [0, 1, 2, 3])
+        sage: perm_from_cycles([], n=4, partial=True)
+        array('i', [-1, -1, -1, -1])
     """
     if not any(tt for tt in t):
-        return array.array('i', [])
+        if n != -1:
+            if partial:
+                return array.array('i', [-1] * n)
+            else:
+                return array.array('i', range(n))
+        else:
+            return array.array('i', [])
 
     if n == -1:
         n = max(map(max, t)) + 1

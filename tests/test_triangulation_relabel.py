@@ -24,10 +24,9 @@ from veerer.triangulation import Triangulation
 
 def test_relabel():
     T = Triangulation([(0,1,2), (-1,-2,-3)], mutable=True)
-    p = perm_init([1,5,0,2,4,3])
+    p = perm_init([3,2,0,1,4,5])
     T.relabel(p)
-    assert T.faces() == [[0, 1, 5], [2, 3, 4]]
-    assert T.edges() == [[0, 2], [1, 3], [4, 5]]
+    assert T.faces() == [[0, 4, 3], [1, 5, 2]]
     T._check()
 
 if __name__ == '__main__':

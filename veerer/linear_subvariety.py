@@ -17,7 +17,8 @@ from sage.graphs.digraph import DiGraph
 
 
 # TODO: make a more atomic class to handle a single-level prime and irreducible linear subvariety
-# (which are in bijection with (finite) Delaunay-Strebel graphs)
+# (which are in bijection with (finite) Delaunay-Strebel graphs). This class would handle
+# horizontal and vertical degenerations.
 # TODO: if there are multiplicities in a given level, we should not do twice the computation of
 # the degenerations
 class IrreducibleRealLinearSubvariety:

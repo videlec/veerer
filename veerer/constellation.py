@@ -50,12 +50,24 @@ def check_relabelling(arg, ne):
         sage: p = check_relabelling("(0,1,2)", 3)
         sage: perm_cycle_string(p, edge_like=True)
         '(0,1,2)(~0,~1,~2)'
+        sage: p = check_relabelling("(0,1,2)(~0,~1,~2)", 3)
+        sage: perm_cycle_string(p, edge_like=True)
+        '(0,1,2)(~0,~1,~2)'
+        sage: p = check_relabelling("(0,~1,2)", 3)
+        sage: perm_cycle_string(p, edge_like=True)
+        '(0,~1,2)(~0,1,~2)'
+        sage: p = check_relabelling("(0,1,2,~0,~1,~2)", 3)
+        sage: perm_cycle_string(p, edge_like=True)
+        '(0,1,2,~0,~1,~2)'
     """
     n = 2 * ne
     if isinstance(arg, str):
         p = perm_init(arg, n, edge_like=True, partial=True)
     else:
         p = perm_init(arg, n, partial=True)
+
+    if len(p) != n:
+        raise ValueError("len(p) = {} while n = {}".format(len(p), n))
 
     for h in range(n):
         if p[h] == -1 and p[h ^ 1] == -1:

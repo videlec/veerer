@@ -279,7 +279,12 @@ class VeeringFlipSequence(object):
             sage: B * R
             VeeringFlipSequence(VeeringTriangulation("(0,6,5)(1,2,~6)(3,4,~5)", "BPBBRPR"), "1B 2R 5R", "(0,2,4,1,3)(~0,~2,~4,~1,~3)(5,6)(~5,~6)")
             sage: (B * R).inverse()
-            VeeringFlipSequence(VeeringTriangulation("(0,6,5)(1,2,~6)(3,4,~5)", "RBRRPBP"), "6B 4R 3B", "(0,3,~1,~4,2)(~0,~3,1,4,~2)(5,6,~5,~6)")
+            VeeringFlipSequence(VeeringTriangulation("(0,6,5)(1,2,~6)(3,4,~5)", "RBRRPBP"), "6B 4R 3B", "(0,3,1,4,2)(~0,~3,~1,~4,~2)(5,6,~5,~6)")
+
+            sage: (B * R).is_pseudo_anosov()
+            True
+            sage: (B * R).inverse().is_pseudo_anosov()
+            True
         """
         start = self._start
         reduced = any(start._colouring[e] == PURPLE for e in range(start._ne))
@@ -306,16 +311,23 @@ class VeeringFlipSequence(object):
         # NOTE: the relabelling might need some conjugation by edge flip
         # (more precisely, the edge flipped an odd number of times are
         #  swapped)
+        vp = self._start._vp
         ep = self._start._ep
         ne = self._start.num_edges()
         c = perm_id(2 * self._start._ne)
-        for i,_ in inverse_flips:
-            c[2 * i], c[2 * i + 1] = c[2 * i + 1], c[2 * i]
+        for e, _ in inverse_flips:
+            if vp[2 * e + 1] != -1:
+                c[2 * e], c[2 * e + 1] = c[2 * e + 1], c[2 * e]
         r = perm_invert(self._relabelling, 2 * self._start._ne)
         r = perm_compose(c, r, 2 * self._start._ne)
 
         V.rotate()
         F = VeeringFlipSequence(V, inverse_flips, r, reduced=reduced)
+
+        # NOTE: it is not necessarily the case that F._end and self._start
+        # coincide up to colouring (some edges might have been swapped)
+        assert F._start._vp == self._end._vp, (F._start, self._end)
+        assert (self._start == self._end) == (F._start == F._end), (self, self._start, self._end, F._start, F._end)
 
         # TODO: remove this expensive check
         F._check()
