@@ -32,15 +32,16 @@ class IrreducibleRealLinearSubvariety:
         sage: from veerer import *
         sage: vt = VeeringTriangulation("(1,2,3)(~1,~2,~3)(0:1)(~0:1)", "BRBB")
         sage: L = vt.linear_subvariety()
-        sage: L
+        sage: L  # optional - surface_dynamics
         Irreducible real linear subvariety of projective dimension 1 in [[H_0(0, -1^2)], [H_1(0)]]
-        sage: L.codimension_one_horizontal_degenerations()
+        sage: L.codimension_one_horizontal_degenerations()  # optional - surface_dynamics
         [Irreducible real linear subvariety of projective dimension 0 in [[H_0(0, -1^2)], [H_0(0, -1^2)]]]
         sage: L.codimension_one_vertical_degenerations()
         []
 
         sage: vt = VeeringTriangulationLinearFamily("(0:2,1:2)(~0:2,~1:2)", "RR", [(1, 1)])
-        sage: vt.linear_subvariety().multiscale_compactification()
+        sage: M = vt.linear_subvariety().multiscale_compactification()
+        sage: M # optional - surface_dynamics
         MultiscaleCompactification Irreducible real linear subvariety of projective dimension 0 in [[H_0(1^2, -2^2)]]
     """
     def __init__(self, ds_graphs):
@@ -323,13 +324,13 @@ class IrreducibleRealLinearSubvariety:
             [Irreducible real linear subvariety of projective dimension 2 in [[H_1(0)], [H_1(2, -2)]],
              Irreducible real linear subvariety of projective dimension 2 in [[H_1(0^2)], [H_0(2, -2^2)]]]
             sage: deg_second = []
-            sage: for L1 in deg_first:  # optional - surface_dynamics
+            sage: for L1 in deg_first: # optional - surface_dynamics
             ....:     degs = sorted(L1.codimension_one_vertical_degenerations())
             ....:     print(L1, degs)
             ....:     deg_second.extend(degs)
             Irreducible real linear subvariety of projective dimension 2 in [[H_1(0)], [H_1(2, -2)]] [Irreducible real linear subvariety of projective dimension 1 in [[H_1(0)], [H_0(0^2, -2)], [H_0(2, -2^2)]]]
             Irreducible real linear subvariety of projective dimension 2 in [[H_1(0^2)], [H_0(2, -2^2)]] [Irreducible real linear subvariety of projective dimension 1 in [[H_1(0)], [H_0(0^2, -2)], [H_0(2, -2^2)]]]
-            sage: for L2 in deg_second:
+            sage: for L2 in deg_second: # optional - surface_dynamics
             ....:     assert not list(L2.codimension_one_vertical_degenerations())
         """
         if level is None:
@@ -459,7 +460,7 @@ class MultiscaleCompactification:
         sage: vt = VeeringTriangulation("(0,6,~5)(~0,~4,5)(1,8,~7)(~1,~8,3)(2,7,~6)(~2,~3,4)", "RRRBBBBBB")
         sage: L = vt.linear_subvariety()
         sage: M = L.multiscale_compactification()
-        sage: M
+        sage: M  # optional - surface_dynamics
         MultiscaleCompactification of Irreducible real linear subvariety of projective dimension 3 in [[H_2(2)]] made of
         3 components in codimension 1
         5 components in codimension 2
@@ -470,7 +471,7 @@ class MultiscaleCompactification:
         sage: vt = VeeringTriangulation("(0,8,~7)(~0,~6,7)(1,11,~10)(~1,~11,4)(2,10,~9)(~2,~4,5)(3,9,~8)(~3,~5,6)", "RRRRBBBBBBBB")
         sage: L = vt.linear_subvariety()
         sage: M = L.multiscale_compactification()
-        sage: M
+        sage: M # optional - surface_dynamics
         MultiscaleCompactification of Irreducible real linear subvariety of projective dimension 4 in [[H_2(1^2)]] made of
         5 components in codimension 1
         11 components in codimension 2

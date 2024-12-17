@@ -345,12 +345,12 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
             sage: from veerer import VeeringTriangulation
             sage: T = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "BRR")
             sage: F = T.flat_structure_min()
-            sage: F.flatsurf()
+            sage: F.flatsurf()  # optional - sage_flatsurf
             Translation Surface in H_1(0) built from 2 isosceles triangles
 
             sage: T = VeeringTriangulation("(0,6,~5)(~0,7,~6)(1,8,~7)(~1,~4,5)(2,~3,4)(~2,~8,3)", "RRRBBBBBB")
             sage: F = T.flat_structure_min()
-            sage: F.flatsurf()
+            sage: F.flatsurf()  # optional - sage_flatsurf
             Half-Translation Surface in Q_1(2, -1^2) built from 2 isosceles triangles and 4 triangles
         """
         if self.has_folded_edge():

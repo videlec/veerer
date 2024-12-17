@@ -76,12 +76,12 @@ colors.
 ::
 
     sage: FS0 = T0.flat_structure_min()
-    sage: FS0.plot().show(figsize=5)
+    sage: FS0.plot().show(figsize=5)  # optional - sage_flatsurf
 
 ::
 
     sage: FFS0 = T0.flat_structure_geometric_middle()
-    sage: FFS0.plot().show(figsize=5)
+    sage: FFS0.plot().show(figsize=5) # optional - sage_flatsurf
 
 ::
 
@@ -100,12 +100,12 @@ colors.
 ::
 
     sage: FS1 = T1.flat_structure_min()
-    sage: FS1.plot().show(figsize=5)
+    sage: FS1.plot().show(figsize=5) # optional - sage_flatsurf
 
 ::
 
     sage: FFS1 = T1.flat_structure_geometric_middle()
-    sage: FFS1.plot().show(figsize=5)
+    sage: FFS1.plot().show(figsize=5) # optional - sage_flatsurf
 
 ::
 
@@ -124,20 +124,11 @@ colors.
 ::
 
     sage: FS2 = T2.flat_structure_min()
-    sage: FS2.plot().show(figsize=5)  # not tested (warning from matplotlib)
+    sage: FS2.plot().show(figsize=5)  # optional - sage_flatsurf
 
 
-Viewing train-tracks!
----------------------
-
-Recall that a veering triangulation is just a pair of transversal
-train-tracks.
-
-::
-
-    sage: TT_horiz = FS1.plot(horizontal_train_track=True, edge_labels=False)
-    sage: TT_vert = FS1.plot(vertical_train_track=True, edge_labels=False)
-    sage: graphics_array([TT_horiz, TT_vert], 1, 2).show(figsize=6)
+More examples
+-------------
 
 ::
 

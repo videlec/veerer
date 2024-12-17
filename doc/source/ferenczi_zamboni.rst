@@ -17,15 +17,15 @@ There are only two possible moves::
 
     sage: from veerer import VeeringTriangulation, VeeringFlipSequence # random output due to deprecation warnings from realalg
     sage: V = VeeringTriangulation("(0,1,2)", "PBR")
-    sage: R = VeeringFlipSequence(V, "0R", [2,1,0])
-    sage: L = VeeringFlipSequence(V, "0B", [1,0,2])
+    sage: R = VeeringFlipSequence(V, "0R", "(0,2)")
+    sage: L = VeeringFlipSequence(V, "0B", "(0,1)")
 
 The smallest dilatation is the golden rotation::
 
     sage: assert R.is_closed() and L.is_closed()
     sage: fp = R * L
     sage: fp
-    VeeringFlipSequence(VeeringTriangulation("(0,1,2)", "PBR"), "0R 2B", "(0,2,1)")
+    VeeringFlipSequence(VeeringTriangulation("(0,1,2)", "PBR"), "0R 2B", "(0,2,1)(~0,~2,~1)")
     sage: a, S = fp.self_similar_surface()
     sage: SS = S.copy(mutable=True)
     sage: SS.flip(0)
@@ -140,22 +140,22 @@ Some pseudo-Anosov with small dilatation in H(2)
     sage: assert f.is_pseudo_anosov()
     sage: f.self_similar_surface()
     (a,
-     FlatVeeringTriangulation(Triangulation("(0,6,5)(1,2,~6)(3,4,~5)"), [(1, -1), (a, a^3 - a^2 - a - 1), (a^3 - 2*a - 2, a^2), (-a^3 + a^2 + a + 1, -a), (2*a^3 - a^2 - 2*a - 2, a^3 - 2), (-a^3 + a + 1, -a^3 + a + 2), (a^3 - a - 2, a^3 - a - 1), (-a^3 + a + 2, -a^3 + a + 1), (-a^3 + a + 1, -a^3 + a + 2)]))
+     FlatVeeringTriangulation("(0,6,5)(1,2,~6)(3,4,~5)", "BBBBRRR", (1, a, -a^3 + 2*a + 2, -a^3 + a^2 + a + 1, 2*a^3 - a^2 - 2*a - 2, a^3 - a - 1, a^3 - a - 2), (1, -a^3 + a^2 + a + 1, a^2, a, a^3 - 2, a^3 - a - 2, a^3 - a - 1)))
 
     sage: f = R1 * R1 * R5
     sage: assert f.is_pseudo_anosov()
     sage: f.self_similar_surface()
     (a,
-     FlatVeeringTriangulation(Triangulation("(0,6,5)(1,2,~6)(3,4,~5)"), [(1, -1), (a^2, 2*a^3 - 3*a^2 - 2*a - 4), (a^3 - 2*a^2 - 2, a), (a, a^3 - 2*a^2 - 2), (a^3 - a^2 - a - 1, a^3 - a^2 - a - 3), (-a^3 + a^2 + 1, -2*a^3 + 3*a^2 + a + 5), (a^3 - a^2 - 2, 2*a^3 - 3*a^2 - a - 4), (-a^3 + a^2 + 2, -2*a^3 + 3*a^2 + a + 4), (-a^3 + a^2 + 1, -2*a^3 + 3*a^2 + a + 5)]))
+     FlatVeeringTriangulation("(0,6,5)(1,2,~6)(3,4,~5)", "BBBBRRR", (1, a^2, -a^3 + 2*a^2 + 2, a, a^3 - a^2 - a - 1, a^3 - a^2 - 1, a^3 - a^2 - 2), (1, -2*a^3 + 3*a^2 + 2*a + 4, a, -a^3 + 2*a^2 + 2, a^3 - a^2 - a - 3, 2*a^3 - 3*a^2 - a - 5, 2*a^3 - 3*a^2 - a - 4)))
 
     sage: f = R3 * R1 * R2 * CL5
     sage: assert f.is_pseudo_anosov()
     sage: f.self_similar_surface()
     (a,
-     FlatVeeringTriangulation(Triangulation("(0,~5,4)(1,2,~6)(3,5,6)"), [(1, 1), (1, 1), (-1/2*a + 3/2, 1/2*a - 1/2), (1/2*a - 1/2, -1/2*a + 3/2), (a - 4, -a), (-a + 3, a - 1), (1/2*a - 5/2, -1/2*a - 1/2), (1/2*a - 5/2, -1/2*a - 1/2), (-a + 3, a - 1)]))
+     FlatVeeringTriangulation("(0,~5,4)(1,2,~6)(3,5,6)", "RRBBRBR", (1, 1, 1/2*a - 3/2, 1/2*a - 1/2, -a + 4, a - 3, -1/2*a + 5/2), (1, 1, 1/2*a - 1/2, 1/2*a - 3/2, a, a - 1, 1/2*a + 1/2)))
 
     sage: f = R3 * R1 * R2 * CL5 * CR5
     sage: assert f.is_pseudo_anosov()
     sage: f.self_similar_surface()
     (a,
-     FlatVeeringTriangulation(Triangulation("(0,~5,4)(1,2,~6)(3,5,6)"), [(1, 1), (7/33*a^3 - 23/33*a^2 - 19/33*a - 25/33, -10/33*a^3 + 32/33*a^2 + 37/33*a + 16/33), (-20/33*a^3 + 61/33*a^2 + 92/33*a + 62/33, 5/33*a^3 - 16/33*a^2 - 2/33*a - 8/33), (-1/33*a^3 + 8/33*a^2 - 2/33*a - 20/33, -8/33*a^3 + 19/33*a^2 + 56/33*a + 26/33), (4/11*a^3 - 10/11*a^2 - 25/11*a - 30/11, -1/11*a^3 + 1/11*a^2 + 7/11*a - 5/11), (-4/11*a^3 + 10/11*a^2 + 25/11*a + 19/11, 1/11*a^3 - 1/11*a^2 - 7/11*a - 6/11), (13/33*a^3 - 38/33*a^2 - 73/33*a - 37/33, 5/33*a^3 - 16/33*a^2 - 35/33*a - 8/33), (13/33*a^3 - 38/33*a^2 - 73/33*a - 37/33, 5/33*a^3 - 16/33*a^2 - 35/33*a - 8/33), (-4/11*a^3 + 10/11*a^2 + 25/11*a + 19/11, 1/11*a^3 - 1/11*a^2 - 7/11*a - 6/11)]))
+     FlatVeeringTriangulation("(0,~5,4)(1,2,~6)(3,5,6)", "RBBBRBR", (1, 7/33*a^3 - 23/33*a^2 - 19/33*a - 25/33, 20/33*a^3 - 61/33*a^2 - 92/33*a - 62/33, -1/33*a^3 + 8/33*a^2 - 2/33*a - 20/33, -4/11*a^3 + 10/11*a^2 + 25/11*a + 30/11, 4/11*a^3 - 10/11*a^2 - 25/11*a - 19/11, -13/33*a^3 + 38/33*a^2 + 73/33*a + 37/33), (1, 10/33*a^3 - 32/33*a^2 - 37/33*a - 16/33, 5/33*a^3 - 16/33*a^2 - 2/33*a - 8/33, 8/33*a^3 - 19/33*a^2 - 56/33*a - 26/33, 1/11*a^3 - 1/11*a^2 - 7/11*a + 5/11, 1/11*a^3 - 1/11*a^2 - 7/11*a - 6/11, -5/33*a^3 + 16/33*a^2 + 35/33*a + 8/33)))
