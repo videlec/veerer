@@ -125,7 +125,7 @@ colors.
 ::
 
     sage: FS2 = T2.flat_structure_min()
-    sage: FS2.plot().show(figsize=5)  # optional - sage_flatsurf
+    sage: FS2.plot().show(figsize=5)  # optional - sage_flatsurf # not tested
 
 
 More examples
