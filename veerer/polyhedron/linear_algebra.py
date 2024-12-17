@@ -29,8 +29,10 @@ Now we want to project a linear form to this subspace:
 from sage.rings.integer_ring import ZZ
 from sage.rings.rational_field import QQ
 
+from sage.sets.disjoint_set import DisjointSet
 from sage.rings.integer import GCD_list
 from sage.arith.functions import LCM_list
+
 
 def linear_form_project(equations, linear_form):
     r"""
@@ -102,3 +104,56 @@ def linear_form_normalize(base_ring, linear_form):
 
 
 vector_normalize = linear_form_normalize
+
+
+def prime_decomposition(mat, partition=None):
+    r"""
+    Return the prime decomposition of the matrix ``mat`` together with dimensions.
+
+    EXAMPLES::
+
+        sage: from veerer.polyhedron.linear_algebra import prime_decomposition
+        sage: prime_decomposition(matrix(ZZ, 2, 3, [1, 0, 1, 0, 1, 0]))
+        [([0, 2], [1 1]), ([1], [1])]
+
+        sage: B = (ZZ**8).basis()
+        sage: m = matrix([B[0] + B[1] + B[2], B[1] - B[2], B[3] + B[4] + B[5], B[6] + B[7]])
+        sage: p0 = prime_decomposition(m)
+        sage: p0
+        [(
+                   [ 1  0  2]
+        [0, 1, 2], [ 0  1 -1]
+        ),
+         ([3, 4, 5], [1 1 1]),
+         ([6, 7], [1 1])]
+        sage: r = random_matrix(ZZ, 4, algorithm="unimodular")
+        sage: m = r * m
+        sage: p1 = prime_decomposition(m)
+        sage: assert p1 == p0, (p1, p0, r)
+
+    Column permutations (be careful that permutations in sage act on {1, ..., n})::
+
+        sage: s = SymmetricGroup(6).random_element()
+        sage: sinv = ~s
+        sage: m.permute_columns(s)
+        sage: p1 = prime_decomposition(m)
+        sage: p2 = sorted((sorted(sinv(i + 1) - 1 for i in atom), dim) for atom, dim in p0)
+        sage: assert [(atom, subspace.nrows()) for atom, subspace in p1] == [(atom, subspace.nrows()) for atom, subspace in p2]
+    """
+    mat = mat.echelon_form()
+    if partition is None:
+        partition = DisjointSet(mat.ncols())
+    pivots = [None] * mat.ncols()
+    for i, r in enumerate(mat.rows()):
+        z = r.nonzero_positions()
+        if not z:
+            break
+        for j in range(1, len(z)):
+            partition.union(z[0], z[j])
+        pivots[z[0]] = i
+    gens = []
+    for atom in partition:
+        rows = [pivots[j] for j in atom if pivots[j] is not None]
+        gens.append(mat.matrix_from_rows_and_columns(rows, atom))
+
+    return list(zip(partition, gens))
