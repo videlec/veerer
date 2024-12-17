@@ -690,8 +690,8 @@ class FlatVeeringQuadrangulation:
 
         self._pr = perm_conjugate(self._pr, p)
         self._pl = perm_conjugate(self._pl, p)
-        perm_on_list(p, self._zr, self._n)
-        perm_on_list(p, self._zl, self._n)
+        perm_on_list(self._zr, p, n)
+        perm_on_list(self._zl, p, n)
 
     def well_slanted_r_staircases(self):
         return [i[0] for i in perm_cycles(self._pr, self._n) if self.is_r_slanted(i[0])]
@@ -1621,10 +1621,10 @@ class VeeringQuadrangulationFlipSequence:
             V.symmetry()
 
         swap = sage.matrix.matrix0.Matrix.swap_rows
-        perm_on_list(self._relabelling, P0, n, swap)
-        perm_on_list(self._relabelling, P1, n, swap)
-        perm_on_list(self._relabelling, Q0, n, swap)
-        perm_on_list(self._relabelling, Q1, n, swap)
+        perm_on_list(P0, self._relabelling, n, swap)
+        perm_on_list(P1, self._relabelling, n, swap)
+        perm_on_list(Q0, self._relabelling, n, swap)
+        perm_on_list(Q1, self._relabelling, n, swap)
         return Q1, P1, Q0, P0
 
     def matrix(self):
