@@ -31,11 +31,12 @@ part of a project that also involve
   with SageMath (see below).
 - The Python library `PyNormaliz <https://pypi.org/project/PyNormaliz/>`_
   (polytope, in particular over number fields).
-- The software `SageMath <https://www.sagemath.org/>`_ (plotting, linear algebra
-  and many other things)
-- The SageMath library `surface_dynamics
+- The Sagemath libraries `sage-flatsruf
+  <https://flatsurf.github.io/sage-flatsurf/>`_ (plotting and construction of
+  surfaces) and `surface_dynamics
   <https://pypi.org/project/surface-dynamics/>`_ (for analyzing stratum
   components)
+- The software `SageMath <https://www.sagemath.org/>`_ (many things)
 
 To import all features from veerer one usually starts with the following
 lines::
@@ -202,7 +203,7 @@ Core vs not core
 ::
 
     sage: FS = S.flat_structure_min()
-    sage: FS.plot()
+    sage: FS.plot()  # optional - sage_flatsurf
     Graphics object consisting of ... graphics primitives
 
 ::
