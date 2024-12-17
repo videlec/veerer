@@ -41,6 +41,40 @@ from .permutation import (perm_init, perm_check, perm_cycles, perm_on_array, per
                           perms_are_transitive, perms_orbits, perm_edge_orbits, edge_relabelling_from)
 
 
+def check_relabelling(arg, ne):
+    r"""
+    EXAMPLES::
+
+        sage: from veerer.constellation import check_relabelling
+        sage: from veerer.permutation import perm_cycle_string
+        sage: p = check_relabelling("(0,1,2)", 3)
+        sage: perm_cycle_string(p, edge_like=True)
+        '(0,1,2)(~0,~1,~2)'
+    """
+    n = 2 * ne
+    if isinstance(arg, str):
+        p = perm_init(arg, n, edge_like=True, partial=True)
+    else:
+        p = perm_init(arg, n, partial=True)
+
+    for h in range(n):
+        if p[h] == -1 and p[h ^ 1] == -1:
+            p[h] = h
+            p[h ^ 1] = h ^ 1
+        elif p[h] == -1:
+            p[h] = p[h ^ 1] ^ 1
+        elif p[h ^ 1] == -1:
+            p[h ^ 1] = p[h] ^ 1
+        elif p[h ^ 1] != p[h] ^ 1:
+            raise ValueError("invalid input for relabelling (arg={})".format(arg))
+
+    if not perm_check(p, n):
+        raise ValueError("invalid input for relabelling (arg={})".format(arg))
+
+    return p
+
+
+
 class Constellation:
     __slots__ = ['_mutable',  # mutability flag
                  '_ne',  # number of edges
@@ -614,7 +648,7 @@ class Constellation:
             sage: S2 = T.copy()
             sage: T == S1 == S2
             True
-            sage: S1.flip(2, BLUE)
+            sage: S1.flip(1, BLUE)
             sage: T == S1
             False
             sage: T == S2
@@ -1048,16 +1082,16 @@ class Constellation:
             Triangulation("(0,~1,~2)(~0,1,2)")
             sage: T.swap(1)
             sage: T
-            Triangulation("(0,1,2)(~0,~1,~2)")
+            Triangulation("(0,1,~2)(~0,~1,2)")
             sage: T.swap(2)
             sage: T
-            Triangulation("(0,~1,2)(~0,1,~2)")
+            Triangulation("(0,1,2)(~0,~1,~2)")
 
             sage: T = Triangulation("(0,~5,4)(3,5,6)(1,2,~6)", mutable=True)
             sage: T.swap(0)
             sage: T
             Triangulation("(0,~5,4)(1,2,~6)(3,5,6)")
-            sage: T.swap(10)
+            sage: T.swap(5)
             sage: T
             Triangulation("(0,5,4)(1,2,~6)(3,~5,6)")
 
@@ -1069,7 +1103,7 @@ class Constellation:
             sage: cols = "BRBBBRRBBBBR"
             sage: V = VeeringTriangulation(fp, cols, mutable=True)
             sage: V.swap(0)
-            sage: V.swap(20)
+            sage: V.swap(10)
             sage: V
             VeeringTriangulation("(0,1,~3)(~0,~1,2)(~2,~4,6)(3,4,~5)(5,~9,~7)(~6,8,7)(~8,10,11)(9,~10,~11)", "BRBBBRRBBBBR")
 
@@ -1077,8 +1111,8 @@ class Constellation:
 
             sage: T = Triangulation("(0,~5,4)(1,2,~6)(3,5,6)", mutable=True)
             sage: T1 = T.copy()
-            sage: T1.swap(10)
-            sage: T1.swap(12)
+            sage: T1.swap(5)
+            sage: T1.swap(6)
             sage: T2 = T.copy()
             sage: T2.relabel("(5,~5)(6,~6)")
             sage: T1 == T2
@@ -1088,43 +1122,47 @@ class Constellation:
             raise ValueError('immutable triangulation; use a mutable copy instead')
 
         if check:
-            e = self._check_half_edge(e)
+            e = self._check_edge(e)
 
         vp = self._vp
         ep = self._ep
         fp = self._fp
-        E = ep(e)
 
-        if e == E:
+        h = 2 * e
+        H = self._ep(h)
+        if h == H:
             return
 
         # images/preimages by vp
-        e_vp = vp[e]
-        E_vp = vp[E]
-        e_vp_inv = fp[E]
-        E_vp_inv = fp[e]
-        assert vp[e_vp_inv] == e
-        assert vp[E_vp_inv] == E
+        h_vp = vp[h]
+        H_vp = vp[H]
+        h_vp_inv = fp[H]
+        H_vp_inv = fp[h]
+        assert vp[h_vp_inv] == h
+        assert vp[H_vp_inv] == H
 
         # images/preimages by fp
-        e_fp = fp[e]
-        E_fp = fp[E]
-        e_fp_inv = ep(e_vp)
-        E_fp_inv = ep(E_vp)
-        assert fp[e_fp_inv] == e
-        assert fp[E_fp_inv] == E
+        h_fp = fp[h]
+        H_fp = fp[H]
+        h_fp_inv = ep(h_vp)
+        H_fp_inv = ep(H_vp)
+        assert fp[h_fp_inv] == h
+        assert fp[H_fp_inv] == H
 
-        fp[e_fp_inv] = E
-        fp[E_fp_inv] = e
-        vp[e_vp_inv] = E
-        vp[E_vp_inv] = e
-        fp[e] = E_fp
-        fp[E] = e_fp
-        vp[e] = E_vp
-        vp[E] = e_vp
+        fp[h_fp_inv] = H
+        fp[H_fp_inv] = h
+        vp[h_vp_inv] = H
+        vp[H_vp_inv] = h
+        fp[h] = H_fp
+        fp[H] = h_fp
+        vp[h] = H_vp
+        vp[H] = h_vp
 
         for l in self._half_edges_data:
-            l[e], l[E] = l[E], l[e]
+            l[h], l[H] = l[H], l[h]
+
+    def _extra_relabelling(self, p):
+        pass
 
     def relabel(self, p, check=True):
         r"""
@@ -1152,10 +1190,10 @@ class Constellation:
 
             sage: T0 = Triangulation("(1,~0,4)(2,~4,~1)(3,~2,5)(~5,~3,0)")
             sage: T = T0.copy(mutable=True)
-            sage: T.flip_back(2) # 1
-            sage: T.flip_back(6) # 3
-            sage: T.flip_back(0) # 0
-            sage: T.flip_back(4) # 2
+            sage: T.flip_back(1)
+            sage: T.flip_back(3)
+            sage: T.flip_back(0)
+            sage: T.flip_back(2)
             sage: T.relabel("(0,2)(1,3)(~0,~2)(~1,~3)")
             sage: T == T0
             True
@@ -1206,28 +1244,19 @@ class Constellation:
         if not self._mutable:
             raise ValueError('immutable triangulation; use a mutable copy instead')
 
-        n = 2 * self._ne
-        if check and not perm_check(p, n):
-            # if the input is not a valid permutation, we assume that half-edges
-            # are not separated
-            if isinstance(p, str):
-                p = perm_init(p, 2 * self._ne, edge_like=True)
-            else:
-                p = perm_init(p, 2 * self._ne)
-
-            for i in range(0, n, 2):
-                if p[i] == -1 or (p[i + 1] != -1 and p[i] // 2 != p[i + 1] // 2):
-                    raise ValueError("invalid relabelling permutation p={}".format(perm_cycle_string(p, edge_like=True)))
+        if check:
+            p = check_relabelling(p, self._ne)
 
         # TODO: would better be inplace!!
         self._vp = perm_conjugate(self._vp, p)
         self._fp = perm_conjugate(self._fp, p)
         for l in self._half_edges_data:
-            perm_on_array(l, l, p, n)
+            perm_on_array(l, l, p, 2 * self._ne)
 
         for l in self._edges_data:
-            perm_on_edge_array(l, l, p, n)
+            perm_on_edge_array(l, l, p, 2 * self._ne)
 
+        self._extra_relabelling(p)
         self._check()
 
     # TODO: consider listing all quotients by looking at blocks under the monodromy group
@@ -1821,3 +1850,8 @@ class Constellation:
             return (True, perm_compose(r1, perm_invert(r2)))
         else:
             return True
+
+    # TODO: deprecate
+    is_isomorphic_to = is_isomorphic
+
+

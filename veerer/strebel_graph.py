@@ -60,12 +60,12 @@ def one_edge_completion(t, angle_excess, colouring):
         sage: colouring = [2, 1]
         sage: angle_excess = array('i', [3, 0, 3, 3])
         sage: one_edge_completion(t, angle_excess, colouring)
-        ((Triangulation("(2,~0,~1)(0:1)(1:1)(~2:1)"),
-          array('i', [3, 3, 0, 3, 0, 0]),
-          array('i', [2, 1, 1, 1, 1, 2])),
-         (Triangulation("(2,~0,~1)(0:1)(1:1)(~2:1)"),
-          array('i', [3, 3, 0, 3, 0, 0]),
-          array('i', [2, 1, 2, 2, 1, 2])))
+        ((Triangulation("(~0,2,~1)(0:1)(1:1)(~2:1)"),
+          array('i', [3, 0, 3, 0, 0, 3]),
+          array('i', [2, 1, 1])),
+         (Triangulation("(~0,2,~1)(0:1)(1:1)(~2:1)"),
+          array('i', [3, 0, 3, 0, 0, 3]),
+          array('i', [2, 1, 2])))
     """
     # We insert the (m, M)-edge as follows
     #
@@ -378,7 +378,7 @@ class StrebelGraph(Constellation):
 
         j = 2 * self._ne
         inv = array('i', [-1] * (2 * self._ne))  # involution on the cover
-        quot = array('i', [-1] * (2 * self._ne))  # quotient map
+        quot = array('i', [-1] * n)  # quotient map
         excess_cov = array('i', [-1] * n)
         for e in range(self._ne):
             quot[2 * e] = 2 * e
@@ -391,10 +391,10 @@ class StrebelGraph(Constellation):
                 excess_cov[2 * e + 1] = excess_cov[j] = self._excess[2 * e + 1]
                 inv[2 * e] = j + 1
                 inv[2 * e + 1] = j
-                j += 2
                 quot[2 * e + 1] = 2 * e + 1
                 quot[j] = 2 * e + 1
                 quot[j + 1] = 2 * e
+                j += 2
 
         vp_cov = array('i', [-1] * n)
         for e in range(2 * self._ne):
@@ -452,6 +452,10 @@ class StrebelGraph(Constellation):
             sage: G = StrebelGraph("(0,1,~1)")
             sage: for colouring in G.colourings():
             ....:     print(colouring, G.angle_excess(colouring))
+            array('i', [1, 1]) array('i', [1, 0, 1, 1])
+            array('i', [1, 2]) array('i', [0, 0, 1, 1])
+            array('i', [2, 1]) array('i', [1, 0, 0, 1])
+            array('i', [2, 2]) array('i', [1, 0, 1, 1])
         """
         # remark: red-red corners with angle excess 0 and 1 both correspond
         # to zero half-plane excess.
@@ -564,20 +568,25 @@ class StrebelGraph(Constellation):
             ....:         assert all(vt.stratum() == G.stratum() for vt in vts)  # optional - surface_dynamics
             ....:         print(colouring, list(G.veering_triangulations(colouring)))
             StrebelGraph("(0,~1:1,~0,1:1)")
-            array('i', [1, 1, 1, 1]) [VeeringTriangulation("(0:1,~1:2,~0:1,1:2)", "RR")]
-            array('i', [1, 2, 2, 1]) [VeeringTriangulation("(0,2,1)(3,~1,~0)(~3:1,~2:2)", "RBBR"), VeeringTriangulation("(0,2,1)(3,~1,~0)(~3:2,~2:2)", "RBBB"), VeeringTriangulation("(0,2,1)(3,~1,~0)(~3:2,~2:2)", "RBRR"), VeeringTriangulation("(0,2,1)(3,~1,~0)(~3:2,~2:1)", "RBRB")]
-            array('i', [2, 1, 1, 2]) [VeeringTriangulation("(0:1,~1:1,~0:1,1:1)", "BR")]
-            array('i', [2, 2, 2, 2]) [VeeringTriangulation("(0:1,~1:2,~0:1,1:2)", "BB")]
-            StrebelGraph("(0,~1)(1)(~0)")
-            array('i', [1, 1, 1, 1]) [VeeringTriangulation("(0:1,~1:1)(1:1)(~0:1)", "RR")]
-            array('i', [1, 2, 2, 1]) [VeeringTriangulation("(0,2,~1)(1:1)(~2:1)(~0:1)", "RBR"), VeeringTriangulation("(0,2,~1)(1:1)(~2:1)(~0:1)", "RBB")]
-            array('i', [2, 1, 1, 2]) [VeeringTriangulation("(0,~1,2)(1:1)(~2:1)(~0:1)", "BRR"), VeeringTriangulation("(0,~1,2)(1:1)(~2:1)(~0:1)", "BRB")]
-            array('i', [2, 2, 2, 2]) [VeeringTriangulation("(0:1,~1:1)(1:1)(~0:1)", "BB")]
-            StrebelGraph("(0:2)(1:2)(~1,~0:2)")
-            array('i', [1, 1, 1, 1]) [VeeringTriangulation("(0:3)(1:3)(~1:1,~0:3)", "RR")]
-            array('i', [1, 2, 2, 1]) [VeeringTriangulation("(0:3)(1:3)(~1:1,~0:2)", "RB")]
-            array('i', [2, 1, 1, 2]) [VeeringTriangulation("(2,~0,~1)(0:3)(1:3)(~2:3)", "BRR"), VeeringTriangulation("(2,~0,~1)(0:3)(1:3)(~2:3)", "BRB")]
-            array('i', [2, 2, 2, 2]) [VeeringTriangulation("(0:3)(1:3)(~1:1,~0:3)", "BB")]
+            array('i', [1, 1]) [VeeringTriangulation("(0:1,~1:2,~0:1,1:2)", "RR")]
+            array('i', [1, 2]) [VeeringTriangulation("(0,2,1)(~0,3,~1)(~2:2,~3:1)", "RBBR"), VeeringTriangulation("(0,2,1)(~0,3,~1)(~2:2,~3:2)", "RBBB"), VeeringTriangulation("(0,2,1)(~0,3,~1)(~2:2,~3:2)", "RBRR"), VeeringTriangulation("(0,2,1)(~0,3,~1)(~2:1,~3:2)", "RBRB")]
+            array('i', [2, 1]) [VeeringTriangulation("(0:1,~1:1,~0:1,1:1)", "BR")]
+            array('i', [2, 2]) [VeeringTriangulation("(0:1,~1:2,~0:1,1:2)", "BB")]
+            StrebelGraph("(0,~1)(~0)(1)")
+            array('i', [1, 1]) [VeeringTriangulation("(0:1,~1:1)(~0:1)(1:1)", "RR")]
+            array('i', [1, 2]) [VeeringTriangulation("(0,2,~1)(~0:1)(1:1)(~2:1)", "RBR"), VeeringTriangulation("(0,2,~1)(~0:1)(1:1)(~2:1)", "RBB")]
+            array('i', [2, 1]) [VeeringTriangulation("(0,~1,2)(~0:1)(1:1)(~2:1)", "BRR"), VeeringTriangulation("(0,~1,2)(~0:1)(1:1)(~2:1)", "BRB")]
+            array('i', [2, 2]) [VeeringTriangulation("(0:1,~1:1)(~0:1)(1:1)", "BB")]
+            StrebelGraph("(0:2)(~0:2,~1)(1:2)")
+            array('i', [1, 1]) [VeeringTriangulation("(0:3)(~0:3,~1:1)(1:3)", "RR")]
+            array('i', [1, 2]) [VeeringTriangulation("(0:3)(~0:2,~1:1)(1:3)", "RB")]
+            array('i', [2, 1]) [VeeringTriangulation("(~0,~1,2)(0:3)(1:3)(~2:3)", "BRR"), VeeringTriangulation("(~0,~1,2)(0:3)(1:3)(~2:3)", "BRB")]
+            array('i', [2, 2]) [VeeringTriangulation("(0:3)(~0:3,~1:1)(1:3)", "BB")]
+            StrebelGraph("(0,1,2,3)")
+            array('i', [1, 1, 1, 1]) [VeeringTriangulation("(0:1,1:1,2:1,3:1)", "RRRR")]
+            array('i', [1, 1, 1, 2]) [VeeringTriangulation("(0,4,3)(1:1,2:1,~4:1)", "RRRBR"), VeeringTriangulation("(0,4,3)(1,5,~4)(2:1,~5:1)", "RRRBBR"), VeeringTriangulation("(0,4,3)(1,5,~4)(2,6,~5)(~6:1)", "RRRBBBR"), VeeringTriangulation("(0,4,3)(1,5,~4)(2,6,~5)(~6:1)", "RRRBBBB")]
+            ...
+            array('i', [2, 2, 2, 2]) [VeeringTriangulation("(0:1,1:1,2:1,3:1)", "BBBB")]
         """
         def is_complete(t, angle_excess, colouring):
             return not any(b1 and b2 == 0 for (b1, b2) in zip(t._bdry, angle_excess))
@@ -629,28 +638,28 @@ class StrebelGraph(Constellation):
             ....:     for colouring in G.colourings():
             ....:         print(colouring, sum(1 for _ in G.veering_triangulations(colouring)), sum(1 for _ in G.delaunay_triangulations(colouring)))
             StrebelGraph("(0,~1:1,~0,1:1)")
-            array('i', [1, 1, 1, 1]) 1 1
-            array('i', [1, 2, 2, 1]) 4 2
-            array('i', [2, 1, 1, 2]) 1 1
-            array('i', [2, 2, 2, 2]) 1 1
-            StrebelGraph("(0,2,~1)(1)(~2,~0)")
-            array('i', [1, 1, 1, 1, 1, 1]) 1 1
-            array('i', [1, 1, 2, 2, 1, 1]) 6 5
-            array('i', [1, 2, 1, 1, 2, 1]) 3 3
-            array('i', [1, 2, 2, 2, 2, 1]) 6 5
-            array('i', [2, 1, 1, 1, 1, 2]) 6 3
-            array('i', [2, 1, 2, 2, 1, 2]) 3 3
-            array('i', [2, 2, 1, 1, 2, 2]) 6 3
-            array('i', [2, 2, 2, 2, 2, 2]) 1 1
-            StrebelGraph("(0:2,2,~1)(1,~0)(~2)")
-            array('i', [1, 1, 1, 1, 1, 1]) 1 1
-            array('i', [1, 1, 2, 2, 1, 1]) 2 2
-            array('i', [1, 2, 1, 1, 2, 1]) 2 2
-            array('i', [1, 2, 2, 2, 2, 1]) 2 2
-            array('i', [2, 1, 1, 1, 1, 2]) 6 5
-            array('i', [2, 1, 2, 2, 1, 2]) 6 5
-            array('i', [2, 2, 1, 1, 2, 2]) 2 2
-            array('i', [2, 2, 2, 2, 2, 2]) 1 1
+            array('i', [1, 1]) 1 1
+            array('i', [1, 2]) 4 2
+            array('i', [2, 1]) 1 1
+            array('i', [2, 2]) 1 1
+            StrebelGraph("(0,2,~1)(~0,~2)(1)")
+            array('i', [1, 1, 1]) 1 1
+            array('i', [1, 1, 2]) 6 5
+            array('i', [1, 2, 1]) 3 3
+            array('i', [1, 2, 2]) 6 5
+            array('i', [2, 1, 1]) 6 3
+            array('i', [2, 1, 2]) 3 3
+            array('i', [2, 2, 1]) 6 3
+            array('i', [2, 2, 2]) 1 1
+            StrebelGraph("(0:2,2,~1)(~0,1)(~2)")
+            array('i', [1, 1, 1]) 1 1
+            array('i', [1, 1, 2]) 2 2
+            array('i', [1, 2, 1]) 2 2
+            array('i', [1, 2, 2]) 2 2
+            array('i', [2, 1, 1]) 6 5
+            array('i', [2, 1, 2]) 6 5
+            array('i', [2, 2, 1]) 2 2
+            array('i', [2, 2, 2]) 1 1
         """
         for vt in self.veering_triangulations(colouring, slope, mutable):
             if vt.is_delaunay(backend):
@@ -675,12 +684,12 @@ class StrebelGraph(Constellation):
             [-1]
             sage: StrebelGraph("(0,~1)(1)(~0)").residue_matrix()
             [ 1  1]
-            [ 0 -1]
             [-1  0]
+            [ 0 -1]
             sage: StrebelGraph("(0,2,~3,~1)(1)(3,~0)(~2)").residue_matrix()
             [ 1  1  1  1]
-            [ 0 -1  0  0]
             [-1  0  0 -1]
+            [ 0 -1  0  0]
             [ 0  0 -1  0]
 
             sage: StrebelGraph("(0:1,~0:1)").residue_matrix()
@@ -688,18 +697,17 @@ class StrebelGraph(Constellation):
 
             sage: StrebelGraph("(0:1,1:1,2)(~2,~3:1,~4:1)(3,~1,5)(~0,4,~5)").residue_matrix()
             [ 1 -1 -1  0  0  0]
-            [ 0  1  0  1  0  1]
             [-1  0  0  0 -1 -1]
+            [ 0  1  0  1  0  1]
             [ 0  0  1 -1  1  0]
 
             sage: sg = StrebelGraph("(0:1,1,2)(~2,~3,~4:1)(3,~1:1,5)(~0:1,4,~5)")
             sage: sg.abelian_cover().residue_matrix()
-            [ 1  1  1  0  0  0  0  0  0 -1 -1 -1]
-            [ 0 -1  0  1  0  1 -1  0 -1  0  1  0]
-            [-1  0  0  0  1 -1  1 -1  0  0  0  1]
-            [ 0  0 -1 -1 -1  0  0  1  1  1  0  0]
+            [ 1  1  1  0  0  0 -1 -1 -1  0  0  0]
+            [-1  0  0  0  1 -1  1  0  0  0 -1  1]
+            [ 0 -1  0  1  0  1  0  1  0 -1  0 -1]
+            [ 0  0 -1 -1 -1  0  0  0  1  1  1  0]
         """
-        ep = self._ep
         nf = self.num_faces()
         ne = self.num_edges()
         r = matrix(ZZ, nf, ne)
@@ -760,23 +768,23 @@ class StrebelGraph(Constellation):
         EXAMPLES::
 
             sage: from veerer import StrebelGraph
-            sage: G = StrebelGraph("(0,2,~3,~1)(1)(3,~0)(~2)")
+            sage: G = StrebelGraph("(0,2,~3,~1)(~0,3)(1)(~2)")
 
-            sage: f1 = G.add_residue_constraints([[1, 2, 0, 0]])
+            sage: f1 = G.add_residue_constraints([[1, 0, 2, 0]])
             sage: f1
-            StrebelGraphLinearFamily("(0,2,~3,~1)(1)(3,~0)(~2)", [(1, 0, 0, -1), (0, 1, 0, 1), (0, 0, 1, -1)])
+            StrebelGraphLinearFamily("(0,2,~3,~1)(~0,3)(1)(~2)", [(1, 0, 0, -1), (0, 1, 0, 1), (0, 0, 1, -1)])
             sage: f1.is_core()
             True
 
-            sage: f2 = G.add_residue_constraints([[1, 1, 0, 0]])
+            sage: f2 = G.add_residue_constraints([[1, 0, 1, 0]])
             sage: f2
-            StrebelGraphLinearFamily("(0,2,~3,~1)(1)(3,~0)(~2)", [(1, 0, 0, -1), (0, 1, 0, 0), (0, 0, 1, -1)])
+            StrebelGraphLinearFamily("(0,2,~3,~1)(~0,3)(1)(~2)", [(1, 0, 0, -1), (0, 1, 0, 0), (0, 0, 1, -1)])
             sage: f2.is_core()
             False
 
             sage: f3 = G.add_residue_constraints([[0, 1, -1, 0], [0, 1, 0, -1]])
             sage: f3
-            StrebelGraphLinearFamily("(0,2,~3,~1)(1)(3,~0)(~2)", [(1, 0, 0, -1), (0, 1, 1, 1)])
+            StrebelGraphLinearFamily("(0,2,~3,~1)(~0,3)(1)(~2)", [(1, 0, 0, -1), (0, 1, 1, 1)])
             sage: f3.is_core()
             True
         """

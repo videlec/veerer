@@ -16,10 +16,16 @@ from sage.misc.cachefunc import cached_method
 from sage.graphs.digraph import DiGraph
 
 
+# TODO: make a more atomic class to handle a single-level prime and irreducible linear subvariety
+# (which are in bijection with (finite) Delaunay-Strebel graphs)
+# TODO: if there are multiplicities in a given level, we should not do twice the computation of
+# the degenerations
 class IrreducibleRealLinearSubvariety:
     r"""
-    Irreducible real linear subvariety of the moduli space of Abelian or
-    quadratic differentials.
+    Irreducible real linear subvariety of the moduli space of multiscale
+    Abelian or quadratic differentials.
+
+    Note that each level is decomposed into prime components.
 
     TESTS::
 
@@ -38,8 +44,6 @@ class IrreducibleRealLinearSubvariety:
         MultiscaleCompactification Irreducible real linear subvariety of projective dimension 0 in [[H_0(1^2, -2^2)]]
     """
     def __init__(self, ds_graphs):
-        # each level is a list of Delaunay-Strebel graphs corresponding to the
-        # prime decomposition of a multicomponent surface
         if isinstance(ds_graphs, DiGraph):
             ds_graphs = [[ds_graphs]]
         elif isinstance(ds_graphs, (tuple, list)):
@@ -322,9 +326,9 @@ class IrreducibleRealLinearSubvariety:
             sage: for L1 in deg_first:  # optional - surface_dynamics
             ....:     degs = sorted(L1.codimension_one_vertical_degenerations())
             ....:     print(L1, degs)
-            Irreducible real linear subvariety of projective dimension 2 in [[H_1(0)], [H_1(2, -2)]] [Irreducible real linear subvariety of projective dimension 1 in [H_1(0), H_0(0^2, -2), H_0(2, -2^2)]]
-            Irreducible real linear subvariety of projective dimension 2 in [[H_1(0^2)], [H_0(2, -2^2)]] [Irreducible real linear subvariety of projective dimension 1 in [[H_1(0)], [H_0(0^2, -2)], [H_0(2, -2^2)]]]
             ....:     deg_second.extend(degs)
+            Irreducible real linear subvariety of projective dimension 2 in [[H_1(0)], [H_1(2, -2)]] [Irreducible real linear subvariety of projective dimension 1 in [[H_1(0)], [H_0(0^2, -2)], [H_0(2, -2^2)]]]
+            Irreducible real linear subvariety of projective dimension 2 in [[H_1(0^2)], [H_0(2, -2^2)]] [Irreducible real linear subvariety of projective dimension 1 in [[H_1(0)], [H_0(0^2, -2)], [H_0(2, -2^2)]]]
             sage: for L2 in deg_second:
             ....:     assert not list(L2.codimension_one_vertical_degenerations())
         """
@@ -442,7 +446,6 @@ class IrreducibleRealLinearSubvariety:
         return MultiscaleCompactification(self)
 
 
-# TODO: bug for H(1,1)
 # TODO: we should store more globally a list of DS graphs to avoid recomputations
 # TODO: if the goal is only to compute components, then in vertical degenerations
 # it is enough to degenerate only the level 0
@@ -470,8 +473,8 @@ class MultiscaleCompactification:
         sage: M
         MultiscaleCompactification of Irreducible real linear subvariety of projective dimension 4 in [[H_2(1^2)]] made of
         5 components in codimension 1
-        12 components in codimension 2
-        14 components in codimension 3
+        11 components in codimension 2
+        13 components in codimension 3
         6 components in codimension 4
     """
     def __init__(self, L):

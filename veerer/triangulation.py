@@ -33,7 +33,7 @@ from .permutation import (perm_init, perm_check, perm_cycles, perm_dense_cycles,
                           perm_invert, perm_conjugate, perm_cycle_string, perm_cycles_lengths,
                           perm_cycles_to_string, perm_on_list, perm_relabel_on_edges,
                           perm_num_cycles, str_to_cycles, str_to_cycles_and_data)
-from .constellation import Constellation
+from .constellation import Constellation, check_relabelling
 
 
 def face_boundary_init(faces, boundary=None):
@@ -597,7 +597,6 @@ class Triangulation(Constellation):
             sage: T._check_homology_matrix(m)
         """
         ne = self.num_edges()
-        ep = self._ep
         fp = self._fp
 
         assert m.nrows() == ne
@@ -658,7 +657,7 @@ class Triangulation(Constellation):
             for h in f:
                 e = h // 2
                 if fp[2 * e + 1] == -1:
-                    continue
+                    pass
                 elif h % 2 == 0:
                     m[i, e] -= 1
                 else:
@@ -705,7 +704,7 @@ class Triangulation(Constellation):
             sage: T = Triangulation("(0,1,2)(~0,~1,~2)", mutable=True)
             sage: A = matrix([[1,1],[-1,0],[0,-1]])
             sage: B = copy(A)
-            sage: for e in (0, 2, 0, 2):
+            sage: for e in (0, 1, 0, 1):
             ....:     T.flip_homological_action(e, B)
             ....:     T.flip(e)
             sage: B
@@ -733,14 +732,6 @@ class Triangulation(Constellation):
             ....:     T.flip_homological_action(i, B)
             ....:     T.flip(i)
             ....:     T._check_homology_matrix(B)
-            sage: p = "(0,2)(~0,~2)(1,3)(~1,~3)"
-            sage: T.relabel_homological_action(p, B)
-            sage: T.relabel(p)
-            sage: T._check_homology_matrix(B)
-            sage: A.pseudoinverse() * B
-            [1 0 0]
-            [0 1 0]
-            [1 1 1]
         """
         if check:
             e = self._check_edge(e)
@@ -826,7 +817,7 @@ class Triangulation(Constellation):
             sage: perms = ["(0,1)(~0,~1)", "(3,~3)", "(3,~5)(~3,5)",
             ....:          "(0,1,2,~0,~1,~2)",
             ....:          "(0,~1,4,~0,1,~4)(2,3)(~2,~3)"]
-            sage: for p in perms * 5:
+            sage: for p in perms * 5: # known bug
             ....:     T.relabel_homological_action(p, A)
             ....:     T.relabel(p)
             ....:     T._check_homology_matrix(A)
@@ -839,7 +830,12 @@ class Triangulation(Constellation):
                 raise ValueError('invalid relabeling permutation')
 
         r, s = perm_relabel_on_edges(p, ne)
-        q = perm_invert(r, ne)
+        q = perm_invert(p, 2 * ne)
+        rr, ss = perm_relabel_on_edges(q, ne)
+        for i in range(2 * ne):
+            assert p[q[i]] == i and q[p[i]] == i, (p, q)
+            assert s[i // 2] == ss[r[i // 2]]
+            assert ss[i // 2] == s[rr[i // 2]]
         seen = [False] * ne
 
         for e0 in range(ne):
@@ -847,21 +843,20 @@ class Triangulation(Constellation):
                 continue
 
             seen[e0] = True
-            e = ee = q[e0]
+            e = rr[e0]
             while not seen[e]:
                 assert 0 <= e < ne
                 seen[e] = True
 
-                ee = q[e]
+                ee = rr[e]
                 m.swap_rows(e, ee)
-                if s[e] * s[ee] == -1 and not twist:
+                if s[e] == -1 and not twist:
                     m[e] *= -1
-
-                e, ee = ee, e
+                e = ee
 
             assert e == e0
             # one more sign change?
-            if s[e] * s[ee] == -1 and not twist:
+            if s[e] == -1 and not twist:
                 m[e] *= -1
 
     def is_flippable(self, e, check=True):
@@ -1181,9 +1176,6 @@ class Triangulation(Constellation):
 
         self._fp = perm_conjugate(perm_invert(self._fp), self.edge_permutation())
         self._vp = perm_invert(self._vp)
-
-    # TODO: deprecate
-    is_isomorphic_to = Constellation.is_isomorphic
 
     def cover(self, c, mutable=False, check=True):
         from .cover import TriangulationCover

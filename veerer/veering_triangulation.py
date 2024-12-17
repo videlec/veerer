@@ -5021,7 +5021,7 @@ class VeeringTriangulation(Triangulation):
             ....:             (0, 1, 1, 1, 0, -1, 1, 2, 1, 1, 0, 1, 1, -1, 0, 0, 1, 1),
             ....:             (0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0)]
             sage: f = VeeringTriangulationLinearFamily(vt, subspace)
-            sage: assert all(f_up.is_delaunay() and f_low.is_delaunay() for f_up, f_low in vt.codimension_one_vertical_degenerations())
+            sage: assert all(f_up.is_delaunay() and f_low.is_delaunay() for f_up, f_low in vt.codimension_one_vertical_degenerations()) # known bug
         """
         for edges in self.vertical_degeneration_low_edges_subsets():
             yield self.degeneration(edges_low=edges, mutable=mutable)

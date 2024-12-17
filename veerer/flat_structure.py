@@ -21,18 +21,20 @@ Flat structures on veering triangulations and Strebel graphs.
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 # ****************************************************************************
 
+import copy
+
 from sage.structure.sequence import Sequence
 from sage.structure.element import Vector
 from sage.categories.rings import Rings
 from sage.categories.fields import Fields
 from sage.rings.all import ZZ, QQ, AA, RDF, NumberField
 from sage.rings.polynomial.polynomial_ring_constructor import PolynomialRing
-from sage.modules.free_module import VectorSpace
+from sage.modules.free_module import VectorSpace, FreeModule
 from sage.modules.free_module_element import vector
 
 from .constants import BLUE, RED, PURPLE, GREEN, LEFT, RIGHT, HORIZONTAL, VERTICAL
 from .constellation import Constellation
-from .permutation import perm_cycles, perm_check, perm_init, perm_conjugate, perm_on_list
+from .permutation import perm_cycles, perm_check, perm_init, perm_conjugate, perm_on_list, perm_on_edge_list
 from .triangulation import Triangulation
 from .veering_triangulation import VeeringTriangulation
 from .misc import flipper_edge, flipper_edge_perm, flipper_nf_to_sage, flipper_nf_element_to_sage, det2, flipper_face_edge_perms
@@ -91,10 +93,10 @@ class FlatStructure:
         y = args[-1]
         if len(constellation_args) == 1:
             arg = constellation_args[0]
-            if isinstance(arg, str):
-                arg = Triangulation(arg)
-            if type(arg) == Triangulation:
+            if not isinstance(arg, VeeringTriangulation):
                 # guess colors based on input
+                if not isinstance(arg, Triangulation):
+                    arg = Triangulation(arg)
                 colouring = arg.colouring_from_xy(x, y)
                 vt = VeeringTriangulation(arg, colouring)
                 constellation_args = (vt,)
@@ -104,7 +106,7 @@ class FlatStructure:
             S = Sequence(list(x) + list(y))
             base_ring = S.universe()
             if base_ring not in _Rings:
-                raise ValueError("invalid coordinates")
+                raise ValueError("invalid coordinates: x={} y={} with universe={}".format(x, y, base_ring))
             if base_ring not in _Fields:
                 base_ring = base_ring.fraction_field()
             x = vector(list(map(base_ring, x)))
@@ -121,11 +123,16 @@ class FlatStructure:
         if not mutable:
             self._x.set_immutable()
             self._y.set_immutable()
+        else:
+            if not x.is_mutable():
+                self._x = copy.copy(self._x)
+            if not y.is_mutable():
+                self._y = copy.copy(self._y)
 
         if check:
             self._check()
 
-    def constellation(self):
+    def constellation(self, mutable=False):
         return Constellation.copy(self, mutable, cls=self._constellation_class)
 
 
@@ -149,7 +156,7 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
         sage: fl = FlatVeeringTriangulation(T, [47, 27, 74, 22, 69, 61, 34], [51, 67, 16, 79, 28, 31, 36], mutable=True)
         sage: fl.relabel('(1,0)(3,5,4,6)')
         sage: fl
-        FlatVeeringTriangulation("(0,1,2)(~0,3,4)(~1,5,6)", "BRRRRRB", (47, 27, 74, 22, 69, 61, 34), (51, 67, 16, 79, 28, 31, 36))
+        FlatVeeringTriangulation("(0,2,1)(~0,4,3)(~1,5,6)", "RBRBRRR", (27, 47, 74, 34, 61, 22, 69), (67, 51, 16, 36, 31, 79, 28))
     """
     __slots__ = ['_x', '_y']
 
@@ -169,7 +176,7 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
         if not isinstance(x, Vector) or not isinstance(y, Vector) or len(x) != self._ne or len(y) != self._ne:
             raise error("invalid coordinates")
         if self._mutable != x.is_mutable() or self._mutable != y.is_mutable():
-            raise error("incoherent mutability state")
+            raise error("incoherent mutability state: self._mutable={}, x.is_mutable()={}, y.is_mutable()={}".format(self._mutable, x.is_mutable(), y.is_mutable()))
 
         self._set_subspace_constraints(lambda c: self._constraint_check(c, error), x, VERTICAL, False, False)
         self._set_subspace_constraints(lambda c: self._constraint_check(c, error), y, HORIZONTAL, False, False)
@@ -245,15 +252,6 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
 
         return FlatVeeringTriangulation(T, vectors, K)
 
-    def to_pyflatsurf(self):
-        if not self._translation:
-            raise ValueError("pyflatsurf only works with translation surfaces")
-        from pyflatsurf.factory import make_surface
-        from pyflatsurf.sage_conversion import make_vectors
-        verts = [(i+1 if i >=0 else i for i in c) for c in perm_cycles(self._vp, True, self._n)]
-        vectors = makeVectors((x[e], y[e]) for e in range(self._ne))
-        return make_surface(verts, vectors)
-
     def __repr__(self):
         return str(self)
 
@@ -266,6 +264,8 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
             sage: F = T.flat_structure_min()
             sage: F.copy()
             FlatVeeringTriangulation("(0,1,2)(~0,~1,3)", "BRRR", (1, 1, 2, 2), (1, 2, 1, 1))
+            sage: F.copy(mutable=True)._check()
+            sage: F.copy(mutable=False)._check()
         """
         if mutable is None:
             mutable = self._mutable
@@ -281,7 +281,7 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
             return super().copy(mutable, cls)
 
         F = self._constellation_class.copy(self, mutable=True, cls=self.__class__)
-
+        F._constellation_class = self._constellation_class
         F._x = self._x[:]
         F._y = self._y[:]
         if not mutable:
@@ -289,15 +289,97 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
             F._y.set_immutable()
         return F
 
-    def edge_colour(self, e):
-        return vec_slope(self._holonomies[e])
-
-    def layout(self):
+    def flat_triangle(self, h, x_start=0, y_start=0, sign=1, check=True):
         r"""
-        Return a layout object that can be used to produce various plots of the surface.
+        EXAMPLES::
+
+            sage: from veerer import *
+            sage: T = VeeringTriangulation("(0,1,2)(~0,~1,3)", "BRRR")
+            sage: F = T.flat_structure_min()
+            sage: F.flat_triangle(0)
+            [(0, 0), (1, -1), (2, 1), (0, 0)]
+            sage: F.flat_triangle(0, sign=-1)
+            [(0, 0), (-1, 1), (-2, -1), (0, 0)]
         """
-        from .layout import FlatVeeringTriangulationLayout
-        return FlatVeeringTriangulationLayout(self)
+        if check:
+            h = self._check_half_edge(h)
+        V = FreeModule(self._x.base_ring(), 2)
+        fp = self._fp
+        x = x_start
+        y = y_start
+        pts = [V((x, y))]
+        col = self.edge_colour(h // 2)
+        for _ in range(3):
+            x += sign * self._x[h // 2]
+            if col == RED:
+                y += sign * self._y[h // 2]
+            elif col == BLUE:
+                y -= sign * self._y[h // 2]
+            pts.append(V((x, y)))
+            hh = fp[h]
+            ccol = self.edge_colour(hh // 2)
+            if col != BLUE or ccol != RED:
+                sign *= -1
+            h = hh
+            col = ccol
+        assert pts[0] == pts[-1]
+        return pts
+
+    def vectors(self):
+        ans, oris = self.is_abelian(certificate=True)
+        vecs = [None] * (2 * self._ne)
+        for a, b, c in self.triangles():
+            if ans:
+                t = self.flat_triangle(a, sign=(1 if oris[a] else -1))
+            else:
+                t = self.flat_triangle(a)
+            vecs[a] = t[1] - t[0]
+            vecs[b] = t[2] - t[1]
+            vecs[c] = t[3] - t[2]
+        return vecs
+
+    def flatsurf(self):
+        r"""
+        EXAMPLES::
+
+            sage: T = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "BRR")
+            sage: F = T.flat_structure_min()
+            sage: F.flatsurf()
+            Translation Surface in H_1(0) built from 2 isosceles triangles
+
+            sage: T = VeeringTriangulation("(0,6,~5)(~0,7,~6)(1,8,~7)(~1,~4,5)(2,~3,4)(~2,~8,3)", "RRRBBBBBB")
+            sage: F = T.flat_structure_min()
+            sage: F.flatsurf()
+            Half-Translation Surface in Q_1(2, -1^2) built from 2 isosceles triangles and 4 triangles
+        """
+        if self.has_folded_edge():
+            raise NotImplementedError
+        import flatsurf
+        vecs = self.vectors()
+        base_ring = self._x.base_ring()
+        half_edge_to_face = [None] * (2 * self._ne)
+        half_edge_to_pos = [None] * (2 * self._ne)
+        S = flatsurf.MutableOrientedSimilaritySurface(base_ring)
+        for i, t in enumerate(self.triangles()):
+            for j, h in enumerate(t):
+                half_edge_to_face[h] = i
+                half_edge_to_pos[h] = j
+            S.add_polygon(flatsurf.Polygon(edges=[vecs[t[0]], vecs[t[1]], vecs[t[2]]]))
+        for e in range(self._ne):
+            S.glue((half_edge_to_face[2 * e], half_edge_to_pos[2 * e]),
+                   (half_edge_to_face[2 * e + 1], half_edge_to_pos[2 * e + 1]))
+        S.set_immutable()
+        return S
+
+    def to_pyflatsurf(self):
+        ans, oris = self.is_abelian(certificate=True)
+        if not ans:
+            raise ValueError("pyflatsurf only works with translation surfaces")
+        from pyflatsurf.factory import make_surface
+        from pyflatsurf.sage_conversion import make_vectors
+        verts = [(i+1 if i >=0 else i for i in c) for c in perm_cycles(self._vp, True, self._n)]
+        vectors = makeVectors((x[e], y[e]) for e in range(self._ne))
+        return make_surface(verts, vectors)
 
     def plot(self, *args, **kwds):
         r"""
@@ -308,15 +390,8 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
             sage: F = T.flat_structure_min()
             sage: F.plot()  # not tested (warning in matplotlib)
             Graphics object consisting of 15 graphics primitives
-
-            sage: F.plot(horizontal_train_track=True)  # not tested (matplotlib warning)
-            Graphics object consisting of 19 graphics primitives
-            sage: F.plot(vertical_train_track=True)  # not tested (matplotlib warning)
-            Graphics object consisting of 19 graphics primitives
-            sage: F.plot(horizontal_train_track=True, vertical_train_track=True)  # not tested (matplotlib warning)
-            Graphics object consisting of 23 graphics primitives
         """
-        return self.layout().plot(*args, **kwds)
+        return self.flatsurf().plot()
 
     def flip(self, e, check=False):
         r"""
@@ -326,20 +401,20 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
 
             sage: from veerer import Triangulation, FlatVeeringTriangulation, RIGHT, LEFT
             sage: fl = FlatVeeringTriangulation("(0,1,2)(3,4,~0)(5,6,~1)", (47, 27, 74, 22, 69, 61, 34), (51, 67, 16, 79, 28, 31, 36), mutable=True)
+            sage: fl.flip(2)
             sage: fl.flip(4)
-            sage: fl.flip(8)
             sage: fl.flip(0)
             sage: fl
             FlatVeeringTriangulation("(0,1,4)(~0,3,2)(~1,5,6)", "RRBRBRB", (2, 27, 20, 22, 25, 61, 34), (197, 67, 118, 79, 130, 31, 36))
 
             sage: fl = FlatVeeringTriangulation("(0,1,2)(3,4,~0)(5,6,~1)", (47,  27, 74, 22, 69, 61, 34,), (51, 67, 16, 79, 28, 31, 36))
-            sage: fl.flip(2)
+            sage: fl.flip(1)
             Traceback (most recent call last):
             ...
             ValueError: immutable flat veering triangulation; use a mutable copy instead
 
             sage: fl = FlatVeeringTriangulation("(0, 1, 2)", (13, 21, 8), (8, 3, 5), mutable=True)
-            sage: fl.flip(2)
+            sage: fl.flip(1)
             sage: fl
             FlatVeeringTriangulation("(0,2,1)", "RRB", (13, 5, 8), (8, 13, 5))
         """
@@ -347,13 +422,12 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
             raise ValueError("immutable flat veering triangulation; use a mutable copy instead")
 
         if check:
-            e = self._check_half_edge(e)
+            e = self._check_edge(e)
+            if not self.is_forward_flippable(e):
+                raise ValueError("invalid edge e={}".format(e))
 
-        if not self.is_forward_flippable(e):
-            raise ValueError("invalid half-edge e={}".format(e))
-
-        ee = e // 2
-        E = self._ep(e)
+        h = 2 * e
+        H = self._ep(h)
 
         # x<----------x
         # |     a    ^^
@@ -368,30 +442,34 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
         # | /         |
         # v/    c     |
         # x---------->x
-        a, b, c, d = self.square_about_edge(e)
+        a, b, c, d = self.square_about_half_edge(h)
         ea = a // 2
         eb = b // 2
         ec = c // 2
         ed = d // 2
 
-        assert self._x[ee] == self._x[ea] + self._x[eb] == self._x[ec] + self._x[ed]
-        assert self._y[ee] == abs(self._y[ea] - self._y[eb]) == abs(self._y[ec] - self._y[ed])
+        assert self._x[e] == self._x[ea] + self._x[eb] == self._x[ec] + self._x[ed]
+        assert self._y[e] == abs(self._y[ea] - self._y[eb]) == abs(self._y[ec] - self._y[ed])
 
         if self._x[ea] > self._x[ed]:
-            self._x[ee] = self._x[ea] - self._x[ed]
+            self._x[e] = self._x[ea] - self._x[ed]
             col = BLUE
         elif self._x[ea] < self._x[ed]:
-            self._x[ee] = self._x[ed] - self._x[ea]
+            self._x[e] = self._x[ed] - self._x[ea]
             col = RED
         else:
             # equality
-            self._x[ee] = self._x[ea] - self._x[ed]
+            self._x[e] = self._x[ea] - self._x[ed]
             col = GREEN
 
-        self._y[ee] = self._y[ea] + self._y[ed]
+        self._y[e] = self._y[ea] + self._y[ed]
 
         self._constellation_class.flip(self, e, col, check=True)
         self._check()
+
+    def _extra_relabelling(self, p):
+        perm_on_edge_list(p, self._x)
+        perm_on_edge_list(p, self._y)
 
     def xy_scaling(self, a, b):
         r"""

@@ -884,12 +884,15 @@ def perm_cycle_string(array.array p, singletons=True, n=-1, edge_like=False):
         sage: from array import array
         sage: from veerer.permutation import perm_cycle_string
 
-        sage: perm_cycle_string(array('i', [0,2,1]))
+        sage: perm_cycle_string(array('i', [0, 2, 1]))
         '(0)(1,2)'
-        sage: perm_cycle_string(array('i', [0,2,1]), False)
+        sage: perm_cycle_string(array('i', [0, 2, 1]), False)
         '(1,2)'
+        sage: perm_cycle_string(array('i', [0, 1, 2]), False)
+        '()'
     """
-    return perm_cycles_to_string(perm_cycles(p, singletons, n), edge_like)
+    c = perm_cycles(p, singletons, n)
+    return '()' if not c else perm_cycles_to_string(c, edge_like)
 
 
 def perm_orbit(array.array p, int i):
@@ -1138,7 +1141,9 @@ def perm_on_edge_array(array.array dest, array.array src, array.array p, int n=-
             seen.data.as_ints[i] = 1
             j = p.data.as_ints[2 * i] // 2
             assert 0 <= j < n // 2
-            assert p.data.as_ints[2 * i + 1] == -1 or p.data.as_ints[2 * i] == p.data.as_ints[2 * i + 1] ^ 1
+            if p.data.as_ints[2 * i + 1] != -1 and p.data.as_ints[2 * i] != p.data.as_ints[2 * i + 1] ^ 1:
+                raise ValueError("inconsistent relabelling: p[2*{}] = {}, p[2*{}+1] = {}".format(i, p.data.as_ints[2 * i],
+                                                                                               i, p.data.as_ints[2 * i + 1]))
             while not seen.data.as_ints[j]:
                 tmp = src.data.as_ints[i]
                 src.data.as_ints[i] = src.data.as_ints[j]
@@ -1962,7 +1967,7 @@ def perm_relabel_on_edges(array.array r, int ne=-1):
 
     cdef array.array rr = array.clone(r, ne, False)  # permutation
     cdef array.array ss = array.clone(r, ne, False)  # signs
-    cdef int i, j, k
+    cdef int i, j
 
     for i in range(ne):
         j = r.data.as_ints[2 * i]
