@@ -1177,10 +1177,6 @@ class Triangulation(Constellation):
         self._fp = perm_conjugate(perm_invert(self._fp), self.edge_permutation())
         self._vp = perm_invert(self._vp)
 
-    def cover(self, c, mutable=False, check=True):
-        from .cover import TriangulationCover
-        return TriangulationCover(self, c, mutable=mutable, check=check)
-
     def colouring_from_xy(self, x, y, check=True):
         r"""
         Return the veering colouring associated with the holonomy data ``x`` and ``y``.
