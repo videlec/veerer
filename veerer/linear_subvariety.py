@@ -2,58 +2,131 @@ r"""
 Real linear subvarieties in the moduli space of meromorphic Abelian differentials.
 """
 
+import collections
 import itertools
 import numbers
+import sys
 
 from .automaton import DelaunayStrebelAutomaton
 from .veering_triangulation import VeeringTriangulation
 from .strebel_graph import StrebelGraph
 
+from sage.structure.richcmp import op_LT, op_LE, op_EQ, op_NE, op_GT, op_GE, rich_to_bool
 from sage.misc.cachefunc import cached_method
 from sage.graphs.digraph import DiGraph
 
-class IrreducibleRealLinearSubvariety:
-    def __init__(self, ds_graphs):
-        if isinstance(ds_graphs, (tuple, list)):
-            self._levels = tuple(ds_graphs)
-        elif isinstance(ds_graphs, DiGraph):
-            self._levels = (ds_graphs,)
-        else:
-            raise TypeError("got {}".format(type(ds_graphs).__name__))
 
-    @cached_method
-    def _min(self):
-        return tuple(min(state for state in ds_graph if isinstance(state, VeeringTriangulation)) for ds_graph in self._levels)
+class IrreducibleRealLinearSubvariety:
+    r"""
+    Irreducible real linear subvariety of the moduli space of Abelian or
+    quadratic differentials.
+
+    TESTS::
+
+        sage: from veerer import *
+        sage: vt = VeeringTriangulation("(1,2,3)(~1,~2,~3)(0:1)(~0:1)", "BRBB")
+        sage: L = vt.linear_subvariety()
+        sage: L
+        Irreducible real linear subvariety of projective dimension 1 in [[H_0(0, -1^2)], [H_1(0)]]
+        sage: L.codimension_one_horizontal_degenerations()
+        [Irreducible real linear subvariety of projective dimension 0 in [[H_0(0, -1^2)], [H_0(0, -1^2)]]]
+        sage: L.codimension_one_vertical_degenerations()
+        []
+
+        sage: vt = VeeringTriangulationLinearFamily("(0:2,1:2)(~0:2,~1:2)", "RR", [(1, 1)])
+        sage: vt.linear_subvariety().multiscale_compactification()
+        MultiscaleCompactification Irreducible real linear subvariety of projective dimension 0 in [[H_0(1^2, -2^2)]]
+    """
+    def __init__(self, ds_graphs):
+        # each level is a list of Delaunay-Strebel graphs corresponding to the
+        # prime decomposition of a multicomponent surface
+        if isinstance(ds_graphs, DiGraph):
+            ds_graphs = [[ds_graphs]]
+        elif isinstance(ds_graphs, (tuple, list)):
+            ds_graphs_new = []
+            for elt in ds_graphs:
+                if isinstance(elt, DiGraph):
+                    ds_graphs_new.append([elt])
+                elif isinstance(elt, (tuple, list)):
+                    ds_graphs_new.append(list(elt))
+                else:
+                    raise ValueError("invalid input")
+            ds_graphs = ds_graphs_new
+
+        # NOTE: in order to normalize we sort the components of each level according
+        # to the minima
+        levels = list(map(list, ds_graphs))
+        mins = []
+        for j, level in enumerate(levels):
+            level_mins = [(min(state for state in comp if isinstance(state, VeeringTriangulation)), i) for i, comp in enumerate(level)]
+            level_mins.sort()
+            levels[j] = [level[k] for _, k in level_mins]
+            mins.extend(level_mins)
+
+        self._levels = tuple(map(tuple, levels))
+        self._mins = tuple(mins)
+
+    def _check(self, error=RuntimeError):
+        if not isinstance(self._levels, tuple) or not all(isinstance(level, tuple) for level in self._levels):
+            raise error
+        if len(self._mins) != sum(map(len, self._levels)):
+            raise error
+        if not all(x.is_prime() for x in self._mins):
+            raise error("all component of a level must be prime; call prime_decomposition first")
+
+    def __hash__(self):
+        return hash(self._mins)
 
     def __eq__(self, other):
         if type(self) is not type(other):
             raise TypeError
-        return self._min() == other._min()
+        return list(map(len, self._levels)) == list(map(len, other._levels)) and self._mins == other._mins
 
     def __ne__(self, other):
         if type(self) is not type(other):
             raise TypeError
-        return self._min() != other._min()
+        return list(map(len, self._levels)) != list(map(len, other._levels)) or self._mins != other._mins
+
+    def _cmp_(self, other):
+        if type(self) is not type(other):
+            raise TypeError("can not compare {} with {}".format(type(self).__name__, type(other).__name__))
+
+        if type(self) is not type(other):
+            raise TypeError
+        data0 = len(self._levels)
+        data1 = len(other._levels)
+        c = (data0 > data1) - (data0 < data1)
+        if c:
+            return c
+
+        data0 = list(map(len, self._levels))
+        data1 = list(map(len, other._levels))
+        c = (data0 > data1) - (data0 < data1)
+        if c:
+            return c
+
+        data0 = self._mins
+        data1 = other._mins
+        c = (data0 > data1) - (data0 < data1)
+        return c
+
+    def _richcmp_(self, other, op):
+        if type(self) is not type(other):
+            raise TypeError("can not compare {} with {}".format(type(self).__name__, type(other).__name__))
+
+        return rich_to_bool(op, self._cmp_(other))
 
     def __lt__(self, other):
-        if type(self) is not type(other):
-            raise TypeError
-        return self._min() < other._min()
+        return self._richcmp_(other, op_LT)
 
     def __le__(self, other):
-        if type(self) is not type(other):
-            raise TypeError
-        return self._min() <= other._min()
+        return self._richcmp_(other, op_LE)
 
     def __gt__(self, other):
-        if type(self) is not type(other):
-            raise TypeError
-        return self._min() > other._min()
+        return self._richcmp_(other, op_GT)
 
     def __ge__(self, other):
-        if type(self) is not type(other):
-            raise TypeError
-        return self._min() >= other._min()
+        return self._richcmp_(other, op_GE)
 
     def _check_level(self, level):
         if not isinstance(level, numbers.Integral):
@@ -69,6 +142,9 @@ class IrreducibleRealLinearSubvariety:
         return "Irreducible real linear subvariety of projective dimension {} in {}".format(
             self.projective_dimension(), self.ambient_stratum())
 
+    def num_levels(self):
+        return len(self._levels)
+
     def levels(self):
         return range(len(self._levels))
 
@@ -76,12 +152,25 @@ class IrreducibleRealLinearSubvariety:
         r"""
         Return a translation or half-translation surface in this subvariety.
         """
+        raise NotImplementedError
+
+    def signature(self, level=None):
+        r"""
+        Return the signature (ie order of zeros).
+
+        If level is provided, return a list of degrees. Otherwise, return a
+        list of lists.
+        """
+        if level is None:
+            return tuple(self.signature(level) for level in self.levels())
+        level = self._check_level(level)
+        return tuple(sorted(sum((next(iter(comp)).stratum().signature() for comp in self._levels[level]), tuple())))
 
     def ambient_stratum(self, level=None):
         if level is None:
             return [self.ambient_stratum(level) for level in self.levels()]
         level = self._check_level(level)
-        return next(iter(self._levels[level])).stratum()
+        return [next(iter(comp)).stratum() for comp in self._levels[level]]
 
     def dimension(self, level=None):
         r"""
@@ -90,7 +179,7 @@ class IrreducibleRealLinearSubvariety:
         if level is None:
             return sum(self.dimension(level) for level in self.levels())
         level = self._check_level(level)
-        return next(iter(self._levels[level])).dimension()
+        return sum(next(iter(comp)).dimension() for comp in self._levels[level])
 
     def projective_dimension(self, level=None):
         if level is None:
@@ -121,7 +210,7 @@ class IrreducibleRealLinearSubvariety:
             sage: L.dimension()
             4
             sage: L.codimension_one_horizontal_degenerations()  # optional - surface_dynamics
-            [Irreducible real linear subvariety of projective dimension 2 in [H_1(2, -1^2)]]
+            [Irreducible real linear subvariety of projective dimension 2 in [[H_1(2, -1^2)]]]
 
         Degenerations of the eigenform loci of discriminant 17 in the stratum H(1,1). Even though these are
         two distinct linear subvarieties (distinguished by the spin) they have the same number of codimension
@@ -129,16 +218,16 @@ class IrreducibleRealLinearSubvariety:
 
             sage: a0, b0, c0, e0 = next(VeeringTriangulationLinearFamilies.H2_prototype_parameters(17, spin=0))
             sage: X17_0 = VeeringTriangulationLinearFamilies.prototype_H2(a0, b0, c0, e0)
-            sage: L0 = X17_0.linear_subvariety()  # long time ~5secs
-            sage: L0.codimension_one_horizontal_degenerations()  # long time # optional - surface_dynamics
+            sage: L0 = X17_0.linear_subvariety()  # long time ~5secs # not tested
+            sage: L0.codimension_one_horizontal_degenerations()  # long time # optional - surface_dynamics # not tested
             [Irreducible real linear subvariety of dimension 1 in Q_0(1, -1, -2^2),
              Irreducible real linear subvariety of dimension 1 in Q_0(1, -1, -2^2),
              Irreducible real linear subvariety of dimension 1 in Q_0(1, -1, -2^2)]
 
             sage: a1, b1, c1, e1 = next(VeeringTriangulationLinearFamilies.H2_prototype_parameters(17, spin=1))
             sage: X17_1 = VeeringTriangulationLinearFamilies.prototype_H2(a1, b1, c1, e1)
-            sage: L1 = X17_1.linear_subvariety()  # long time ~5secs
-            sage: L1.codimension_one_horizontal_degenerations()  # long time # optional - surface_dynamics
+            sage: L1 = X17_1.linear_subvariety()  # long time ~5secs # not tested
+            sage: L1.codimension_one_horizontal_degenerations()  # long time # optional - surface_dynamics # not tested
             [Irreducible real linear subvariety of dimension 1 in Q_0(1, -1, -2^2),
              Irreducible real linear subvariety of dimension 1 in Q_0(1, -1, -2^2),
              Irreducible real linear subvariety of dimension 1 in Q_0(1, -1, -2^2)]
@@ -147,28 +236,72 @@ class IrreducibleRealLinearSubvariety:
             return [degeneration for level in self.levels() for degeneration in self.codimension_one_horizontal_degenerations(level)]
 
         level = self._check_level(level)
-        degenerations = set()
         automata = []
-        for state in self.strebel_delaunay_graph(level):
-            if isinstance(state, VeeringTriangulation):
-                for (f_up, f_low) in state.codimension_one_horizontal_degenerations(mutable=True):
-                    assert f_up is None
-                    assert f_low.dimension() == state.dimension() - 1
-                    f_low.set_canonical_labels()
-                    f_low.set_immutable()
-                    degenerations.add(f_low)
+        DSgraphs = self.strebel_delaunay_graph(level)
+        for DSgraph_num, DSgraph in enumerate(DSgraphs):
+            non_primes = []
+            non_prime_degenerations = set()
+            prime_degenerations = set()
+            for state in DSgraph:
+                if isinstance(state, VeeringTriangulation):
+                    for (f_up, f_low) in state.codimension_one_horizontal_degenerations(mutable=True):
+                        assert f_up is None
+                        assert f_low.dimension() == state.dimension() - 1
+                        if not f_low.is_prime():
+                            prime_components = [comp for atom, comp in f_low.prime_decomposition(mutable=True, check=True)]
+                            if f_low.is_abelian() and not all(f.is_abelian() for f in prime_components):
+                                raise ValueError("{}\n{}".format(f_low, prime_components))
+                            for f in prime_components:
+                                f.set_canonical_labels()
+                                f.set_immutable()
+                                non_prime_degenerations.add(f)
+                            non_primes.append(prime_components)
+                        else:
+                            f_low.set_canonical_labels()
+                            f_low.set_immutable()
+                            prime_degenerations.add(f_low)
 
-        # NOTE: since we have the full list of Delaunay cells, we do not need to run
-        # the expensive Strebel -> Delaunay
-        from .automaton import DelaunayStrebelAutomaton
-        DS = DelaunayStrebelAutomaton(backward=False)
-        for state in degenerations:
-            DS.add_seed(state, setup=False)
-        DS.run()
+            # NOTE: since we have the full list of Delaunay cells, we do not need to run
+            # the expensive Strebel -> Delaunay (ie we can set backward=False in the
+            # construction of the automata below).
+            ds_graphs_degenerations = []
+            from .automaton import DelaunayStrebelAutomaton
+            if prime_degenerations:
+                DS_graph = DelaunayStrebelAutomaton(backward=False)
+                for state in prime_degenerations:
+                    DS_graph.add_seed(state, setup=False)
+                DS_graph.run()
 
-        assert set(state for state in DS if isinstance(state, VeeringTriangulation)) == degenerations
+                assert set(state for state in DS_graph if isinstance(state, VeeringTriangulation)) == prime_degenerations
 
-        return [IrreducibleRealLinearSubvariety(graph) for graph in DS._graph.connected_components_subgraphs()]
+                ds_graphs_degenerations.extend((comp,) for comp in DS_graph._graph.connected_components_subgraphs())
+
+            if non_prime_degenerations:
+                DS_graph = DelaunayStrebelAutomaton(backward=False)
+                for state in non_prime_degenerations:
+                    DS_graph.add_seed(state, setup=False)
+                DS_graph.run()
+
+                assert set(state for state in DS_graph if isinstance(state, VeeringTriangulation)) == non_prime_degenerations
+
+                ccs = DS_graph._graph.connected_components_subgraphs()
+                tuples = set()
+                for f in non_primes:
+                    tuples.add(tuple(sorted(next(j for j, cc in enumerate(ccs) if fcomp in cc) for fcomp in f)))
+                for t in tuples:
+                    ds_graphs_degenerations.append(tuple(ccs[j] for j in t))
+
+            # NOTE: some degeneration component might not be prime, we do compute their prime decompositions
+            # (this ought to be equivariant but we nevertheless recompute their full ds graphs)
+            ans = []
+            for ds in ds_graphs_degenerations:
+                new_level = DSgraphs[:DSgraph_num] + ds + DSgraphs[DSgraph_num + 1:]
+                new_levels = self._levels[:level] + (new_level,) + self._levels[level + 1:]
+                new_subvariety = IrreducibleRealLinearSubvariety(new_levels)
+                assert new_subvariety.projective_dimension() == self.projective_dimension() - 1
+                assert new_subvariety.num_levels() == self.num_levels()
+                ans.append(new_subvariety)
+            return ans
 
     def codimension_one_vertical_degenerations(self, level=None):
         r"""
@@ -180,17 +313,17 @@ class IrreducibleRealLinearSubvariety:
             sage: vt = VeeringTriangulation("(0,1,2)(~1,3,4)(~3,5,6)(~6,~2,~5)(~4,7,8)(~8,~0,~7)", "RBBBRRBBR")
             sage: L = vt.linear_subvariety()
             sage: L # optional - surface_dynamics
-            Irreducible real linear subvariety of projective dimension 3 in [H_2(2)]
+            Irreducible real linear subvariety of projective dimension 3 in [[H_2(2)]]
             sage: deg_first = sorted(L.codimension_one_vertical_degenerations()) # optional - surface_dynamics
             sage: deg_first # optional - surface_dynamics
-            [Irreducible real linear subvariety of projective dimension 2 in [H_1(0), H_1(2, -2)],
-             Irreducible real linear subvariety of projective dimension 2 in [H_1(0^2), H_0(2, -2^2)]]
+            [Irreducible real linear subvariety of projective dimension 2 in [[H_1(0)], [H_1(2, -2)]],
+             Irreducible real linear subvariety of projective dimension 2 in [[H_1(0^2)], [H_0(2, -2^2)]]]
             sage: deg_second = []
             sage: for L1 in deg_first:  # optional - surface_dynamics
             ....:     degs = sorted(L1.codimension_one_vertical_degenerations())
             ....:     print(L1, degs)
-            Irreducible real linear subvariety of projective dimension 2 in [H_1(0), H_1(2, -2)] [Irreducible real linear subvariety of projective dimension 1 in [H_1(0), H_0(0^2, -2), H_0(2, -2^2)]]
-            Irreducible real linear subvariety of projective dimension 2 in [H_1(0^2), H_0(2, -2^2)] [Irreducible real linear subvariety of projective dimension 1 in [H_1(0), H_0(0^2, -2), H_0(2, -2^2)]]
+            Irreducible real linear subvariety of projective dimension 2 in [[H_1(0)], [H_1(2, -2)]] [Irreducible real linear subvariety of projective dimension 1 in [H_1(0), H_0(0^2, -2), H_0(2, -2^2)]]
+            Irreducible real linear subvariety of projective dimension 2 in [[H_1(0^2)], [H_0(2, -2^2)]] [Irreducible real linear subvariety of projective dimension 1 in [[H_1(0)], [H_0(0^2, -2)], [H_0(2, -2^2)]]]
             ....:     deg_second.extend(degs)
             sage: for L2 in deg_second:
             ....:     assert not list(L2.codimension_one_vertical_degenerations())
@@ -200,51 +333,191 @@ class IrreducibleRealLinearSubvariety:
 
         level = self._check_level(level)
         degenerations = set()
-        automata = []
-        for state in self.strebel_delaunay_graph(level):
-            if isinstance(state, VeeringTriangulation):
-                for (f_up, f_low) in state.codimension_one_vertical_degenerations(mutable=True):
-                    assert f_up is not None, (state,)
-                    # NOTE: the projectivization makes us loose one dimension
-                    assert f_low.dimension() + f_up.dimension() == state.dimension()
-                    assert f_low.is_delaunay()
-                    assert f_up.is_delaunay()
-                    f_up.set_canonical_labels()
-                    f_up.set_immutable()
-                    f_low.set_canonical_labels()
-                    f_low.set_immutable()
-                    degenerations.add((f_up, f_low))
-
-        # NOTE: since we have the full list of Delaunay cells, we do not need to run
-        # the expensive Strebel -> Delaunay
-        from .automaton import DelaunayStrebelAutomaton
-        DS_up = DelaunayStrebelAutomaton(backward=False)
-        for f_up, f_low in degenerations:
-            DS_up.add_seed(f_up, setup=False)
-        DS_up.run()
-
-        DS_low = DelaunayStrebelAutomaton(backward=False)
-        for f_up, f_low in degenerations:
-            DS_low.add_seed(f_low, setup=False)
-        DS_low.run()
-
-        assert set(state for state in DS_up if isinstance(state, VeeringTriangulation)) == set(f_up for f_up, f_low in degenerations)
-        assert set(state for state in DS_low if isinstance(state, VeeringTriangulation)) == set(f_low for f_up, f_low in degenerations)
-
-        # retrieve which pairs of Delaunay-Strebel graph corresponds to actual
-        # pairs (f_up, f_low)
-        ccs_up = DS_up._graph.connected_components_subgraphs()
-        ccs_low = DS_low._graph.connected_components_subgraphs()
-        pairs = set()
-        for (f_up, f_low) in degenerations:
-            i_up = next(j for j, cc in enumerate(ccs_up) if f_up in cc)
-            i_low = next(j for j, cc in enumerate(ccs_low) if f_low in cc)
-            pairs.add((i_up, i_low))
-
         ans = []
-        for (i_up, i_low) in pairs:
-            ds_up = ccs_up[i_up]
-            ds_low = ccs_low[i_low]
-            new_levels = self._levels[:level] + (ds_up, ds_low) + self._levels[level + 1:]
-            ans.append(IrreducibleRealLinearSubvariety(new_levels))
+        DSgraphs = self.strebel_delaunay_graph(level)
+        for DSgraph_num, DSgraph in enumerate(DSgraphs):
+            for state in DSgraph:
+                if isinstance(state, VeeringTriangulation):
+                    for (f_up, f_low) in state.codimension_one_vertical_degenerations(mutable=True):
+                        assert f_up is not None, (state,)
+                        # NOTE: the projectivization makes us loose one dimension
+                        assert f_low.dimension() + f_up.dimension() == state.dimension()
+                        assert f_low.is_delaunay()
+                        assert f_up.is_delaunay()
+                        f_up.set_canonical_labels()
+                        f_up.set_immutable()
+                        f_low.set_canonical_labels()
+                        f_low.set_immutable()
+                        degenerations.add((f_up, f_low))
+
+            # NOTE: since we have the full list of Delaunay cells, we do not need to run
+            # the expensive Strebel -> Delaunay
+            from .automaton import DelaunayStrebelAutomaton
+            DS = DelaunayStrebelAutomaton(backward=False)
+            family_to_cc = {}
+            for f_up, f_low in degenerations:
+                if f_up.is_prime():
+                    DS.add_seed(f_up, setup=False)
+                    family_to_cc[f_up] = [f_up]
+                else:
+                    prime_components = [comp for atom, comp in f_up.prime_decomposition(mutable=True, check=True)]
+                    if f_up.is_abelian() and not all(f.is_abelian() for f in prime_components):
+                        raise ValueError("{}\n{}".format(f_low, prime_components))
+                    for f in prime_components:
+                        f.set_canonical_labels()
+                        f.set_immutable()
+                        DS.add_seed(f, setup=False)
+                    family_to_cc[f_up] = prime_components
+
+                if f_low.is_prime():
+                    DS.add_seed(f_low, setup=False)
+                    family_to_cc[f_low] = [f_low]
+                else:
+                    prime_components = [comp for atom, comp in f_low.prime_decomposition(mutable=True, check=True)]
+                    if f_low.is_abelian() and not all(f.is_abelian() for f in prime_components):
+                        raise ValueError("{}\n{}".format(f_up, prime_components))
+                    for f in prime_components:
+                        f.set_canonical_labels()
+                        f.set_immutable()
+                        DS.add_seed(f, setup=False)
+                    family_to_cc[f_low] = prime_components
+
+            DS.run()
+
+            ccs = DS._graph.connected_components_subgraphs()
+            for f, prime_components in family_to_cc.items():
+                family_to_cc[f] = tuple(sorted(next(j for j, cc in enumerate(ccs) if fcomp in cc) for fcomp in prime_components))
+
+#            vts_degeneration_up = set(f_up for f_up, f_low in degenerations)
+#            vts_in_graphs_up = set(state for state in DS_up if isinstance(state, VeeringTriangulation))
+#            if vts_degeneration_up != vts_in_graphs_up:
+#                error_msg = "mismatch between degenerations and DS graph in upper level:\n"
+#
+#                error_msg += " obtained {} veering triangulations by degeneration".format(len(vts_degeneration_up))
+#                missing = vts_in_graphs_up.difference(vts_degeneration_up)
+#                if missing:
+#                    error_msg += ": missing\n   " + "\n   ".join(map(str, missing))
+#                error_msg += "\n"
+#
+#                error_msg += " obtained {} veering triangulations in DS graphs".format(len(vts_in_graphs_up))
+#                missing = vts_degeneration_up.difference(vts_in_graphs_up)
+#                if missing:
+#                    error_msg += ": missing\n   " + "\n   ".join(map(str, missing))
+#
+#                raise AssertionError(error_msg)
+#
+#            vts_degeneration_low = set(f_low for f_up, f_low in degenerations)
+#            vts_in_graphs_low = set(state for state in DS_low if isinstance(state, VeeringTriangulation))
+#            if vts_degeneration_low != vts_in_graphs_low:
+#                error_msg = "mismatch between degenerations and DS graph in lower level:\n"
+#
+#                error_msg += " obtained {} veering triangulations by degeneration".format(len(vts_degeneration_low))
+#                missing = vts_in_graphs_low.difference(vts_degeneration_low)
+#                if missing:
+#                    error_msg += ": missing\n   " + "\n   ".join(map(str, missing))
+#                error_msg += "\n"
+#
+#                error_msg += " obtained {} veering triangulations in DS graphs".format(len(vts_in_graphs_low))
+#                missing = vts_degeneration_low.difference(vts_in_graphs_low)
+#                if missing:
+#                    error_msg += ": missing\n   " + "\n   ".join(map(str, missing))
+#
+#                raise AssertionError(error_msg)
+#
+
+            # retrieve which pairs of Delaunay-Strebel graph corresponds to actual
+            # pairs (f_up, f_low)
+            pairs = set((family_to_cc[f_up], family_to_cc[f_low]) for f_up, f_low in degenerations)
+            for (i_up, i_low) in pairs:
+                ds_up = tuple(ccs[j] for j in i_up)
+                ds_low = tuple(ccs[j] for j in i_low)
+                new_levels = self._levels[:level] + (DSgraphs[:DSgraph_num] + ds_up + DSgraphs[DSgraph_num+1:],) + (ds_low,) + self._levels[level + 1:]
+                new_subvariety = IrreducibleRealLinearSubvariety(new_levels)
+                assert new_subvariety.num_levels() == self.num_levels() + 1, (new_subvariety.num_levels(), self.num_levels())
+                assert new_subvariety.projective_dimension() == self.projective_dimension() - 1
+                ans.append(new_subvariety)
         return ans
+
+    def multiscale_compactification(self):
+        return MultiscaleCompactification(self)
+
+
+# TODO: bug for H(1,1)
+# TODO: we should store more globally a list of DS graphs to avoid recomputations
+# TODO: if the goal is only to compute components, then in vertical degenerations
+# it is enough to degenerate only the level 0
+class MultiscaleCompactification:
+    r"""
+    EXAMPLES:
+
+    The example of H(2)::
+
+        sage: from veerer import VeeringTriangulation
+        sage: vt = VeeringTriangulation("(0,6,~5)(~0,~4,5)(1,8,~7)(~1,~8,3)(2,7,~6)(~2,~3,4)", "RRRBBBBBB")
+        sage: L = vt.linear_subvariety()
+        sage: M = L.multiscale_compactification()
+        sage: M
+        MultiscaleCompactification of Irreducible real linear subvariety of projective dimension 3 in [[H_2(2)]] made of
+        3 components in codimension 1
+        5 components in codimension 2
+        3 components in codimension 3
+
+    The example of H(1,1)::
+
+        sage: vt = VeeringTriangulation("(0,8,~7)(~0,~6,7)(1,11,~10)(~1,~11,4)(2,10,~9)(~2,~4,5)(3,9,~8)(~3,~5,6)", "RRRRBBBBBBBB")
+        sage: L = vt.linear_subvariety()
+        sage: M = L.multiscale_compactification()
+        sage: M
+        MultiscaleCompactification of Irreducible real linear subvariety of projective dimension 4 in [[H_2(1^2)]] made of
+        5 components in codimension 1
+        12 components in codimension 2
+        14 components in codimension 3
+        6 components in codimension 4
+    """
+    def __init__(self, L):
+        self._L = L
+
+        # at position (i, j) = i vertical and j horizontal degenerations
+        self._components = collections.defaultdict(set)
+        self._components[0, 0].add(L)
+        d = L.projective_dimension()
+
+        # vertical degenerations
+        for codim in range(d - 1):
+            for comp in self._components[codim, 0]:
+                for comp_deg in comp.codimension_one_vertical_degenerations():
+                    self._components[codim + 1, 0].add(comp_deg)
+
+        for codim in range(d):
+            sys.stdout.flush()
+            h = 0
+            has_horiz = True
+            while has_horiz:
+                sys.stdout.flush()
+                has_horiz = False
+                for comp in self._components[codim, h]:
+                    for comp_deg in comp.codimension_one_horizontal_degenerations():
+                        has_horiz = True
+                        self._components[codim, h + 1].add(comp_deg)
+                h += 1
+
+    def projective_dimension(self):
+        return self._L.projective_dimension()
+
+    def components(self, codim):
+        if codim < 0 or codim > self._L.projective_dimension():
+            raise ValueError("invalid codimension")
+        ans = []
+        for i in range(codim + 1):
+            j = codim - i
+            if (i, j) in self._components:
+                ans.extend(self._components[i, j])
+        return ans
+
+    def __repr__(self):
+        if self.projective_dimension() == 0:
+            return "MultiscaleCompactification {}".format(self._L)
+        s = ["MultiscaleCompactification of {} made of".format(self._L)]
+        for codim in range(1, self.projective_dimension() + 1):
+            s.append("{} components in codimension {}".format(len(self.components(codim)), codim))
+        return "\n".join(s)
