@@ -1046,6 +1046,19 @@ def perm_on_list(l, array.array p, int n=-1, swap=None):
         sage: perm_on_list(m, perm_compose(p1, p2), swap=sage.matrix.matrix0.Matrix.swap_rows)
         sage: m == m2 * m1
         True
+
+        sage: m1 = matrix(ZZ, 5, range(25))
+        sage: m2 = matrix(ZZ, 5, range(137, 87, -2))
+        sage: m = m1 * m2
+        sage: p = perm_init([4, 1, 3, 2, 0])
+        sage: perm_on_list(m1, p, swap=sage.matrix.matrix0.Matrix.swap_rows)
+        sage: perm_on_list(m1, p, swap=sage.matrix.matrix0.Matrix.swap_columns)
+        sage: perm_on_list(m2, p, swap=sage.matrix.matrix0.Matrix.swap_rows)
+        sage: perm_on_list(m2, p, swap=sage.matrix.matrix0.Matrix.swap_columns)
+        sage: perm_on_list(m, p, swap=sage.matrix.matrix0.Matrix.swap_rows)
+        sage: perm_on_list(m, p, swap=sage.matrix.matrix0.Matrix.swap_columns)
+        sage: m == m1 * m2
+        True
     """
     cdef int i, j, tmp
     if n == -1:
