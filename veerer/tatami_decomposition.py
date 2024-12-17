@@ -229,4 +229,5 @@ def tatami_decomposition(rectangles, base_ring=None):
         elif side == RIGHT and (sep, LEFT, x, y) not in interval_id:
             raise RuntimeError('ERROR: missing (sep={}, side=LEFT, x={}, y={})'.format(sep, x, y))
 
+    surface.set_immutable()
     return surface
