@@ -23,7 +23,7 @@ jobs:
       - name: install veerer
         shell: bash -l {0}
         run: |
-          pip install --no-index .
+          pip install --no-index --no-build-isolation .
       - name: fix permissions
         shell: bash -l {0}
         run: |
