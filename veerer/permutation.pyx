@@ -1063,7 +1063,7 @@ def perm_on_list(l, array.array p, int n=-1, swap=None):
         sage: m == m1 * m2
         True
     """
-    cdef int i, j, tmp
+    cdef int i, j
     if n == -1:
         n = len(p)
     cdef array.array seen = array.clone(p, n, True)
@@ -1078,9 +1078,7 @@ def perm_on_list(l, array.array p, int n=-1, swap=None):
             if swap:
                 swap(l, i, j)
             else:
-                tmp = l[i]
-                l[i] = l[j]
-                l[j] = tmp
+                l[i], l[j] = l[j], l[i]
             seen.data.as_ints[j] = 1
             j = p.data.as_ints[j]
             if j == -1:
