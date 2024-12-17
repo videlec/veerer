@@ -3558,13 +3558,13 @@ class VeeringTriangulation(Triangulation):
             sage: x = [1, 2, 1]
             sage: y = [1, 1, 2]
             sage: vt.zippered_rectangles(x, y)  # optional: sage_flatsurf
-            Translation Surface built from a square and a rectangle
+            Translation Surface in H_1(0^3) built from a square and a rectangle
 
             sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,4)(~2,5,3)(~3,~4,~5)", "RBBRBR")
             sage: x = [1,2,1,2,1,1]
             sage: y = [1,1,2,1,2,3]
             sage: vt.zippered_rectangles(x, y)  # optional: sage_flatsurf
-            Translation Surface built from 3 squares and a rectangle
+            Translation Surface in H_1(0^7) built from 3 squares and a rectangle
 
             sage: vt = VeeringTriangulation("(0,~2,1)(2,~8,~3)(3,~7,~4)(4,6,~5)(5,8,~6)(7,~1,~0)", "PRBPRBPBR")
             sage: R0, R1 = vt.dehn_twists(RED)
@@ -3573,7 +3573,7 @@ class VeeringTriangulation(Triangulation):
             sage: a, x, y = f.self_similar_widths_and_heights()
             sage: S = vt.zippered_rectangles(x, y)  # optional: sage_flatsurf
             sage: S  # optional: sage_flatsurf
-            Translation Surface built from 6 rectangles
+            Translation Surface in H_2(2, 0^9) built from 6 rectangles
 
         We now check that labelling of the rectangles in ``S`` coincide with
         the order of faces in the veering triangulation::
@@ -3595,7 +3595,7 @@ class VeeringTriangulation(Triangulation):
             sage: x = [1, 2, 1]
             sage: y = [1, 1, 2]
             sage: vt.zippered_rectangles(x, y, base_ring=AA)  # optional: sage_flatsurf
-            Translation Surface built from a square and a rectangle
+            Translation Surface in H_1(0^3) built from a square and a rectangle
         """
         ans, edge_orientations = self.is_abelian(certificate=True)
         if not ans:

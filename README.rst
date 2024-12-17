@@ -89,4 +89,5 @@ Authors
 
 - Mark Bell
 - Vincent Delecroix
+- Kai Fu
 - Saul Schleimer
