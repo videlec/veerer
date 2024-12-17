@@ -342,6 +342,7 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
         r"""
         EXAMPLES::
 
+            sage: from veerer import VeeringTriangulation
             sage: T = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "BRR")
             sage: F = T.flat_structure_min()
             sage: F.flatsurf()

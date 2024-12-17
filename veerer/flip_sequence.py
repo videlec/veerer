@@ -305,7 +305,7 @@ class VeeringFlipSequence(object):
 
         # NOTE: the relabelling might need some conjugation by edge flip
         # (more precisely, the edge flipped an odd number of times are
-        #  swaped)
+        #  swapped)
         ep = self._start._ep
         ne = self._start.num_edges()
         c = perm_id(2 * self._start._ne)

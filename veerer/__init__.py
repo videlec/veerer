@@ -32,4 +32,3 @@ from .strebel_graph import StrebelGraph
 from .automaton import FlipGraph, CoreAutomaton, ReducedCoreAutomaton, DelaunayAutomaton, DelaunayStrebelAutomaton
 from .flip_sequence import VeeringFlipSequence
 from .flat_structure import FlatVeeringTriangulation
-from .measured_train_track import MeasuredTrainTrack

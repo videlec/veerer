@@ -586,7 +586,7 @@ class Constellation:
         r"""
         Compare ``self`` and ``other`` according to the operator ``op``.
 
-        EXMAPLES::
+        EXAMPLES::
 
             sage: import itertools
             sage: from veerer import Triangulation
@@ -1546,7 +1546,7 @@ class Constellation:
         n = 2 * ne
 
         if not self.is_connected():
-            # each compoent is labelled with consecutive half-edge labels
+            # each component is labelled with consecutive half-edge labels
             # we use canonical labels for each of them, and then use a total ordering on the components
             components = {}
             for cc in self.connected_components():
