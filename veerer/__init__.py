@@ -26,12 +26,10 @@ Delaunay decomposition of surfaces.
 
 from .constants import RED, BLUE, PURPLE, GREEN, HORIZONTAL, VERTICAL, RIGHT, LEFT, UP, DOWN
 from .triangulation import Triangulation
-from .cover import TriangulationCover
 from .veering_triangulation import VeeringTriangulation, VeeringTriangulations
 from .linear_family import VeeringTriangulationLinearFamily, StrebelGraphLinearFamily, VeeringTriangulationLinearFamilies
 from .strebel_graph import StrebelGraph
 from .automaton import FlipGraph, CoreAutomaton, ReducedCoreAutomaton, DelaunayAutomaton, DelaunayStrebelAutomaton
 from .flip_sequence import VeeringFlipSequence
 from .flat_structure import FlatVeeringTriangulation
-from .layout import FlatVeeringTriangulationLayout
 from .measured_train_track import MeasuredTrainTrack
