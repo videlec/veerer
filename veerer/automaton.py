@@ -1057,14 +1057,18 @@ class ReducedCoreAutomaton(Automaton):
             return (False, ())
 
         recolorings = []
-        a, b, c, d = state.square_about_edge(e)
+        a, b, c, d = state.square_about_half_edge(2 * e)
+        a //= 2
+        b //= 2
+        c //= 2
+        d //= 2
 
         # assertions to be removed
-        cola = state._colouring[a // 2]
-        colb = state._colouring[b // 2]
-        colc = state._colouring[c // 2]
-        cold = state._colouring[d // 2]
-        cole = state._colouring[e // 2]
+        cola = state._colouring[a]
+        colb = state._colouring[b]
+        colc = state._colouring[c]
+        cold = state._colouring[d]
+        cole = state._colouring[e]
 
         assert cola == RED, (a, cola)
         assert colb == BLUE, (b, colb)
@@ -1074,10 +1078,10 @@ class ReducedCoreAutomaton(Automaton):
         if col == BLUE:
             if state.is_forward_flippable(b):
                 recolorings.append((b, BLUE))
-                state._colouring[b // 2] = PURPLE
+                state._colouring[b] = PURPLE
             if b != d and state.is_forward_flippable(d):
                 recolorings.append((d, BLUE))
-                state._colouring[d // 2] = PURPLE
+                state._colouring[d] = PURPLE
 
             # assertions to be removed
             if CHECK:
@@ -1088,10 +1092,10 @@ class ReducedCoreAutomaton(Automaton):
         elif col == RED:
             if state.is_forward_flippable(a):
                 recolorings.append((a, RED))
-                state._colouring[a // 2] = PURPLE
+                state._colouring[a] = PURPLE
             if a != c and state.is_forward_flippable(c):
                 recolorings.append((c, RED))
-                state._colouring[c // 2] = PURPLE
+                state._colouring[c] = PURPLE
 
             if CHECK:
                 assert not state.is_forward_flippable(e)
@@ -1102,7 +1106,7 @@ class ReducedCoreAutomaton(Automaton):
 
     def _flip_back(self, state, e, recolorings, check=CHECK):
         for ee, ccol in recolorings:
-            state._colouring[ee // 2] = ccol
+            state._colouring[ee] = ccol
         state.flip_back(e, PURPLE, check=CHECK)
 
     def _out_neighbors(self, state):

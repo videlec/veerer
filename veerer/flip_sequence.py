@@ -22,13 +22,13 @@ The golden mean pseudo-Anosov realized on the sphere::
 
     sage: a, fs = fp.self_similar_surface(mutable=True)
     sage: fs
-    FlatVeeringTriangulation(Triangulation("(0,1,2)"), [(1, -1), (a - 3, a), (-a + 2, -a + 1)])
+    FlatVeeringTriangulation("(0,1,2)", "BBR", (1, -a + 3, a - 2), (1, a, a - 1))
     sage: fs.flip(0)
     sage: fs.flip(2)
     sage: fs.relabel(fp._relabelling)
     sage: fs.xy_scaling(a, 1/a)
     sage: fs
-    FlatVeeringTriangulation(Triangulation("(0,1,2)"), [(-1, 1), (-a + 3, -a), (a - 2, a - 1)])
+    FlatVeeringTriangulation("(0,1,2)", "BBR", (1, -a + 3, a - 2), (1, a, a - 1))
 
 The same flip sequence defined in one line::
 
@@ -56,7 +56,11 @@ The same flip sequence defined in one line::
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 # ****************************************************************************
 
+from sage.rings.integer_ring import ZZ
+from sage.modules.free_module_element import vector
+
 from .constants import colour_from_char, colour_to_char, RED, BLUE, PURPLE, GREEN, HORIZONTAL, VERTICAL
+from .constellation import check_relabelling
 from .permutation import perm_init, perm_check, perm_id, perm_is_one, perm_preimage, perm_invert, perm_cycle_string, perm_compose, perm_pow, perm_conjugate
 from .veering_triangulation import VeeringTriangulation
 
@@ -76,19 +80,17 @@ class VeeringFlipSequence(object):
         sage: from veerer import VeeringTriangulation, VeeringFlipSequence, BLUE, RED
         sage: T = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
         sage: F = VeeringFlipSequence(T)
-        sage: F
-        VeeringFlipSequence(VeeringTriangulation("(0,1,2)(~2,~0,~1)", "RRB"), "", "(0)(1)(2)(~2)(~1)(~0)")
         sage: F.append_flip(1, RED)
         sage: F.append_flip(0, RED)
         sage: F
-        VeeringFlipSequence(VeeringTriangulation("(0,1,2)(~2,~0,~1)", "RRB"), "1R 0R", "(0)(1)(2)(~2)(~1)(~0)")
+        VeeringFlipSequence(VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB"), "1R 0R", "()")
 
     The flips can also be specified in the input as a string or as a list::
 
         sage: VeeringFlipSequence(T, "1R 0R")
-        VeeringFlipSequence(VeeringTriangulation("(0,1,2)(~2,~0,~1)", "RRB"), "1R 0R", "(0)(1)(2)(~2)(~1)(~0)")
+        VeeringFlipSequence(VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB"), "1R 0R", "()")
         sage: VeeringFlipSequence(T, [(1, RED), (0, RED)])
-        VeeringFlipSequence(VeeringTriangulation("(0,1,2)(~2,~0,~1)", "RRB"), "1R 0R", "(0)(1)(2)(~2)(~1)(~0)")
+        VeeringFlipSequence(VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB"), "1R 0R", "()")
     """
     def __init__(self, start, sequence=None, relabelling=None, reduced=None):
         if not isinstance(start, VeeringTriangulation):
@@ -140,17 +142,17 @@ class VeeringFlipSequence(object):
 
             sage: T = VeeringTriangulation("(0,1,2)(~1,~2,~0)", "RRB")
             sage: VeeringFlipSequence(T, "1R 0R")
-            VeeringFlipSequence(VeeringTriangulation("(0,1,2)(~2,~0,~1)", "RRB"), "1R 0R", "(0)(1)(2)(~2)(~1)(~0)")
+            VeeringFlipSequence(VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB"), "1R 0R", "()")
             sage: VeeringFlipSequence(T, "1R 0R", reduced=True)
-            VeeringFlipSequence(VeeringTriangulation("(0,1,2)(~2,~0,~1)", "RPB"), "1R 0R", "(0)(1)(2)(~2)(~1)(~0)")
-            sage: VeeringFlipSequence(T, "1R 0R", relabelling="(0,5)(1,3)", reduced=True)
-            VeeringFlipSequence(VeeringTriangulation("(0,1,2)(~2,~0,~1)", "RPB"), "1R 0R", "(0,~0)(1,~2)(2,~1)")
-            sage: VeeringFlipSequence(T, "1R 0R", relabelling="(0,5)(1,3)", reduced=True)
-            VeeringFlipSequence(VeeringTriangulation("(0,1,2)(~2,~0,~1)", "RPB"), "1R 0R", "(0,~0)(1,~2)(2,~1)")
+            VeeringFlipSequence(VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RPB"), "1R 0R", "()")
+            sage: VeeringFlipSequence(T, "1R 0R", relabelling="(0,~0)(1,~2)", reduced=True)
+            VeeringFlipSequence(VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RPB"), "1R 0R", "(0,~0)(1,~2)(~1,2)")
+            sage: VeeringFlipSequence(T, "1R 0R", relabelling="(0,~0)(1,~2)", reduced=True)
+            VeeringFlipSequence(VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RPB"), "1R 0R", "(0,~0)(1,~2)(~1,2)")
         """
         args = [repr(self._start)]
         args.append("\"%s\"" % flip_sequence_to_string(self.flips()))
-        args.append("\"%s\"" % perm_cycle_string(self._relabelling, 2 * self._end._ne, edge_like=True))
+        args.append("\"%s\"" % perm_cycle_string(self._relabelling, singletons=False, n=2 * self._end._ne, edge_like=True))
         return "VeeringFlipSequence({})".format(", ".join(args))
 
     # properties
@@ -233,9 +235,7 @@ class VeeringFlipSequence(object):
         i = len(self._flips) - 1
         while i >= 0 and undetermined:
             e, col, oldcol = self._flips[i]
-            e = self._relabelling[e]
-            if e >= ne:
-                e = ep(e)
+            e = self._relabelling[2 * e] // 2
             if e in undetermined:
                 undetermined.remove(e)
                 colours[e] = col
@@ -243,16 +243,17 @@ class VeeringFlipSequence(object):
 
         # for unflipped edges, look at colours of the initial triangulation
         for e in undetermined:
-            re = perm_preimage(self._relabelling, e)
-            col = self._start._colouring[re // 2]
+            re = perm_preimage(self._relabelling, 2 * e) // 2
+            col = self._start._colouring[re]
             if col != PURPLE:
-                if re >= ne:
-                    re = ep(re)
                 colours[e] = col
 
         return colours
 
     def coloured_start(self):
+        r"""
+        Return the colouring of the start of the flip sequence imposed by the choice of flips.
+        """
         V = self._start.copy()
         ne = V.num_edges()
         if any(V._colouring[e] == PURPLE for e in range(ne)):
@@ -275,8 +276,10 @@ class VeeringFlipSequence(object):
             sage: V = VeeringTriangulation("(0,6,5)(1,2,~6)(3,4,~5)", "BPBBRPR")
             sage: B = VeeringFlipSequence(V, "1B", "(1,2)")
             sage: R = VeeringFlipSequence(V, "1R 5R", "(0,2,3)(1,4)(5,6)")
+            sage: B * R
+            VeeringFlipSequence(VeeringTriangulation("(0,6,5)(1,2,~6)(3,4,~5)", "BPBBRPR"), "1B 2R 5R", "(0,2,4,1,3)(~0,~2,~4,~1,~3)(5,6)(~5,~6)")
             sage: (B * R).inverse()
-            VeeringFlipSequence(VeeringTriangulation("(0,6,5)(1,2,~6)(3,4,~5)", "RBRRPBP"), "6B 4R 3B", "(0,3,1,4,2)(5,6,~5,~6)")
+            VeeringFlipSequence(VeeringTriangulation("(0,6,5)(1,2,~6)(3,4,~5)", "RBRRPBP"), "6B 4R 3B", "(0,3,~1,~4,2)(~0,~3,1,4,~2)(5,6,~5,~6)")
         """
         start = self._start
         reduced = any(start._colouring[e] == PURPLE for e in range(start._ne))
@@ -298,16 +301,16 @@ class VeeringFlipSequence(object):
             V = self._end.copy()
 
         assert all(oldcol == BLUE or oldcol == RED for (_, _, oldcol) in coloured_flips)
-        inverse_flips = [(self._relabelling[e], BLUE if oldcol == RED else RED) for (e, _, oldcol) in reversed(coloured_flips)]
+        inverse_flips = [(self._relabelling[2 * e] // 2, BLUE if oldcol == RED else RED) for (e, _, oldcol) in reversed(coloured_flips)]
 
         # NOTE: the relabelling might need some conjugation by edge flip
         # (more precisely, the edge flipped an odd number of times are
-        #  flipped)
+        #  swaped)
         ep = self._start._ep
         ne = self._start.num_edges()
         c = perm_id(2 * self._start._ne)
         for i,_ in inverse_flips:
-            c[i], c[ep(i)] = c[ep(i)], c[i]
+            c[2 * i], c[2 * i + 1] = c[2 * i + 1], c[2 * i]
         r = perm_invert(self._relabelling, 2 * self._start._ne)
         r = perm_compose(c, r, 2 * self._start._ne)
 
@@ -380,30 +383,28 @@ class VeeringFlipSequence(object):
         """
         if self._start != self._end:
             raise TypeError
-        n = self._start.num_edges()
+        ne = self._start.num_edges()
         ep = self._start._ep
         flipped = set(x[0] for x in self._flips)
-        if len(flipped) == n:
+        if len(flipped) == ne:
             return set()
 
         new = list(flipped)
         very_new = []
         modified = True
         r = self._relabelling
-        while len(flipped) < n and modified:
+        while len(flipped) < ne and modified:
             modified = False
             for e in new:
-                e = r[e]
-                if e >= n:
-                    e = ep(e)
+                e = r[2 * e] // 2
                 if e not in flipped:
                     modified = True
                     flipped.add(e)
                     very_new.append(e)
             new, very_new = very_new, new
-            del very_new[:]
+            very_new.clear()
 
-        E = set(range(n))
+        E = set(range(ne))
         assert flipped.issubset(E)
         E.difference_update(flipped)
         return E
@@ -472,7 +473,7 @@ class VeeringFlipSequence(object):
             sage: from veerer import VeeringTriangulation, VeeringFlipSequence, BLUE, RED
             sage: V = VeeringTriangulation("(0,3,4)(1,~3,5)(2,6,~4)", "RBRBRRB")
             sage: VeeringFlipSequence(V, "0B 1B").flat_structure_middle()
-            FlatVeeringTriangulation(Triangulation("(0,3,4)(1,~3,5)(2,6,~4)"), [(6, 2), (6, -2), (3, 3), (-4, 4), (-2, -6), (-2, -2), (-1, 3), (-2, -6), (-4, 4)])
+            FlatVeeringTriangulation("(0,3,4)(1,~3,5)(2,6,~4)", "RBRBRRB", (6, 6, 3, 4, 2, 2, 1), (2, 2, 3, 4, 6, 2, 3))
 
             sage: fs = VeeringFlipSequence(V, "0B 1R 2B 5R 6B", "(3,4)(1,5,6)")
             sage: fl = fs.flat_structure_middle(mutable=True)
@@ -491,16 +492,15 @@ class VeeringFlipSequence(object):
         # TODO: make this function support various polytope backends
         n = self._start.num_edges()
 
-        PH = self.train_track_polytope(HORIZONTAL, backend='ppl')._cone
         PV = self.train_track_polytope(VERTICAL, backend='ppl')._cone
+        x = [g.coefficients() for g in PV.generators() if g.is_ray()]
+        x = vector(ZZ, [sum(v[i] for v in x) for i in range(n)])
 
-        # pick sum of rays
-        VH = [g.coefficients() for g in PH.generators() if g.is_ray()]
-        VH = [sum(v[i] for v in VH) for i in range(n)]
-        VV = [g.coefficients() for g in PV.generators() if g.is_ray()]
-        VV = [sum(v[i] for v in VV) for i in range(n)]
+        PH = self.train_track_polytope(HORIZONTAL, backend='ppl')._cone
+        y = [g.coefficients() for g in PH.generators() if g.is_ray()]
+        y = vector(ZZ, [sum(v[i] for v in y) for i in range(n)])
 
-        return self._start._flat_structure_from_train_track_lengths(VH, VV, mutable=mutable, check=check)
+        return self._start.flat_structure(x, y, mutable=mutable, check=check)
 
     def self_similar_widths_and_heights(self):
         r"""
@@ -574,43 +574,43 @@ class VeeringFlipSequence(object):
             sage: f = B0*R0*B1*R1
             sage: f.self_similar_surface()
             (a,
-             FlatVeeringTriangulation(Triangulation("(0,~2,1)(2,~8,~3)(3,~7,~4)(4,6,~5)(5,8,~6)(7,~1,~0)"), [(1, 1), (a^3 - 7*a^2 + 13*a - 7, -a), ..., (-a^3 + 7*a^2 - 13*a + 7, a), (-1, -1)]))
+             FlatVeeringTriangulation("(0,~2,1)(~0,7,~1)...(5,8,~6)", "RRBRRBRBR", (1, -a^3 + 7*a^2 - 13*a + 7, ..., -4*a^3 + 27*a^2 - 45*a + 16), (1, a, ..., a^2 - 3*a + 1)))
 
             sage: f = B1*B0*R0*B1*R1*R1*R1*R0*B1*R0*B1
             sage: f.self_similar_surface()
             (a,
-             FlatVeeringTriangulation(Triangulation("(0,~2,1)(2,~8,~3)(3,~7,~4)(4,6,~5)(5,8,~6)(7,~1,~0)"), [(1, 1), ..., (-1/183*a^3 + 8/61*a^2 - 42/61*a + 274/183, 4/183*a^3 - 30/61*a^2 + 119/61*a + 8/183), (-1, -1)]))
+             FlatVeeringTriangulation("(0,~2,1)(~0,7,~1)...(5,8,~6)", "RRBRRBBBR", (1, -1/183*a^3 + 8/61*a^2 - 42/61*a + 274/183, ..., -89/183*a^3 + 651/61*a^2 - 2274/61*a + 1511/183), (1, 4/183*a^3 - 30/61*a^2 + 119/61*a + 8/183, ..., -10/183*a^3 + 75/61*a^2 - 267/61*a + 163/183)))
         """
         r, w, h = self.self_similar_widths_and_heights()
-        return r, self.coloured_start()._flat_structure_from_train_track_lengths(h, w, base_ring=r.parent(), mutable=mutable, check=True)
+        return r, self.coloured_start().flat_structure(w, h, mutable=mutable, check=check)
 
     # change
-    def append_flip(self, e, col):
+    def append_flip(self, e, col, check=True):
         r"""
         Append the flip ``(e, col)`` to this flip sequence.
         """
+        if check:
+            e = self._start._check_edge(e)
+            if col != BLUE and col != RED:
+                raise ValueError("col must be BLUE or RED")
+
         ep = self._end._ep
-        oldcol = self._end._colouring[e // 2]
-        E = ep(e)
-        if E < e:
-            e = E
+        oldcol = self._end._colouring[e]
         self._end.flip(e, col)
-        if self._relabelling[e] != e:
+        if self._relabelling[2 * e] != 2 * e:
             # push the flip to the left of relabelling
-            e = perm_preimage(self._relabelling, e)
-            E = ep(e)
-            if E < e:
-                e = E
+            e = perm_preimage(self._relabelling, 2 * e) // 2
         self._flips.append((e, col, oldcol))
 
     def swap(self, e):
         r"""
         Swap the orientation of the edge ``e`` by modifying the relabelling of this flip sequence.
         """
-        E = self._end._ep(e)
+        h = 2 * e
+        H = self._end._ep(h)
         self._end.swap(e)
-        self._relabelling[e] = E
-        self._relabelling[E] = e
+        self._relabelling[h] = H
+        self._relabelling[H] = h
 
         # TODO: remove check
         self._check()
@@ -629,21 +629,18 @@ class VeeringFlipSequence(object):
             True
             sage: fp.append_flip(2, BLUE)
             sage: fp.find_closure()
-            array('i', [2, 0, 1])
+            array('i', [4, 5, 0, 1, 2, 3])
         """
         ans, r = self._end.is_isomorphic_to(self._start, certificate=True)
         return r if ans else None
 
-    def append_relabelling(self, r):
+    def append_relabelling(self, r, check=True):
         r"""
         Append the relabelling ``r`` to this flip sequence.
         """
         end = self._end
-        if not perm_check(r, 2 * end._ne):
-            r = perm_init(r, 2 * end._ne, end._ep)
-            if not perm_check(r, 2 * end._ne):
-                raise ValueError('invalid relabelling permutation')
-
+        if check:
+            r = check_relabelling(r, end._ne)
         end.relabel(r)
         self._relabelling = perm_compose(self._relabelling, r)
 
@@ -658,7 +655,7 @@ class VeeringFlipSequence(object):
             sage: assert F.is_closed()
             sage: F *= F
             sage: F
-            VeeringFlipSequence(VeeringTriangulation("(0,3,4)(1,~3,5)(2,6,~4)", "PPPBRRB"), "2B 6B", "(0)(1)(2)(3)(4)(5)(6)(~4)(~3)")
+            VeeringFlipSequence(VeeringTriangulation("(0,3,4)(1,~3,5)(2,6,~4)", "PPPBRRB"), "2B 6B", "()")
         """
         if type(self) != type(other):
             raise TypeError
@@ -669,7 +666,7 @@ class VeeringFlipSequence(object):
         ne = self._start.num_edges()
         r = perm_invert(self._relabelling, n)
         ep = self._start._ep
-        self._flips.extend([((r[e] if r[e] < ne else ep(r[e])), col, oldcol) for e, col, oldcol in other._flips])
+        self._flips.extend([(r[2 * e] // 2, col, oldcol) for e, col, oldcol in other._flips])
         self._end = other._end.copy()
         self._relabelling = perm_compose(self._relabelling, other._relabelling)
 
@@ -687,6 +684,13 @@ class VeeringFlipSequence(object):
             sage: F2 = VeeringFlipSequence(V2, "0B 1B")
             sage: F3 = VeeringFlipSequence(V3, "3B", "(0,1)")
             sage: (F2 * F3) * (F2 * F3) == (F2 * (F3 * F2)) * F3 == F2 * ((F3 * F2) * F3)
+            True
+
+            sage: Vc = VeeringTriangulation("(0,~5,4)(3,5,6)(1,2,~6)", "PPBPRBR")
+            sage: CR5 = VeeringFlipSequence(Vc, "1B", "(1,2)")
+            sage: CL5 = VeeringFlipSequence(Vc, "0R", "(0,4)")
+            sage: L32 = VeeringFlipSequence(Vc, "1R 3R 6R", "(1,3)(6,~6)")
+            sage: (L32 * CR5) * CL5 == L32 * (CR5 * CL5)
             True
         """
         res = self.copy()
@@ -710,11 +714,9 @@ class VeeringFlipSequence(object):
 
         m = len(res._flips)
         r = perm_invert(self._relabelling, 2 * self._start._ne)
-        ne = self._start.num_edges()
-        ep = self._start._ep
         for _ in range(m * (k-1)):
             e, col, oldcol = res._flips[-m]
-            res._flips.append(((r[e] if r[e] < ne else ep(r[e])), col, oldcol))
+            res._flips.append(((r[2 * e] // 2), col, oldcol))
 
         # TODO: remove this expensive check
         res._check()
