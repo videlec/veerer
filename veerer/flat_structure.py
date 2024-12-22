@@ -338,40 +338,6 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
             vecs[c] = t[3] - t[2]
         return vecs
 
-    def flatsurf(self):
-        r"""
-        EXAMPLES::
-
-            sage: from veerer import VeeringTriangulation
-            sage: T = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "BRR")
-            sage: F = T.flat_structure_min()
-            sage: F.flatsurf()  # optional - sage_flatsurf
-            Translation Surface in H_1(0) built from 2 isosceles triangles
-
-            sage: T = VeeringTriangulation("(0,6,~5)(~0,7,~6)(1,8,~7)(~1,~4,5)(2,~3,4)(~2,~8,3)", "RRRBBBBBB")
-            sage: F = T.flat_structure_min()
-            sage: F.flatsurf()  # optional - sage_flatsurf
-            Half-Translation Surface in Q_1(2, -1^2) built from 2 isosceles triangles and 4 triangles
-        """
-        if self.has_folded_edge():
-            raise NotImplementedError
-        import flatsurf
-        vecs = self.vectors()
-        base_ring = self._x.base_ring()
-        half_edge_to_face = [None] * (2 * self._ne)
-        half_edge_to_pos = [None] * (2 * self._ne)
-        S = flatsurf.MutableOrientedSimilaritySurface(base_ring)
-        for i, t in enumerate(self.triangles()):
-            for j, h in enumerate(t):
-                half_edge_to_face[h] = i
-                half_edge_to_pos[h] = j
-            S.add_polygon(flatsurf.Polygon(edges=[vecs[t[0]], vecs[t[1]], vecs[t[2]]]))
-        for e in range(self._ne):
-            S.glue((half_edge_to_face[2 * e], half_edge_to_pos[2 * e]),
-                   (half_edge_to_face[2 * e + 1], half_edge_to_pos[2 * e + 1]))
-        S.set_immutable()
-        return S
-
     def to_pyflatsurf(self):
         ans, oris = self.is_abelian(certificate=True)
         if not ans:
@@ -389,10 +355,29 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
             sage: from veerer import *
             sage: T = VeeringTriangulation("(0,1,2)(~0,~1,3)", "BRRR")
             sage: F = T.flat_structure_min()
-            sage: F.plot()  # not tested (warning in matplotlib)
-            Graphics object consisting of 15 graphics primitives
+            sage: F.plot()
+            Graphics object consisting of ... graphics primitives
         """
-        return self.flatsurf().plot()
+        from .flatsurf_conversion import flat_structure_to_sage_flatsurf
+        S, m = flat_structure_to_sage_flatsurf(self)
+        edge_labels = {v: self._half_edge_string(h) for h, v in enumerate(m) if v is not None}
+        options = {BLUE: {"color": "blue"},
+                   RED: {"color": "red"},
+                   GREEN: {"color": "green"},
+                   PURPLE: {"color": "purple"}}
+        edge_options = {v: options[self._colouring[h // 2]] for h, v in enumerate(m) if v is not None}
+        for h, v in enumerate(m):
+            if self._bdry[h]:
+                edge_options[v]["thickness"] = 3
+        G = S.graphical_surface(edge_labels=edge_labels,
+                                edge_label_options={"color": "black"},
+                                edge_options=edge_options,
+                                self_glued_edge_options={},
+                                polygon_labels=False)
+        G.will_plot_adjacent_edge_labels = True
+        G.will_plot_self_glued_edge_labels = True
+        G.will_plot_non_adjacent_edge_labels = True
+        return G.plot()
 
     def flip(self, e, check=False):
         r"""

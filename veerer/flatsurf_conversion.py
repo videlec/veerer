@@ -121,6 +121,63 @@ def oriented_slope(a, rotate=1):
     raise ValueError("invalid argument rotate={}".format(rotate))
 
 
+def flat_structure_to_sage_flatsurf(flat_structure):
+    r"""
+    Construct a sage-flatsurf surface associated to the given veerer flat structure.
+
+    Return a pair ``(surface, mapping_of_half_edges)``.
+
+    EXAMPLES::
+
+        sage: from veerer import VeeringTriangulation
+        sage: from veerer.flatsurf_conversion import flat_structure_to_sage_flatsurf
+
+        sage: T = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "BRR")
+        sage: F = T.flat_structure_min()
+        sage: flat_structure_to_sage_flatsurf(F)  # optional - sage_flatsurf
+        (Translation Surface in H_1(0) built from 2 isosceles triangles,
+         [(0, 0), (1, 0), (0, 1), (1, 1), (0, 2), (1, 2)])
+
+        sage: T = VeeringTriangulation("(0,1,2)", "BRR")
+        sage: F = T.flat_structure_min()
+        sage: flat_structure_to_sage_flatsurf(F)  # optional - sage_flatsurf
+        (Half-Translation Surface in Q_0(-1^4) built from an isosceles triangle,
+         [(0, 0), None, (0, 1), None, (0, 2), None])
+    """
+    sage_flatsurf_feature.require()
+    import flatsurf
+
+    ep = flat_structure._ep
+    vp = flat_structure._vp
+    bdry = flat_structure._bdry
+    ne = flat_structure.num_edges()
+    vecs = flat_structure.vectors()
+
+    base_ring = flat_structure._x.base_ring()
+    half_edge_to_face = [None] * (2 * ne)
+    half_edge_to_pos = [None] * (2 * ne)
+    S = flatsurf.MutableOrientedSimilaritySurface(base_ring)
+    for i, t in enumerate(flat_structure.triangles()):
+        for j, h in enumerate(t):
+            half_edge_to_face[h] = i
+            half_edge_to_pos[h] = j
+        S.add_polygon(flatsurf.Polygon(edges=[vecs[t[0]], vecs[t[1]], vecs[t[2]]]))
+    for e in range(ne):
+        if not bdry[2 * e] and not bdry[ep(2 * e)]:
+            S.glue((half_edge_to_face[2 * e], half_edge_to_pos[2 * e]),
+                   (half_edge_to_face[ep(2 * e)], half_edge_to_pos[ep(2 * e)]))
+    S.set_immutable()
+
+    m = [None] * (2 * ne)
+    for h in range(2 * ne):
+        if vp[h] == -1:
+            continue
+        label = half_edge_to_face[h]
+        e = half_edge_to_pos[h]
+        m[h] = (label, e)
+    return S, m
+
+
 def pyflatsurf_surface_to_veerer_veering_triangulation(surface):
     r"""
     Convert a pyflatsurf surface in a veering triangulation.
