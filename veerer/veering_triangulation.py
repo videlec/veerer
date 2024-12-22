@@ -1755,11 +1755,23 @@ class VeeringTriangulation(Triangulation):
         Forward and backward delaunay flips are interchanged under a rotation::
 
             sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "RRBBRBBBR", mutable=True)
+            sage: vt.delaunay_cone()
+            8-dimensional Delaunay cone of VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "RRBBRBBBR") made of
+             2 forward-flip facets
+             2 backward-flip facets
+             5 x-degeneration facets
+             4 y-degeneration facets
             sage: sorted(vt.delaunay_flips())
             [([1], 1), ([1], 2), ([5, 6], 1), ([5, 6], 2)]
             sage: sorted(vt.backward_delaunay_flips())
             [([0], 1), ([0], 2), ([7], 1), ([7], 2)]
             sage: vt.rotate()
+            sage: vt.delaunay_cone()
+            8-dimensional Delaunay cone of VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "BBRRBRRRB") made of
+             2 forward-flip facets
+             2 backward-flip facets
+             4 x-degeneration facets
+             5 y-degeneration facets
             sage: sorted(vt.delaunay_flips())
             [([0], 1), ([0], 2), ([7], 1), ([7], 2)]
             sage: sorted(vt.backward_delaunay_flips())
@@ -3182,19 +3194,39 @@ class VeeringTriangulation(Triangulation):
 
             sage: T = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
             sage: T.delaunay_cone()
-            Cone of dimension 4 in ambient dimension 6 made of 6 facets (backend=ppl)
+            4-dimensional Delaunay cone of VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB") made of
+             1 forward-flip facets
+             1 backward-flip facets
+             2 x-degeneration facets
+             2 y-degeneration facets
             sage: T.delaunay_cone(x_low_bound=1, y_low_bound=1, hw_bound=1)  # not tested
 
             sage: T.delaunay_cone(backend='sage')
-            Cone of dimension 4 in ambient dimension 6 made of 6 facets (backend=sage)
+            4-dimensional Delaunay cone of VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB") made of
+             1 forward-flip facets
+             1 backward-flip facets
+             2 x-degeneration facets
+             2 y-degeneration facets
 
             sage: T = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
             sage: T.delaunay_cone()
-            Cone of dimension 4 in ambient dimension 6 made of 6 facets (backend=ppl)
+            4-dimensional Delaunay cone of VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB") made of
+             1 forward-flip facets
+             1 backward-flip facets
+             2 x-degeneration facets
+             2 y-degeneration facets
             sage: T.as_linear_family().delaunay_cone(backend='ppl')
-            Cone of dimension 4 in ambient dimension 6 made of 6 facets (backend=ppl)
+            4-dimensional Delaunay cone of VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)]) made of
+             1 forward-flip facets
+             1 backward-flip facets
+             2 x-degeneration facets
+             2 y-degeneration facets
             sage: T.as_linear_family().delaunay_cone(backend='sage')
-            Cone of dimension 4 in ambient dimension 6 made of 6 facets (backend=sage)
+            4-dimensional Delaunay cone of VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)]) made of
+             1 forward-flip facets
+             1 backward-flip facets
+             2 x-degeneration facets
+             2 y-degeneration facets
 
         An example in genus 2 involving a linear constraint::
 
@@ -3202,15 +3234,19 @@ class VeeringTriangulation(Triangulation):
             sage: f = VeeringTriangulationLinearFamily(vt, [s, t])
             sage: PG = f.delaunay_cone(backend='ppl')
             sage: PG
-            Cone of dimension 4 in ambient dimension 14 made of 6 facets (backend=ppl)
+            4-dimensional Delaunay cone of VeeringTriangulationLinearFamily("(0,2,3)(~0,1,4)(~1,5,6)", "BRRBBBB", [(1, 0, 0, 1, 1, 1, 1), (0, 1, 1, 1, 1, 1, 0)]) made of
+             1 forward-flip facets
+             1 backward-flip facets
+             2 x-degeneration facets
+             2 y-degeneration facets
             sage: sorted(PG.rays())
-            [[0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1],
-             [0, 1, 1, 1, 1, 1, 0, 2, 0, 0, 2, 2, 2, 2],
-             [0, 1, 1, 1, 1, 1, 0, 2, 2, 2, 0, 0, 0, 2],
-             [0, 2, 2, 2, 2, 2, 0, 1, 1, 1, 0, 0, 0, 1],
-             [1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1],
-             [1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1],
-             [2, 0, 0, 2, 2, 2, 2, 1, 1, 1, 0, 0, 0, 1]]
+            [(0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1),
+             (0, 1, 1, 1, 1, 1, 0, 2, 0, 0, 2, 2, 2, 2),
+             (0, 1, 1, 1, 1, 1, 0, 2, 2, 2, 0, 0, 0, 2),
+             (0, 2, 2, 2, 2, 2, 0, 1, 1, 1, 0, 0, 0, 1),
+             (1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1),
+             (1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1),
+             (2, 0, 0, 2, 2, 2, 2, 1, 1, 1, 0, 0, 0, 1)]
         """
         if x_low_bound or y_low_bound or hw_bound:
             raise NotImplementedError
@@ -3231,7 +3267,8 @@ class VeeringTriangulation(Triangulation):
         self._set_delaunay_constraints_fast(cs, L)
         self._set_subspace_constraints_fast(cs, L, VERTICAL)
         self._set_subspace_constraints_fast(cs, L, HORIZONTAL)
-        delaunay_cone = cs.cone(backend)
+        from .delaunay_cone import DelaunayCone
+        delaunay_cone = DelaunayCone(self.copy(mutable=False), cs.cone(backend))
         if not self._mutable:
             try:
                 cache = self._delaunay_cone
@@ -4146,58 +4183,38 @@ class VeeringTriangulation(Triangulation):
             sage: sorted(vt.as_linear_family().delaunay_flips())
             [([2], 1), ([2], 2), ([4, 8], 1), ([4, 8], 2)]
         """
-        from sage.matrix.constructor import matrix
-
-        dim = self.dimension()
-        base_ring = self.base_ring()
-        ne = ambient_dim = self.num_edges()
-        L = LinearExpressions(base_ring)
-        x = [L.variable(e) for e in range(ne)]
-        y = [L.variable(ne + e) for e in range(ne)]
-        P = self.delaunay_cone(backend=backend)
-        if P.affine_dimension() != 2 * dim:
-            raise ValueError('not geometric P.dimension() = {} while 2 * dim = {}'.format(P.affine_dimension(), 2 * dim))
-
-        # compute the Delaunay flip facets and the associated
-        # subset of edges
-        eqns = matrix(base_ring, P.eqns())
-        delaunay_facets = {}
-        for e in self.forward_flippable_edges():
-            a, b, c, d = self.square_about_half_edge(2 * e, check=False)
-            constraint = x[e] == y[a // 2] + y[d // 2]
-            constraint = constraint.coefficients(dim=2 * ne, homogeneous=True)
-            linear_form_project(eqns, constraint)
-            vector_normalize(base_ring, constraint)
-            constraint = tuple(constraint)
-            if constraint in delaunay_facets:
-                delaunay_facets[constraint].append(e)
-            else:
-                delaunay_facets[constraint] = [e]
-
-        # determine the possible colours
-        neighbours = []
-        for ieq, edges in delaunay_facets.items():
-            # build the facet
-            F = P.add_constraint(L(ieq) == 0)
-            if not F.affine_dimension() == 2 * dim - 1:
-                continue
-
-            # test each edge colour conditions
-            # NOTE: all simultaneous flips must be of the same colour
-            assert all(self._colouring[e] == self._colouring[edges[0]] for e in edges)
-            # NOTE: the equations for the different edges are all equivalent, it
-            # is hence enough to use the first edge
-            a, b, c, d = self.square_about_half_edge(2 * edges[0], check=False)
-            Fred = F.add_constraint(x[a // 2] <= x[d // 2])
-            if Fred.affine_dimension() == 2 * dim - 1:
-                neighbours.append((edges, RED))
-                Fblue = F.add_constraint(x[a // 2] >= x[d // 2])
-                if Fblue.affine_dimension() == 2 * dim - 1:
-                    neighbours.append((edges, BLUE))
-            else:
-                neighbours.append((edges, BLUE))
-
-        return neighbours
+        ne = self._ne
+        delaunay_cone = self.delaunay_cone()
+        rays = delaunay_cone.rays()
+        ans = []
+        for facet, edges in delaunay_cone.forward_delaunay_facets():
+            e = edges[0]
+            a, b, c, d = self.square_about_half_edge(2 * e)
+            a //= 2
+            b //= 2
+            c //= 2
+            d //= 2
+            colours = 0
+            for i in facet.ambient_V_indices():
+                r = rays[i]
+                if r[ne + b] > r[ne + a]:
+                    assert self._colouring[e] == RED
+                elif r[ne + b] < r[ne + a]:
+                    assert self._colouring[e] == BLUE
+                if r[a] < r[d]:
+                    colours |= RED
+                    if colours & BLUE:
+                        break
+                if r[a] > r[d]:
+                    colours |= BLUE
+                    if colours & RED:
+                        break
+            assert colours
+            if colours & RED:
+                ans.append((edges, RED))
+            if colours & BLUE:
+                ans.append((edges, BLUE))
+        return ans
 
     def geometric_flips(self, *args, **kwds):
         import warnings
@@ -4230,11 +4247,10 @@ class VeeringTriangulation(Triangulation):
             sage: cols2 = "RBRR"
             sage: VeeringTriangulation(fp, bdry, cols0).backward_delaunay_flips()
             []
-            sage: VeeringTriangulation(fp, bdry, cols1).backward_delaunay_flips()
-            [([0], 2), ([0], 1)]
+            sage: sorted(VeeringTriangulation(fp, bdry, cols1).backward_delaunay_flips())
+            [([0], 1), ([0], 2)]
             sage: sorted(VeeringTriangulation(fp, bdry, cols2).backward_delaunay_flips())
             [([0], 1), ([0], 2)]
-
 
         An example in H_0(1, 0, -1^3)::
 
@@ -4247,58 +4263,38 @@ class VeeringTriangulation(Triangulation):
             ....:         vt2.flip_back(e, col)
             ....:         assert vt2.is_delaunay()
         """
-        from sage.matrix.constructor import matrix
-
-        dim = self.dimension()
-        base_ring = self.base_ring()
-        ne = ambient_dim = self.num_edges()
-        L = LinearExpressions(base_ring)
-        x = [L.variable(e) for e in range(ne)]
-        y = [L.variable(ne + e) for e in range(ne)]
-        P = self.delaunay_cone(backend=backend)
-        if P.affine_dimension() != 2 * dim:
-            raise ValueError('not geometric P.dimension() = {} while 2 * dim = {}'.format(P.affine_dimension(), 2 * dim))
-
-        # compute the Delaunay flip facets and the associated
-        # subset of edges
-        eqns = matrix(base_ring, P.eqns())
-        delaunay_facets = {}
-        for e in self.backward_flippable_edges():
-            a, b, c, d = self.square_about_half_edge(2 * e, check=False)
-            constraint = y[e] == x[a // 2] + x[d // 2]
-            constraint = constraint.coefficients(dim=2 * ne, homogeneous=True)
-            linear_form_project(eqns, constraint)
-            vector_normalize(base_ring, constraint)
-            constraint = tuple(constraint)
-            if constraint in delaunay_facets:
-                delaunay_facets[constraint].append(e)
-            else:
-                delaunay_facets[constraint] = [e]
-
-        # determine the possible colours
-        neighbours = []
-        for ieq, edges in delaunay_facets.items():
-            # build the facet
-            F = P.add_constraint(L(ieq) == 0)
-            if not F.affine_dimension() == 2 * dim - 1:
-                continue
-
-            # test each edge colour conditions
-            # NOTE: all simultaneous flips must be of the same colour
-            assert all(self._colouring[e] == self._colouring[edges[0]] for e in edges)
-            # NOTE: the equations for the different edges are all equivalent, it
-            # is hence enough to use the first edge
-            a, b, c, d = self.square_about_half_edge(2 * edges[0], check=False)
-            Fred = F.add_constraint(y[a // 2] <= y[d // 2])
-            if Fred.affine_dimension() == 2 * dim - 1:
-                neighbours.append((edges, BLUE))
-                Fblue = F.add_constraint(y[a // 2] >= y[d // 2])
-                if Fblue.affine_dimension() == 2 * dim - 1:
-                    neighbours.append((edges, RED))
-            else:
-                neighbours.append((edges, RED))
-
-        return neighbours
+        ne = self._ne
+        delaunay_cone = self.delaunay_cone()
+        rays = delaunay_cone.rays()
+        ans = []
+        for facet, edges in delaunay_cone.backward_delaunay_facets():
+            e = edges[0]
+            a, b, c, d = self.square_about_half_edge(2 * e)
+            a //= 2
+            b //= 2
+            c //= 2
+            d //= 2
+            colours = 0
+            for i in facet.ambient_V_indices():
+                r = rays[i]
+                if r[a] > r[b]:
+                    assert self._colouring[e] == RED
+                if r[a] < r[b]:
+                    assert self._colouring[e] == BLUE
+                if r[ne + a] > r[ne + d]:
+                    colours |= RED
+                    if colours & BLUE:
+                        break
+                if r[ne + a] < r[ne + d]:
+                    colours |= BLUE
+                    if colours & RED:
+                        break
+            assert colours
+            if colours & RED:
+                ans.append((edges, RED))
+            if colours & BLUE:
+                ans.append((edges, BLUE))
+        return ans
 
     def random_forward_flip_sequence(self, length=1, relabel=False):
         r"""
@@ -4504,6 +4500,7 @@ class VeeringTriangulation(Triangulation):
 
         return parallel_families
 
+    # TODO: change edges_low/edges_up to low_edges/up_edges
     def degeneration(self, edges_low=None, edges_up=None, mutable=False, check=True):
         r"""
         Return the veering triangulation obtained by blowing-up the given subset of ``edges``.
@@ -4895,32 +4892,57 @@ class VeeringTriangulation(Triangulation):
             sage: from veerer import VeeringTriangulation, VeeringTriangulationLinearFamily
 
             sage: vt = VeeringTriangulation("(0,8,~7)(1,3,~2)(2,10,~3)(4,6,~5)(5,11,~6)(7,~9,~8)(9,~11,~10)(~4,~1,~0)", "RRBRBBRRBRRB")
-            sage: list(vt.vertical_degeneration_low_edges_subsets())
-            [(2,),
-             (6,),
-             (8,),
-             (2, 6),
-             (2, 8),
-             (6, 8),
-             (2, 6, 8),
-             (4, 5, 6, 11),
-             (2, 4, 5, 6, 11),
-             (4, 5, 6, 8, 11)]
+            sage: sorted(vt.vertical_degeneration_low_edges_subsets(), key=lambda x: (len(x), x))
+            [(2,), (6,), (8,), (2, 6), (6, 8), (4, 5, 6, 11)]
 
             sage: vt = VeeringTriangulation("(0,1,2)(3,4,5)(6,7,8)(~0,~7,~5)(~3,~4,~2)(~6,~1,~8)", "RRBRRBRRB")
-            sage: list(vt.vertical_degeneration_low_edges_subsets())
+            sage: sorted(vt.vertical_degeneration_low_edges_subsets(), key=lambda x: (len(x), x))
             [(8,), (2, 3, 4, 5)]
 
             sage: vt = VeeringTriangulation("(0,~7,6)(1,~5,~2)(2,4,~3)(3,11,~4)(5,10,~6)(7,9,~8)(8,~10,~9)(~11,~1,~0)", "RBRBRRBRBRRR")
-            sage: list(vt.vertical_degeneration_low_edges_subsets())
-            [(1,), (3,), (6,), (8,), (1, 3), (1, 6), (3, 8), (6, 8), (1, 3, 6), (1, 6, 8)]
+            sage: sorted(vt.vertical_degeneration_low_edges_subsets(), key=lambda x: (len(x), x))
+            [(1,), (3,), (6,), (8,), (1, 3), (1, 6), (3, 8), (6, 8)]
+
+        TESTS::
+
+        An example which used to be wrong::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,3,4)(~1,~3,5)(~2,6,7)(~4,~6,8)(~5,9,10)(~7,11,12)(~8,13,~12)(~9,14,15)(~10,16,17)(~11,18,19)(~13,~14,~16)(~15,20,21)(~17,~18,22)(~19,23,24)(~20,~23,25)(~21,26,~25)(~22,~26,~24)", "RRBBBBRRRRRBRBRBBBRRRBRBRRB")
+            sage: sorted(vt.vertical_degeneration_low_edges_subsets(), key=lambda x: (len(x), x))
+            [(2,),
+             (23,),
+             (2, 23),
+             (0, 1, 2),
+             (20, 23, 25),
+             (0, 1, 2, 23),
+             (2, 20, 23, 25),
+             (0, 1, 2, 3, 4, 5),
+             (0, 1, 2, 20, 23, 25),
+             (15, 20, 21, 23, 25, 26),
+             (0, 1, 2, 3, 4, 5, 23),
+             (2, 15, 20, 21, 23, 25, 26),
+             (0, 1, 2, 3, 4, 5, 20, 23, 25),
+             (0, 1, 2, 15, 20, 21, 23, 25, 26),
+             (0, 1, 2, 3, 4, 5, 15, 20, 21, 23, 25, 26),
+             (0, 1, 2, 3, 4, 5, 9, 10, 14, 15, 20, 21, 23, 25, 26)]
+            sage: for low_edges in vt.vertical_degeneration_low_edges_subsets():
+            ....:     fup, flow = vt.degeneration(edges_low=low_edges)
+            ....:     assert fup is not None and flow is not None
+            ....:     assert fup.is_delaunay() and flow.is_delaunay()
         """
-        cone = self.delaunay_cone()
-        dim = cone.space_dimension()
+        # For each edge e compute the face corresponding to x[e] == 0 and the face to y[e] == 0 (in H-rep)
+        delaunay_cone = self.delaunay_cone()
+        dim = delaunay_cone.affine_dimension()
+        base_ring = self.base_ring()
         ne = self._ne
-        L = LinearExpressions(self.base_ring())
-        x = [L.variable(e) for e in range(ne)]
-        y = [L.variable(ne + e) for e in range(ne)]
+        space_dim = 2 * ne
+        facets = delaunay_cone.facets()
+        rays = delaunay_cone.rays()
+        CP = delaunay_cone.combinatorial_polyhedron().face_generator()
+        vanishing_faces = [delaunay_cone.vanishing_face(e) for e in range(ne)]
+        vanishing_H_indices = [frozenset(face.ambient_H_indices()) for face in vanishing_faces]
+        facets_kind, facets_data = delaunay_cone.facets_kind_and_data()
 
         cylinders = collections.defaultdict(set)
         for middle, bot, top, _ in itertools.chain(self.cylinders(RED), self.cylinders(BLUE)):
@@ -4933,70 +4955,72 @@ class VeeringTriangulation(Triangulation):
             cylinders[top].update(bot)
             cylinders[top].update(middle)
 
-        def completion(vanishing_edges, vanishing_cone):
-            cs = ConstraintSystem(dim)
-            for e in vanishing_edges:
-                cs.insert(x[e] == 0)
-                cs.insert(y[e] == 0)
-
+        def complete(face):
+            # if x-degenerationn or y-degeneration facets -> complete with its friend
+            # if Delaunay -> add x-degeneration and y-degeneration correspond to a,b,c,d
             done = False
             while not done:
-                vanishing_cone = vanishing_cone.add_constraints(cs)
-
-                vanishing_indices = [True] * (2 * ne)
-                for r in vanishing_cone.rays():
-                    for i in range(2 * ne):
-                        if r[i]:
-                            vanishing_indices[i] = False
                 done = True
-                for i in range(ne):
-                    num = vanishing_indices[i] + vanishing_indices[ne + i]
-                    if num == 0:
-                        pass
-                    elif num == 1:
-                        cs.insert(x[i] == 0)
-                        cs.insert(y[i] == 0)
-                        done = False
-                        vanishing_edges.add(i)
-                    elif num == 2:
-                        vanishing_edges.add(i)
+                ambient_H_indices = set(face.ambient_H_indices())
 
-                # exclude horizontal degenerations
-                for bdry, forced in cylinders.items():
-                    if bdry.issubset(vanishing_edges) and not forced.issubset(vanishing_edges):
-                        for i in forced.difference(vanishing_edges):
-                            cs.insert(x[i] == 0)
-                            cs.insert(y[i] == 0)
-                        vanishing_edges.update(forced)
-                        done = False
+                # force compl
+                for i in list(ambient_H_indices):
+                    kind = facets_kind[i]
+                    if kind == "x" or kind == "y":
+                        # x or y degeneration
+                        for e in facets_data[i]:
+                            new_indices = vanishing_H_indices[e]
+                            if not new_indices.issubset(ambient_H_indices):
+                                done = False
+                                ambient_H_indices.update(new_indices)
+                    elif kind == "f" or kind == "b":
+                        # forward or backward Delaunay
+                        for e in facets_data[i]:
+                            a, b, c, d = self.square_about_half_edge(2 * e)
+                            new_indices = set().union(vanishing_H_indices[a // 2], vanishing_H_indices[b // 2], vanishing_H_indices[c // 2], vanishing_H_indices[d // 2])
+                        if not new_indices.issubset(ambient_H_indices):
+                            done = False
+                            ambient_H_indices.update(new_indices)
+                if not done:
+                    face = CP.meet_of_Hrep(*ambient_H_indices)
 
-            return frozenset(vanishing_edges), vanishing_cone
+            return face
 
-        # 1. for each edge, we compute inductively what needs to degenerate
-        # on the V-representation we can get the list of vanishing edges
-        ne = self.num_edges()
-        ans = [{} for _ in range(ne + 1)]
+        ans = [set() for _ in range(dim + 1)]
         for e in range(ne):
-            vanishing_edges = set([e])
-            vanishing_edges, vanishing_cone = completion(vanishing_edges, cone)
-            k = len(vanishing_edges)
-            ans[k][vanishing_edges] = vanishing_cone
+            e_face = complete(vanishing_faces[e])
+            assert e_face.dimension() % 2 == 1  # WARNING: there is a shift in dimension
+            codim = dim - (1 + e_face.dimension()) // 2
+            ans[codim].add(e_face.ambient_H_indices())
 
-        # 2. make all possible unions of such subsets
-        for i in range(1, ne):
-            for edges1, cone1 in ans[i].items():
-                for j in range(1, i + 1):
-                    for edges2, cone2 in ans[j].items():
-                        if edges1 != edges2:
-                            vanishing_edges = set().union(edges1, edges2)
-                            vanishing_cone = cone1.intersection(cone2)
-                            vanishing_edges, vanishing_cone = completion(vanishing_edges, vanishing_cone)
-                            k = len(vanishing_edges)
-                            ans[k][vanishing_edges] = vanishing_cone
+        for codim1 in range(1, dim):
+            for Hindices1 in ans[codim1]:
+                assert CP.meet_of_Hrep(*Hindices1).dimension() == 2 * dim - 2 * codim1 - 1
+                for codim2 in range(1, codim1 + 1):
+                    for Hindices2 in ans[codim2]:
+                        assert CP.meet_of_Hrep(*Hindices2).dimension() == 2 * dim - 2 * codim2 - 1
+                        if Hindices1 != Hindices2:
+                            new_face = CP.meet_of_Hrep(*Hindices1, *Hindices2)
+                            new_face = complete(new_face)
+                            assert new_face.dimension() % 2 == 1
+                            codim = dim - (1 + new_face.dimension()) // 2
+                            if codim == codim1:
+                                assert new_face.ambient_H_indices() == Hindices1, (face.ambient_H_indices(), Hindices1)
+                            elif codim == codim2:
+                                assert new_face.ambient_H_indices() == Hindices2, (face.ambient_H_indices(), Hindices2)
+                            else:
+                                assert codim > min(codim1, codim2), (codim, codim1, codim2)
+                                ans[codim].add(new_face.ambient_H_indices())
 
         output = []
-        for i in range(1, ne):
-            output.extend(sorted(tuple(sorted(t)) for t in ans[i]))
+        for codim in range(1, dim):
+            for Hindices in ans[codim]:
+                face = CP.meet_of_Hrep(*Hindices)
+                frays = [rays[i] for i in face.ambient_V_indices()]
+                vanishing_edges1 = [e for e in range(ne) if all(r[e] == 0 for r in frays)]
+                vanishing_edges2 = [e for e in range(ne) if all(r[ne + e] == 0 for r in frays)]
+                assert vanishing_edges1 == vanishing_edges2
+                output.append(tuple(vanishing_edges1))
         return output
 
     def codimension_one_vertical_degenerations(self, mutable=False, mapping=False):
@@ -5013,11 +5037,7 @@ class VeeringTriangulation(Triangulation):
              (H_2(2), H_0(1^2, -4)),
              (H_1(0^2), H_0(1^2, -2^2)),
              (H_1(0^2), H_0(1^2, -2^2)),
-             (H_1(0^2), H_0(1^2, -2^2)),
-             (H_1(0), H_1(1^2, -2)),
-             (H_1(0^2), H_0(1^2, -2^2)),
-             (H_1(0), H_1(1^2, -2)),
-             (H_1(0), H_1(1^2, -2))]
+             (H_1(0^2), H_0(1^2, -2^2))]
 
         TESTS:
 
@@ -5032,7 +5052,7 @@ class VeeringTriangulation(Triangulation):
             sage: f = VeeringTriangulationLinearFamily(vt, subspace)
             sage: assert all(f_up is not None for f_up in f.codimension_one_vertical_degenerations())
             sage: half_edges = set(f.half_edges())
-            sage: for edges_low in f.vertical_degeneration_low_edges_subsets():
+            sage: for edges_low in sorted(f.vertical_degeneration_low_edges_subsets(), key=lambda x: (len(x), x)):
             ....:     print(edges_low, tuple(sorted(half_edges.difference(edges_low))))
             (0, 16, 25) (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 23, 24, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53)
             (5, 12, 23) (0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53)
@@ -5041,15 +5061,6 @@ class VeeringTriangulation(Triangulation):
             sage: for edges_up in f.horizontal_degeneration_up_edges_subsets():
             ....:     print(tuple(sorted(half_edges.difference(edges_up))), edges_up)
             (0, 5, 8, 12, 13, 16, 18, 23, 25, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53) (1, 2, 3, 4, 6, 7, 9, 10, 11, 14, 15, 17, 19, 20, 21, 22, 24, 26)
-
-        Another example that used to be wrong::
-
-            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,5,~4)(~3,6,7)(4,8,~5)(~6,9,10)(~7,11,12)(~8,~10,~12)(~9,13,14)(~11,15,16)(~13,~14,17)(~15,~16,~17)", "RBBBRRRBBBRBRRRRBB")
-            sage: subspace = [(1, 0, -1, -1, 0, 1, 1, 0, -1, -1, 2, -1, 1, 1, 0, 1, 0, -1),
-            ....:             (0, 1, 1, 1, 0, -1, 1, 2, 1, 1, 0, 1, 1, -1, 0, 0, 1, 1),
-            ....:             (0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0)]
-            sage: f = VeeringTriangulationLinearFamily(vt, subspace)
-            sage: assert all(f_up.is_delaunay() and f_low.is_delaunay() for f_up, f_low in vt.codimension_one_vertical_degenerations()) # known bug
         """
         for edges in self.vertical_degeneration_low_edges_subsets():
             yield self.degeneration(edges_low=edges, mutable=mutable)
