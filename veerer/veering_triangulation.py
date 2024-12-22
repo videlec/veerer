@@ -1724,7 +1724,7 @@ class VeeringTriangulation(Triangulation):
 
             sage: faces = "(0,1,2)(~0,~4,~2)(3,4,5)(~3,~1,~5)"
             sage: cols = [BLUE,RED,RED,BLUE,RED,RED]
-            sage: T = VeeringTriangulation(faces, cols)
+            sage: T = VeeringTriangulation(faces, cols, mutable=True)
             sage: T.rotate()
             sage: T
             VeeringTriangulation("(0,1,2)(~0,~4,~2)(~1,~5,~3)(3,4,5)", "RBBRBB")
@@ -1751,7 +1751,22 @@ class VeeringTriangulation(Triangulation):
             sage: T.rotate()
             sage: T
             VeeringTriangulation("(0,1,2)(~0,~4,~2)(~1,~5,~3)(3,4,5)", "BRPBRP")
+
+        Forward and backward delaunay flips are interchanged under a rotation::
+
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "RRBBRBBBR", mutable=True)
+            sage: sorted(vt.delaunay_flips())
+            [([1], 1), ([1], 2), ([5, 6], 1), ([5, 6], 2)]
+            sage: sorted(vt.backward_delaunay_flips())
+            [([0], 1), ([0], 2), ([7], 1), ([7], 2)]
+            sage: vt.rotate()
+            sage: sorted(vt.delaunay_flips())
+            [([0], 1), ([0], 2), ([7], 1), ([7], 2)]
+            sage: sorted(vt.backward_delaunay_flips())
+            [([1], 1), ([1], 2), ([5, 6], 1), ([5, 6], 2)]
         """
+        if not self._mutable:
+            raise ValueError('immutable veering triangulation; use a mutable copy instead')
         for i, col in enumerate(self._colouring):
             if col == RED:
                 self._colouring[i] = BLUE
@@ -2191,7 +2206,7 @@ class VeeringTriangulation(Triangulation):
 
             sage: from veerer import VeeringTriangulation, BLUE, RED
 
-            sage: T = VeeringTriangulation("(0,~4,5)(1,~0,6)(2,8,~1)(3,~7,~2)(4,~3,7)(~8,9,~11)(10,~5,~9)(11,~6,~10)", "BBBBBRRRRBBB")
+            sage: T = VeeringTriangulation("(0,~4,5)(1,~0,6)(2,8,~1)(3,~7,~2)(4,~3,7)(~8,9,~11)(10,~5,~9)(11,~6,~10)", "BBBBBRRRRBBB", mutable=True)
             sage: b1, b2 = T.dehn_twists(BLUE)
             sage: b1
             VeeringFlipSequence(VeeringTriangulation("(0,~4,5)...(~8,9,~11)", "BBBBBRRRRBBB"), "1B 0B 4B 2B 1B 0B", "(0,3,1,4,~2)(~0,~3,~1,~4,2)")
@@ -3922,7 +3937,7 @@ class VeeringTriangulation(Triangulation):
             sage: T.is_balanced()  # not tested
             False
 
-            sage: T = VeeringTriangulation("(0,1,8)(2,~7,~1)(3,~0,~2)(4,~5,~3)(5,6,~4)(7,~8,~6)", "BRRRRBRBR")
+            sage: T = VeeringTriangulation("(0,1,8)(2,~7,~1)(3,~0,~2)(4,~5,~3)(5,6,~4)(7,~8,~6)", "BRRRRBRBR", mutable=True)
             sage: T.is_balanced()  # not tested
             False
             sage: T.rotate()
@@ -4249,9 +4264,9 @@ class VeeringTriangulation(Triangulation):
         eqns = matrix(base_ring, P.eqns())
         delaunay_facets = {}
         for e in self.backward_flippable_edges():
-            a, b, c, d = self.square_about_half_edge(e, check=False)
-            constraint = y[e // 2] == x[a // 2] + x[d // 2]
-            constraint = constraint.coefficients(dim=2*ne, homogeneous=True)
+            a, b, c, d = self.square_about_half_edge(2 * e, check=False)
+            constraint = y[e] == x[a // 2] + x[d // 2]
+            constraint = constraint.coefficients(dim=2 * ne, homogeneous=True)
             linear_form_project(eqns, constraint)
             vector_normalize(base_ring, constraint)
             constraint = tuple(constraint)
@@ -4270,10 +4285,10 @@ class VeeringTriangulation(Triangulation):
 
             # test each edge colour conditions
             # NOTE: all simultaneous flips must be of the same colour
-            assert all(self._colouring[e // 2] == self._colouring[edges[0] // 2] for e in edges)
+            assert all(self._colouring[e] == self._colouring[edges[0]] for e in edges)
             # NOTE: the equations for the different edges are all equivalent, it
             # is hence enough to use the first edge
-            a, b, c, d = self.square_about_half_edge(edges[0], check=False)
+            a, b, c, d = self.square_about_half_edge(2 * edges[0], check=False)
             Fred = F.add_constraint(y[a // 2] <= y[d // 2])
             if Fred.affine_dimension() == 2 * dim - 1:
                 neighbours.append((edges, BLUE))
