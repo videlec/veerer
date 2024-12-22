@@ -126,6 +126,18 @@ class Cone:
         return 'Cone of dimension {} in ambient dimension {} made of {} facets (backend={})'.format(
                 self.affine_dimension(), self.space_dimension(), len(self.ieqs()), self._name)
 
+    def __eq__(self, other):
+        if type(self) is not type(other):
+            raise TypeError
+
+        return self._cone == other._cone
+
+    def __ne__(self, other):
+        if type(self) is not type(other):
+            raise TypeError
+
+        return self._cone != other._cone
+
     def space_dimension(self):
         raise NotImplementedError
 
