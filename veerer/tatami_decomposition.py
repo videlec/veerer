@@ -30,8 +30,11 @@ def tatami_decomposition(rectangles, base_ring=None):
     r"""
     Return a sage-flatsurf surface built from the given ``rectangles``
 
-    Each point is identified by its position on a separatrix. It is encoded in
-    a triple ``(separatrix_label, side, distance_to_singularity)`` where
+    A tatami decomposition is a decomposition of a translation surface such
+    that all sides of all rectangles are on horizontal or vertical
+    separatrices. Each vertex of the decomposition is identified by its
+    position on a separatrix. It is encoded in a triple ``(separatrix_label,
+    side, distance_to_singularity)`` where
     - ``separatrix_label``: is a label identifying a separatrix
     - ``side``: specifies either left (``LEFT``) or right (``RIGHT``) of the separatrix
     - ``distance_to_singularity``: a positive real number
