@@ -377,7 +377,7 @@ class IrreducibleRealLinearSubvariety:
     def rank(self):
         raise NotImplementedError
 
-    def strebel_delaunay_graph(self, level):
+    def delaunay_strebel_graph(self, level):
         level = self._check_level(level)
         return self._levels[level]
 
@@ -423,7 +423,7 @@ class IrreducibleRealLinearSubvariety:
 
         level = self._check_level(level)
         automata = []
-        DSgraphs = self.strebel_delaunay_graph(level)
+        DSgraphs = self.delaunay_strebel_graph(level)
         for DSgraph_num, DSgraph in enumerate(DSgraphs):
             non_primes = []
             non_prime_degenerations = set()
@@ -520,7 +520,7 @@ class IrreducibleRealLinearSubvariety:
         level = self._check_level(level)
         degenerations = set()
         ans = []
-        DSgraphs = self.strebel_delaunay_graph(level)
+        DSgraphs = self.delaunay_strebel_graph(level)
         for DSgraph_num, DSgraph in enumerate(DSgraphs):
             for state in DSgraph:
                 if isinstance(state, VeeringTriangulation):
