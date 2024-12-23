@@ -248,6 +248,65 @@ class VeeringTriangulation(Triangulation):
     def base_ring(self):
         return ZZ
 
+    def non_degenerate_triangles(self, slope=VERTICAL):
+        r"""
+        Iterate through non-degenerate triangles.
+
+        Triple of half-edges are ordered such that the first is always the large edge.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,3,8)(~0,5,6)(~3,4,2)(~4,1,7)", "BBBRRRRRR")
+            sage: list(vt.non_degenerate_triangles())
+            [(16, 0, 6), (12, 1, 10), (9, 2, 14), (8, 4, 7)]
+        """
+        if slope == VERTICAL:
+            LAR = PURPLE
+            POS = RED
+            NEG = BLUE
+        elif slope == HORIZONTAL:
+            LAR = GREEN
+            POS = BLUE
+            NEG = RED
+
+        for a, b, c in self.triangles():
+            cola = self._colouring[a // 2]
+            colb = self._colouring[b // 2]
+            colc = self._colouring[c // 2]
+            if colb == NEG and colc == POS:
+                yield (a, b, c)
+            elif colc == NEG and cola == POS:
+                yield (b, c, a)
+            elif cola == NEG and colb == POS:
+                yield (c, a, b)
+
+    def degenerate_triangles(self, slope=VERTICAL):
+        r"""
+        Iterate through degenerate triangles.
+
+        Triple of half-edges are ordered such that the first is always the degenerate edge.
+        """
+        if slope == VERTICAL:
+            ZERO = GREEN
+            POS = RED
+            NEG = BLUE
+        elif slope == HORIZONTAL:
+            ZERO = PURPLE
+            POS = BLUE
+            NEG = RED
+
+        for a, b, c in self.triangles():
+            cola = self._colouring[a // 2]
+            colb = self._colouring[b // 2]
+            colc = self._colouring[c // 2]
+            if cola == ZERO:
+                yield (a, b, c)
+            elif colb == ZERO:
+                yield (b, c, a)
+            elif colc == ZERO:
+                yield (c, a, b)
+
     def right_wedges(self, slope=VERTICAL):
         r"""
         Return the (vertical or horizontal) right sides of the wedges in this veering triangulation.
@@ -264,26 +323,11 @@ class VeeringTriangulation(Triangulation):
             sage: from veerer import VeeringTriangulation, VERTICAL, HORIZONTAL
             sage: vt = VeeringTriangulation("(0,1,2)(3,4,5)(6,7,8)(~8,~0,~7)(~6,~1,~5)(~4,~2,~3)", "RRBRRBRRB")
             sage: vt.right_wedges(VERTICAL)
-            [0, 1, 6, 7, 12, 13]
+            [0, 1, 13, 7, 6, 12]
             sage: vt.right_wedges(HORIZONTAL)
-            [4, 5, 10, 11, 16, 17]
+            [4, 17, 11, 5, 10, 16]
         """
-        if slope == VERTICAL:
-            right_colour = RED
-            left_colour = BLUE
-        elif slope == HORIZONTAL:
-            right_colour = BLUE
-            left_colour = RED
-        else:
-            raise ValueError('invalid slope argument')
-
-        vp = self._vp
-        wedges = []
-        for i in range(2 * self._ne):
-            j = vp[i]
-            if j != -1 and not self._bdry[i] and self.half_edge_colour(i) == right_colour and self.half_edge_colour(vp[i]) == left_colour:
-                wedges.append(i)
-        return wedges
+        return [c for a, b, c in self.non_degenerate_triangles(slope)]
 
     def as_linear_family(self, mutable=False):
         r"""
@@ -2701,70 +2745,120 @@ class VeeringTriangulation(Triangulation):
             Gx.add_multiple_of_column(e, a, +1)
             Gx.add_multiple_of_column(e, b, +1)
 
+    def intersection_form(self):
+        r"""
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,3,8)(~0,5,6)(~3,4,2)(~4,1,7)", "BBBRRRRRR")
+            sage: I = vt.intersection_form()
+            sage: I
+            [ 0  0  0  0  0  0  0  0  0]
+            [ 0  0  0  0  0  0  0  0  0]
+            [ 0  0  0  0  0  0  0  0  0]
+            [ 0  0  0  0  1  0  0  0  1]
+            [ 0  0  0 -1  0  0  0 -1  0]
+            [ 0  0  0  0  0  0  1  0  0]
+            [ 0  0  0  0  0 -1  0  0  0]
+            [ 0  0  0  0  1  0  0  0  0]
+            [ 0  0  0 -1  0  0  0  0  0]
+        """
+        if any(c == PURPLE or c == GREEN for c in self._colouring):
+            raise NotImplementedError
+
+        m = matrix(ZZ, self._ne)
+        for a, b, c in self.triangles():
+            b //= 2
+            c //= 2
+            m[b, c] = 1
+            m[c, b] = -1
+        return m
+
+    def rank(self):
+        r"""
+        EXAMPLES::
+
+            sage: from veerer import *
+
+        An example in Q_0(2, -1^6)::
+
+            sage: VeeringTriangulation("(0,3,8)(~0,5,6)(~3,4,2)(~4,1,7)", "BBBRRRRRR").rank()
+            2
+
+        Abelian principal stratum in genus 3::
+
+            sage: vt = VeeringTriangulation("(0,16,~15)(~0,~14,15)(1,19,~18)(~1,~23,8)(2,22,~21)(~2,~8,9)(3,21,~20)(~3,~9,10)(4,20,~19)(~4,~10,11)(5,23,~22)(~5,~11,12)(6,18,~17)(~6,~12,13)(7,17,~16)(~7,~13,14)", "RRRRRRRRBBBBBBBBBBBBBBBB")
+            sage: vt.rank()
+            3
+
+        A Teichmueller curve in Q_0(1, -1^5)::
+
+            sage: T, s, t = VeeringTriangulations.L_shaped_surface(1, 1, 1, 1)
+            sage: f = VeeringTriangulationLinearFamily(T, [s, t])
+            sage: f.rank()
+            1
+
+        An eigenform locus in Q_0(2, -1^6)::
+
+            sage: X9 = VeeringTriangulationLinearFamilies.prototype_H1_1(0, 2, 1, -1)
+            sage: X9.rank()
+            1
+
+        Gothic locus::
+
+            sage: vt = VeeringTriangulation("(0,1,2)(3,4,~0)(5,6,~1)(7,~2,8)(9,~3,~6)(10,~7,~4)(11,~5,12)(13,14,~8)(15,~9,16)(17,18,~10)(19,~17,~11)(20,~13,~12)(21,~14,~18)(22,~21,~15)(23,24,~16)(25,~23,~19)(26,~20,~25)(~26,~24,~22)", "RBBRBRBRRBRBBRBBRRBRRRBBRRB")
+            sage: subspace = [(1, 0, -1, 0, -1, 0, 0, 0, 1, 0, 1, -1, -1, 0, -1, 0, 0, 0, -1, 1, 1, 0, 0, -1, 1, 0, -1),
+            ....:             (0, 1, 1, 0, 0, 1, 2, 0, -1, 2, 0, 0, 1, 0, 1, 2, 0, 0, 0, 0, -1, 1, 1, 0, 0, 0, 1),
+            ....:             (0, 0, 0, 1, 1, 1, 1, 0, 0, 0, -1, 1, 2, 2, 2, 1, 1, 0, 1, -1, 0, 1, 0, 1, 0, 0, 0),
+            ....:             (0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 1, 2, 1, 0, 0, 2, 1, 1, 1, 0, 0, 0, 0, 1, 0)]
+            sage: f = VeeringTriangulationLinearFamily(vt, subspace)
+            sage: f.rank()
+            2
+
+        An eigenform locus in Q_1(2, 1, -1^3)::
+
+            sage: f = VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,6,7)(~4,8,9)(~5,~7,10)(~9,~10,11)", "RRBBBRRBRRBR", [(1, 0, -1, -1, 0, -1, -2, -3, 0, 0, -2, 2), (0, 1, 1, 1, 0, 1, 2, 3, 2, 2, 2, 0), (0, 0, 0, 0, 1, -1, -2, -2, -2, -1, -1, 0)])
+            sage: f.rank()
+            1
+        """
+        if any(self._bdry):
+            raise NotImplementedError
+
+        gens = self.generators_matrix()
+        I = gens * self.intersection_form() * gens.transpose()
+        r = I.rank()
+        if r % 2:
+            raise ValueError
+        return r // 2
+
     def _set_train_track_constraints_fast(self, cs, L, slope):
         zero = L.base_ring().zero()
         one = L.base_ring().one()
         m_one = -one
         ne = self.num_edges()
-        ep = self._ep
         if slope == VERTICAL:
-            LAR = PURPLE
-            POS = BLUE
-            NEG = RED
-            ZERO = GREEN
             shift = 0
         elif slope == HORIZONTAL:
-            LAR = GREEN
-            POS = RED
-            NEG = BLUE
-            ZERO = PURPLE
             shift = ne
         else:
-            raise ValueError('bad slope parameter')
+            raise ValueError("invalid slope parameter; must be VERTICAL or HORIZONTAL")
 
         # switch
-        for (i, j, k) in self.triangles():
-            i = i // 2
-            ci = self._colouring[i]
-            j = j // 2
-            cj = self._colouring[j]
-            k = k // 2
-            ck = self._colouring[k]
+        for (i, j, k) in self.degenerate_triangles(slope):
+            # i is degenerate
+            # x[i] = 0
+            # x[j] - x[k] = 0
+            cs.insert(L.element_class(L, {shift + i // 2: one}, zero) == zero, check=False)
+            cs.insert(L.element_class(L, {shift + j // 2: one, shift + k // 2: m_one}, zero) == zero, check=False)
 
-            if ci == ZERO and cj == NEG and ck == POS:
-                # i is degenerate
-                cs.insert(L.element_class(L, {shift + i: one}, zero) == zero, check=False)
-                if i != k:
-                    cs.insert(L.element_class(L, {shift + i: one, shift + k: m_one}, zero) == zero, check=False)
-            elif cj == ZERO and ck == NEG and ci == POS:
-                # j is degenerate
-                cs.insert(L.element_class(L, {shift + j: one}, zero) == zero, check=False)
-                if i != k:
-                    cs.insert(L.element_class(L, {shift + k: one, shift + i: m_one}, zero) == zero, check=False)
-            elif ck == ZERO and ci == NEG and cj == POS:
-                # k is degenerate
-                cs.insert(L.element_class(L, {shift + k: one}, zero) == zero, check=False)
-                if i != j:
-                    cs.insert(L.element_class(L, {shift + i: one, shift + j: m_one}, zero) == zero, check=False)
-            elif ck == LAR or (ci == POS and cj == NEG):
-                # k is large
-                cs.insert(L.element_class(L, {shift + k: one, shift + i: m_one, shift + j: m_one}, zero) == zero, check=False)
-            elif ci == LAR or (cj == POS and ck == NEG):
-                # i is large
-                cs.insert(L.element_class(L, {shift + i: one, shift + j: m_one, shift + k: m_one}, zero) == zero, check=False)
-            elif cj == LAR or (ck == POS and ci == NEG):
-                # j is large
-                cs.insert(L.element_class(L, {shift + j: one, shift + k: m_one, shift + i: m_one}, zero) == zero, check=False)
-            else:
-                raise ValueError('can not determine the nature of triangle (%s, %s, %s) with colors (%s, %s, %s) in %s direction' %
-                                 (self._edge_rep(i), self._edge_rep(j), self._edge_rep(k),
-                                  colour_to_string(ci), colour_to_string(cj), colour_to_string(ck),
-                                  'horizontal' if slope == HORIZONTAL else 'vertical'))
+        for (i, j, k) in self.non_degenerate_triangles(slope):
+            # i is large
+            # x[i] - x[j] - x[k] == 0
+            cs.insert(L.element_class(L, {shift + i // 2: one, shift + j // 2: m_one, shift + k // 2: m_one}, zero) == zero, check=False)
 
         # non-negativity
         for e in range(ne):
-            if self._colouring[e] != ZERO:
-                cs.insert(L.element_class(L, {shift + e: one}, zero) >= zero, check=False)
+            cs.insert(L.element_class(L, {shift + e: one}, zero) >= zero, check=False)
 
     def _set_switch_conditions(self, insert, x, slope=VERTICAL):
         r"""
@@ -2797,53 +2891,14 @@ class VeeringTriangulation(Triangulation):
             (0, 0, 0, 1, -1, 1, 0, 0, 0)
             (0, 0, 0, 0, 0, 0, 1, -1, 1)
         """
-        if slope == VERTICAL:
-            LAR = PURPLE
-            POS = BLUE
-            NEG = RED
-            ZERO = GREEN
-        elif slope == HORIZONTAL:
-            LAR = GREEN
-            POS = RED
-            NEG = BLUE
-            ZERO = PURPLE
-        else:
-            raise ValueError('bad slope parameter')
+        for (i, j, k) in self.degenerate_triangles(slope):
+            # i is degenerate
+            insert(x[i // 2] == 0)
+            insert(x[j // 2] == x[k // 2])
 
-        for (i, j, k) in self.triangles():
-            i = i // 2
-            ci = self._colouring[i]
-            j = j // 2
-            cj = self._colouring[j]
-            k = k // 2
-            ck = self._colouring[k]
-
-            if ci == ZERO and cj == NEG and ck == POS:
-                # i is degenerate
-                insert(x[i] == 0)
-                insert(x[j] == x[k])
-            elif cj == ZERO and ck == NEG and ci == POS:
-                # j is degenerate
-                insert(x[j] == 0)
-                insert(x[k] == x[i])
-            elif ck == ZERO and ci == NEG and cj == POS:
-                # k is degenerate
-                insert(x[k] == 0)
-                insert(x[i] == x[j])
-            elif ck == LAR or (ci == POS and cj == NEG):
-                # k is large
-                insert(x[k] == x[i] + x[j])
-            elif ci == LAR or (cj == POS and ck == NEG):
-                # i is large
-                insert(x[i] == x[j] + x[k])
-            elif cj == LAR or (ck == POS and ci == NEG):
-                # j is large
-                insert(x[j] == x[k] + x[i])
-            else:
-                raise ValueError('can not determine the nature of triangle (%s, %s, %s) with colors (%s, %s, %s) in %s direction' %
-                                 (self._edge_rep(i), self._edge_rep(j), self._edge_rep(k),
-                                  colour_to_string(ci), colour_to_string(cj), colour_to_string(ck),
-                                  'horizontal' if slope == HORIZONTAL else 'vertical'))
+        for (i, j, k) in self.non_degenerate_triangles(slope):
+            # i is large
+            insert(x[i // 2] == x[j // 2] + x[k // 2])
 
     @staticmethod
     def _constraint_check(x, error=AssertionError):
@@ -3261,7 +3316,7 @@ class VeeringTriangulation(Triangulation):
         zero = R.zero()
         one = R.one()
         ne = self.num_edges()
-        cs = ConstraintSystem()
+        cs = ConstraintSystem(2 * ne)
         for i in range(2 * ne):
             cs.insert(LinearConstraint(op_GE, L.element_class(L, {i : one}, zero)), check=False)
         self._set_delaunay_constraints_fast(cs, L)
