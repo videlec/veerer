@@ -4250,6 +4250,8 @@ class VeeringTriangulation(Triangulation):
             c //= 2
             d //= 2
             colours = 0
+            # TODO: here we do not need to run through all rays. It is actually
+            # sufficient to run through a basis of the support of the facet.
             for i in facet.ambient_V_indices():
                 r = rays[i]
                 if r[ne + b] > r[ne + a]:
@@ -4688,12 +4690,10 @@ class VeeringTriangulation(Triangulation):
         ne_up = len(edges_up) - n_mix
         n_up = len(half_edges_up) - 2 * n_mix
 
-        # build the upper level: we construct only the edge permutation ep_up
-        # and the face permutation fp_up
+        # build the upper level (only the face permutation fp_up)
         relabelling_up = {}
         vertical_nodes = []
         if n_up:
-            ep_up = array('i', [-1] * n_up)
             fp_up = array('i', [-1] * n_up)
             angle_excess_up = array('i', [0] * n_up)
             colouring_up = array('i', [0] * ne_up)
@@ -4730,9 +4730,9 @@ class VeeringTriangulation(Triangulation):
                 # in the upper veering triangulation). We simply apply the formula
                 #   new_angle_excess = sum(angle excesses of contracted edges) - length + alternations / 2
                 col = colouring[e // 2]
-                excess = bdry[e]
+                excess = 0        # excess collected
                 alternations = 0  # number of alternations (including start and end)
-                length = 0  # number of edges that degenerate along the face
+                length = 0        # number of edges that degenerate along the face
                 ee = fp[e]
                 while ee not in half_edges_up:
                     excess += bdry[ee]
@@ -4742,9 +4742,10 @@ class VeeringTriangulation(Triangulation):
                     ee = fp[ee]
                 alternations += colouring[ee // 2] != col
                 alternations -= colouring[ee // 2] != colouring[e // 2]  # alternation after degeneration
+                excess += bdry[ee]
                 fp_up[relabelling_up[e]] = relabelling_up[ee]
                 assert alternations % 2 == 0
-                angle_excess_up[relabelling_up[e]] = excess - length + alternations // 2
+                angle_excess_up[relabelling_up[ee]] = excess - length + alternations // 2
 
             vt_up = VeeringTriangulation.from_permutations(None, fp_up, (angle_excess_up,), (colouring_up,), mutable=mutable, check=check)
 
@@ -4897,7 +4898,7 @@ class VeeringTriangulation(Triangulation):
                 del angles_deg[angles_deg.index(a)]
             assert len(angles_deg) % 2 == 0 and all(a == 0 for a in angles_deg)
 
-       # TODO: also return relabelling and horiz/vert nodes data
+        # TODO: also return relabelling and horiz/vert nodes data
         return (f_up, f_low)
 
     def horizontal_degeneration_up_edges_subsets(self):
@@ -5116,6 +5117,17 @@ class VeeringTriangulation(Triangulation):
             sage: for edges_up in f.horizontal_degeneration_up_edges_subsets():
             ....:     print(tuple(sorted(half_edges.difference(edges_up))), edges_up)
             (0, 5, 8, 12, 13, 16, 18, 23, 25, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53) (1, 2, 3, 4, 6, 7, 9, 10, 11, 14, 15, 17, 19, 20, 21, 22, 24, 26)
+
+        Another example that used to be wrong::
+
+            sage: vt = VeeringTriangulation("(0:1,1:1,~0:1,2:1,3:3)(~1:1,4:1,~3:1,~2:3,~4:1)", "BRRRB")
+            sage: f_up, f_low = vt.degeneration(edges_low=(1,))
+            sage: f_up
+            VeeringTriangulationLinearFamily("(0:1,~0:2,1:1,2:3)(~1:3,~3:1,3:2,~2:1)", "BRRB", [(1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)])
+            sage: f_low
+            VeeringTriangulationLinearFamily("(0:3)(~0:3)", "R", [(1)])
+            sage: (f_up.stratum(), f_low.stratum())  # optional - surface_dynamics
+            (H_0(2^2, 0^2, -3^2), H_0(2, -2^2))
         """
         for edges in self.vertical_degeneration_low_edges_subsets():
             yield self.degeneration(edges_low=edges, mutable=mutable, check=check)
