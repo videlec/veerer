@@ -4746,7 +4746,7 @@ class VeeringTriangulation(Triangulation):
                 assert alternations % 2 == 0
                 angle_excess_up[relabelling_up[e]] = excess - length + alternations // 2
 
-            vt_up = VeeringTriangulation.from_permutations(None, fp_up, (angle_excess_up,), (colouring_up,), mutable=mutable)
+            vt_up = VeeringTriangulation.from_permutations(None, fp_up, (angle_excess_up,), (colouring_up,), mutable=mutable, check=check)
 
         else:
             vt_up = None
@@ -4781,7 +4781,7 @@ class VeeringTriangulation(Triangulation):
             assert (alternations % 2 == 0) == (colouring[e // 2] == colouring[ee // 2])
             angle_excess_low[relabelling_low[e]] = excess + alternations // 2
 
-        vt_low = VeeringTriangulation.from_permutations(vp_low, None, (angle_excess_low,), (colouring_low,), mutable=mutable)
+        vt_low = VeeringTriangulation.from_permutations(vp_low, None, (angle_excess_low,), (colouring_low,), mutable=mutable, check=check)
 
         edges_up = sorted(edges_up)
         edges_low = sorted(edges_low)
@@ -4815,12 +4815,12 @@ class VeeringTriangulation(Triangulation):
             half_edges_up_to_edge_index = {2 * e: i for i, e in enumerate(edges_up)}
             half_edges_up_to_edge_index.update({ep(e): i for e, i in half_edges_up_to_edge_index.items()})
             representatives = [half_edges_up_to_edge_index[e] for e, e_up in relabelling_up.items() if e_up % 2 == 0]
-            f_up = VeeringTriangulationLinearFamily(vt_up, generators_up.matrix_from_columns(representatives), mutable=mutable)
+            f_up = VeeringTriangulationLinearFamily(vt_up, generators_up.matrix_from_columns(representatives), mutable=mutable, check=check)
         else:
             # horizontal degeneration
             f_up = None
 
-        f_low = VeeringTriangulationLinearFamily(vt_low, constraints_low.right_kernel_matrix().__copy__(), mutable=mutable)
+        f_low = VeeringTriangulationLinearFamily(vt_low, constraints_low.right_kernel_matrix().__copy__(), mutable=mutable, check=check)
 
         # Build horizontal nodes coming from cylinders blow-up (for horizontal degeneration)
         cylinders = []
@@ -4910,7 +4910,7 @@ class VeeringTriangulation(Triangulation):
                             edges.add(i)
                 yield tuple(sorted(edges))
 
-    def codimension_one_horizontal_degenerations(self, mutable=False, mapping=False):
+    def codimension_one_horizontal_degenerations(self, mutable=False, mapping=False, check=True):
         r"""
         Return codimension one horizontal degenerations.
 
@@ -4934,7 +4934,7 @@ class VeeringTriangulation(Triangulation):
         if mapping:
             raise NotImplementedError
         for edges in self.horizontal_degeneration_up_edges_subsets():
-            yield self.degeneration(edges_up=edges, mutable=mutable)
+            yield self.degeneration(edges_up=edges, mutable=mutable, check=check)
 
     def vertical_degeneration_low_edges_subsets(self):
         r"""
@@ -5078,7 +5078,7 @@ class VeeringTriangulation(Triangulation):
                 output.append(tuple(vanishing_edges1))
         return output
 
-    def codimension_one_vertical_degenerations(self, mutable=False, mapping=False):
+    def codimension_one_vertical_degenerations(self, mutable=False, mapping=False, check=True):
         r"""
         Return codimension one vertical degenerations.
 
@@ -5118,7 +5118,7 @@ class VeeringTriangulation(Triangulation):
             (0, 5, 8, 12, 13, 16, 18, 23, 25, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53) (1, 2, 3, 4, 6, 7, 9, 10, 11, 14, 15, 17, 19, 20, 21, 22, 24, 26)
         """
         for edges in self.vertical_degeneration_low_edges_subsets():
-            yield self.degeneration(edges_low=edges, mutable=mutable)
+            yield self.degeneration(edges_low=edges, mutable=mutable, check=check)
 
     def is_half_edge_strebel(self, e, slope=VERTICAL, check=True):
         r"""
