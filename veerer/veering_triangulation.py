@@ -2753,26 +2753,52 @@ class VeeringTriangulation(Triangulation):
             sage: vt = VeeringTriangulation("(0,3,8)(~0,5,6)(~3,4,2)(~4,1,7)", "BBBRRRRRR")
             sage: I = vt.intersection_form()
             sage: I
+            [ 0  0  0  1  0  1  0  0  0]
+            [ 0  0  0  0  0  0  0  1  0]
+            [ 0  0  0  1  0  0  0  0  0]
+            [-1  0 -1  0  0  0  0  0  0]
             [ 0  0  0  0  0  0  0  0  0]
+            [-1  0  0  0  0  0  0  0  0]
             [ 0  0  0  0  0  0  0  0  0]
+            [ 0 -1  0  0  0  0  0  0  0]
             [ 0  0  0  0  0  0  0  0  0]
-            [ 0  0  0  0  1  0  0  0  1]
-            [ 0  0  0 -1  0  0  0 -1  0]
-            [ 0  0  0  0  0  0  1  0  0]
-            [ 0  0  0  0  0 -1  0  0  0]
-            [ 0  0  0  0  1  0  0  0  0]
-            [ 0  0  0 -1  0  0  0  0  0]
         """
         if any(c == PURPLE or c == GREEN for c in self._colouring):
             raise NotImplementedError
 
+        if any(self._bdry):
+            raise NotImplementedError
+
         m = matrix(ZZ, self._ne)
-        for a, b, c in self.triangles():
+        for a, b, c in self.non_degenerate_triangles():
             b //= 2
             c //= 2
             m[b, c] = 1
             m[c, b] = -1
         return m
+
+    def relative_generators_matrix(self):
+        r"""
+        EXAMPLES::
+
+            sage: from veerer import *
+
+            sage: VeeringTriangulation("(0,~5,4)(~0,~2,3)(1,2,5)(~1,~3,~4)", "RRBBRB").relative_generators_matrix().echelon_form()
+            [ 1 -1  0 -1  0  1]
+            sage: VeeringTriangulation("(0,6,~5)(~0,~4,5)(1,3,8)(~1,~6,~7)(2,~8,7)(~2,~3,4)", "RRRBBBBRB").relative_generators_matrix().echelon_form()
+            []
+            sage: VeeringTriangulation("(0,~5,~4)(~0,7,9)(1,5,~7)(~1,10,~9)(2,11,~6)(~2,~11,8)(3,~8,~10)(~3,6,4)", "RRBBBRRBRRBR").relative_generators_matrix().echelon_form()
+            [ 1 -1  2 -1 -1  0  0  1  0  0 -1 -2]
+        """
+        if any(self._bdry):
+            raise NotImplementedError
+
+        G = self.generators_matrix()
+        I = G * self.intersection_form() * G.transpose()
+        return I.right_kernel_matrix() * G
+
+    def relative_dimension(self):
+        return self.relative_generators_matrix().nrows()
 
     def rank(self):
         r"""
@@ -2820,16 +2846,26 @@ class VeeringTriangulation(Triangulation):
             sage: f = VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,6,7)(~4,8,9)(~5,~7,10)(~9,~10,11)", "RRBBBRRBRRBR", [(1, 0, -1, -1, 0, -1, -2, -3, 0, 0, -2, 2), (0, 1, 1, 1, 0, 1, 2, 3, 2, 2, 2, 0), (0, 0, 0, 0, 1, -1, -2, -2, -2, -1, -1, 0)])
             sage: f.rank()
             1
-        """
-        if any(self._bdry):
-            raise NotImplementedError
 
-        gens = self.generators_matrix()
-        I = gens * self.intersection_form() * gens.transpose()
-        r = I.rank()
-        if r % 2:
-            raise ValueError
-        return r // 2
+        TESTS:
+
+        These Abelian examples used to be wrong::
+
+            sage: VeeringTriangulation("(0,~5,4)(~0,~2,3)(1,2,5)(~1,~3,~4)", "RRBBRB").rank()
+            1
+            sage: VeeringTriangulation("(0,6,~5)(~0,~4,5)(1,3,8)(~1,~6,~7)(2,~8,7)(~2,~3,4)", "RRRBBBBRB").rank()
+            2
+            sage: VeeringTriangulation("(0,3,2)(~0,4,7)(1,~2,~7)(~1,~3,~6)(~4,~5,~8)(5,8,6)", "BBRRRBRRR").rank()
+            2
+            sage: VeeringTriangulation("(0,~5,~4)(~0,7,9)(1,5,~7)(~1,10,~9)(2,11,~6)(~2,~11,8)(3,~8,~10)(~3,6,4)", "RRBBBRRBRRBR").rank()
+            2
+            sage: VeeringTriangulation("(0,1,2)(~0,3,4)(~1,5,6)(~2,7,8)(~3,10,9)(~4,11,~8)(~5,12,13)(~6,14,15)(~7,~9,~14)(~10,16,~11)(~12,17,18)(~13,19,20)(~15,~18,~20)(~16,~17,~19)", "BRRRRRBRBBBRBRRRRRBBR").rank()
+            4
+        """
+        absolute_dimension = self.dimension() - self.relative_dimension()
+        if absolute_dimension % 2:
+            raise ValueError("odd-dimensional intersection with absolute cohomology")
+        return absolute_dimension // 2
 
     def _set_train_track_constraints_fast(self, cs, L, slope):
         zero = L.base_ring().zero()
