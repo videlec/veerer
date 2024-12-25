@@ -683,7 +683,7 @@ class LinearFamily:
             for block in blocks:
                 subspace[i, mapping[block[0]] // 2] = self._subspace[i, block[0] // 2]
 
-        return self.__class__(constellation_quotient, subspace)
+        return self.__class__(constellation_quotient, subspace, mutable=mutable, check=check)
 
 
 class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
@@ -1351,6 +1351,10 @@ class VeeringTriangulationLinearFamilies:
             VeeringTriangulationLinearFamily("(0,9,~8)(~0,22,7)(1,8,2)(~1,~19,~7)(~2,~3,~11)(3,11,~10)(4,~14,15)(~4,16,~12)(5,~15,12)(~5,~23,18)(6,~16,13)(~6,~17,~20)(~9,10,14)(~13,23,21)(17,20,~18)(19,~22,~21)", "BBRBRBRRRRRRRRBRBBRRRBRR", [(1, phi, 0, 0, 0, 1, 0, 0, -phi, -phi - 1, 0, 0, -phi, -phi, phi + 1, -phi - 1, phi, 0, 0, -phi, 0, phi - 1, -1, -1), (0, 0, 1, 0, 0, 0, phi - 1, 0, 1, 1, 1, 1, 0, phi - 1, 0, 0, 0, 0, phi - 1, 0, phi - 1, 0, 0, phi - 1), (0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, phi - 1, 0, 0, -phi + 1, 0, 0, 0), (0, 0, 0, 0, 1, 0, 0, phi - 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, phi - 1, 0, 0, phi - 1, 0)])
             sage: f.stratum()  # optional - surface_dynamics
             Q_4(11, 1)
+            sage: f.dimension()
+            4
+            sage: f.rank()
+            2
         """
         from sage.rings.rational_field import QQ
         from sage.rings.number_field.number_field import NumberField
@@ -1361,31 +1365,216 @@ class VeeringTriangulationLinearFamilies:
         fp = "(0,9,~8)(1,8,2)(10,14,~9)(3,11,~10)(~2,~3,~11)(~14,15,4)(12,5,~15)(~4,16,~12)(13,6,~16)(23,21,~13)(18,~5,~23)(17,20,~18)(~6,~17,~20)(~0,22,7)(~21,19,~22)(~7,~1,~19)"
         cols = "BBRBRBRRRRRRRRBRBBRRRBRR"
         vt = VeeringTriangulation(fp, cols)
-
-        # equations (beyond switches)
-        # B = phi A
-        # S = phi T
-        # C = phi D
-        # U = phi V
-        # where A = 0, B = 1, C = 2, D = 6, S = 3, T = 17, U = 4, V = 7
         K = NumberField(x**2 - x - 1, 'phi', embedding=(AA(5).sqrt() + 1)/2)
         phi = K.gen()
         L = LinearExpressions(K)
-        cs = ConstraintSystem()
+        cs = ConstraintSystem(24)
         vt._set_switch_conditions(cs.insert, [L.variable(e) for e in range(24)])
-        A = L.variable(0)
-        B = L.variable(1)
-        C = L.variable(2)
-        C = L.variable(2)
-        D = L.variable(6)
-        S = L.variable(3)
-        T = L.variable(17)
-        U = L.variable(4)
-        V = L.variable(7)
-        cs.insert(B == phi * A)
-        cs.insert(S == phi * T)
-        cs.insert(C == phi * D)
-        cs.insert(U == phi * V)
-
+        cs.insert(L.variable(1) == phi * L.variable(0))
+        cs.insert(L.variable(3) == phi * L.variable(17))
+        cs.insert(L.variable(2) == phi * L.variable(6))
+        cs.insert(L.variable(4) == phi * L.variable(7))
         return VeeringTriangulationLinearFamily(vt, cs.linear_generators_matrix())
 
+    @staticmethod
+    def quadrilateral_1_1_1_7_unfolding_orbit_closure():
+        r"""
+        EXAMPLES::
+
+            sage: from veerer.linear_family import VeeringTriangulationLinearFamilies
+            sage: f = VeeringTriangulationLinearFamilies.quadrilateral_1_1_1_7_unfolding_orbit_closure()
+            sage: f
+            VeeringTriangulationLinearFamily("(0,~14,~18)(~0,~20,13)(1,8,20)(~1,6,~2)(2,19,5)(3,~5,~6)(~3,16,~17)(4,7,~10)(~4,17,~19)(~7,~8,~9)(9,~11,~13)(10,14,~12)(11,15,~16)(12,~15,18)", "RBRBBRRRRBRRRBBBBRRBR", [(1, 0, phi - 1, 0, 0, phi - 1, phi - 1, 1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1), (0, 1, 0, 0, 0, -1, -1, phi - 1, 0, -phi + 1, phi - 1, phi, 0, 1, phi - 1, phi - 1, -1, 1, -phi + 1, 1, 1), (0, 0, 0, 1, 0, -1, 0, phi, phi, 0, phi, phi, phi, phi, 0, phi, 0, 1, 0, 1, phi), (0, 0, 0, 0, 1, 0, 0, -phi, -1, phi - 1, -phi + 1, -phi, -phi + 1, -1, 0, -phi + 1, 1, -1, 0, 0, -1)])
+            sage: f.stratum()  # optional - surface_dynamics
+            H_4(6)
+            sage: f.base_ring()
+            Number Field in phi with defining polynomial x^2 - x - 1 with phi = 1.618033988749895?
+            sage: f.dimension()
+            4
+            sage: f.rank()
+            2
+        """
+        from sage.rings.number_field.number_field import NumberField
+        from sage.rings.polynomial.polynomial_ring_constructor import PolynomialRing
+        from sage.rings.qqbar import AA
+        fp = "(0,~14,~18)(~0,~20,13)(1,8,20)(~1,6,~2)(2,19,5)(3,~5,~6)(~3,16,~17)(4,7,~10)(~4,17,~19)(~7,~8,~9)(9,~11,~13)(10,14,~12)(11,15,~16)(12,~15,18)"
+        cols = "RBRBBRRRRBRRRBBBBRRBR"
+        vt = VeeringTriangulation(fp, cols)
+        R = PolynomialRing(QQ, 'x')
+        x = R.gen()
+        K = NumberField(x**2 - x - 1, 'phi', embedding=(1 + AA(5).sqrt()) / 2)
+        phi = K.gen()
+        L = LinearExpressions(K)
+        cs = ConstraintSystem(21)
+        vt._set_switch_conditions(cs.insert, [L.variable(e) for e in range(21)])
+        cs.insert(L.variable(0) == phi * L.variable(2))
+        cs.insert(L.variable(1) == phi * L.variable(14))
+        cs.insert(L.variable(16) == phi * L.variable(9))
+        cs.insert(L.variable(11) == phi * L.variable(17))
+        return VeeringTriangulationLinearFamily(vt, cs.linear_generators_matrix())
+
+    @staticmethod
+    def quadrilateral_1_1_1_9_unfolding_orbit_closure():
+        r"""
+        EXAMPLES::
+
+            sage: from veerer.linear_family import VeeringTriangulationLinearFamilies
+            sage: f = VeeringTriangulationLinearFamilies.quadrilateral_1_1_1_9_unfolding_orbit_closure()
+            sage: f
+            VeeringTriangulationLinearFamily("(0,7,4)(~0,14,13)(1,10,~7)(~1,5,9)(2,~11,~12)(~2,11,6)(3,~8,~5)(~3,~4,~6)(8,~10,12)", "RBRRBRRRBRBBRBR", [(1, 0, 0, 0, -1/2, 0, 1/2, 1/2, 0, 0, -1/2, -1/2, 1/2, -1, 0), (0, 1, 0, 0, 0, -1, 0, 0, 1, 0, 1, 0, 0, 0, 0), (0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 2), (0, 0, 0, 1, 1, 2, 0, 1, -1, 2, -1, 0, 0, 0, 0)])
+            sage: f.stratum()  # optional - surface_dynamics
+            Q_1(1^3, -1^3)
+            sage: f.base_ring()
+            Rational Field
+            sage: f.dimension()
+            4
+            sage: f.rank()
+            2
+        """
+        fp = "(0,7,4)(~0,14,13)(1,10,~7)(~1,5,9)(2,~11,~12)(~2,11,6)(3,~8,~5)(~3,~4,~6)(8,~10,12)"
+        cols = "RBRRBRRRBRBBRBR"
+        vt = VeeringTriangulation(fp, cols)
+        L = LinearExpressions(QQ)
+        cs = ConstraintSystem(15)
+        vt._set_switch_conditions(cs.insert, [L.variable(e) for e in range(15)])
+        cs.insert(L.variable(0) == 2 * L.variable(6))
+        cs.insert(L.variable(14) == 2 * L.variable(2))
+        return VeeringTriangulationLinearFamily(vt, cs.linear_generators_matrix())
+
+    @staticmethod
+    def quadrilateral_1_1_2_8_unfolding_orbit_closure():
+        r"""
+        EXAMPLES::
+
+            sage: from veerer.linear_family import VeeringTriangulationLinearFamilies
+            sage: f = VeeringTriangulationLinearFamilies.quadrilateral_1_1_2_8_unfolding_orbit_closure()
+            sage: f
+            VeeringTriangulationLinearFamily("(0,4,~6)(~0,11,5)(1,~9,10)(~1,7,~3)(2,~7,6)(3,~10,~8)(~4,8,~12)(~5,9,12)", "RRRBRBBRRRBRB", [(1, 0, 0, 0, 1, 1, 0, 0, 1, -1, -1, 2, 0), (0, 1, 0, 0, 1, 2, 1, 1, 2, -1, -2, 2, 1), (0, 0, 1, 0, -1, -2, -1, 0, -3/2, 3/2, 3/2, -2, -1/2), (0, 0, 0, 1, 1, 2, 1, 1, 2, -1, -1, 2, 1)])
+            sage: f.stratum()  # optional - surface_dynamics
+            Q_2(6, -1^2)
+            sage: f.base_ring()
+            Rational Field
+            sage: f.dimension()
+            4
+            sage: f.rank()
+            2
+        """
+        fp = "(0,4,~6)(~0,11,5)(1,~9,10)(~1,7,~3)(2,~7,6)(3,~10,~8)(~4,8,~12)(~5,9,12)"
+        cols = "RRRBRBBRRRBRB"
+        vt = VeeringTriangulation(fp, cols)
+        L = LinearExpressions(QQ)
+        cs = ConstraintSystem(13)
+        vt._set_switch_conditions(cs.insert, [L.variable(e) for e in range(13)])
+        cs.insert(L.variable(11) == 2 * L.variable(4))
+        return VeeringTriangulationLinearFamily(vt, cs.linear_generators_matrix())
+
+    @staticmethod
+    def quadrilateral_1_1_2_12_unfolding_orbit_closure():
+        r"""
+        EXAMPLES::
+
+            sage: from veerer.linear_family import VeeringTriangulationLinearFamilies
+            sage: f = VeeringTriangulationLinearFamilies.quadrilateral_1_1_2_12_unfolding_orbit_closure()
+            sage: f
+            VeeringTriangulationLinearFamily("(0,~6,~14)(1,~4,15)(~1,4,~2)(2,12,~3)(3,17,8)(5,~7,9)(~5,~12,~8)(6,~10,16)(7,~13,10)(~9,18,~11)(11,13,19)(14,~18,~15)", "BBRBRRRBRBRBBRBRBRRR", [(1, 0, 0, 1/2*sqrt2, 0, 0, -1, 0, -1/2*sqrt2, 0, 0, 0, 1/2*sqrt2, 0, 0, 0, 1, -sqrt2, 0, 0), (0, 1, 0, 0, -1, 0, 0, sqrt2 + 1, 0, sqrt2 + 1, 0, sqrt2 + 1, 0, -sqrt2 - 1, 0, 0, 0, 0, 0, 0), (0, 0, 1, 0, 1, 0, -1/2*sqrt2, -1/2*sqrt2 - 1, -1, -1/2*sqrt2 - 1, 1/2*sqrt2, 0, 1, sqrt2 + 1, -1/2*sqrt2, 1, sqrt2, -1, 1/2*sqrt2 + 1, sqrt2 + 1), (0, 0, 0, 0, 0, 1, 1/2*sqrt2, 1/2*sqrt2 + 1, 1, 1/2*sqrt2, 1/2*sqrt2, 0, 0, -1, 1/2*sqrt2, 0, 0, 1, -1/2*sqrt2, -1)])
+            sage: f.stratum()  # optional - surface_dynamics
+            Q_1(1^4, -1^4)
+            sage: f.base_ring()
+            Number Field in sqrt2 with defining polynomial x^2 - 2 with sqrt2 = 1.414213562373095?
+            sage: f.dimension()
+            4
+            sage: f.rank()
+            2
+        """
+        from sage.rings.number_field.number_field import NumberField
+        from sage.rings.polynomial.polynomial_ring_constructor import PolynomialRing
+        from sage.rings.qqbar import AA
+        fp = "(0,~6,~14)(1,~4,15)(~1,4,~2)(2,12,~3)(3,17,8)(5,~7,9)(~5,~12,~8)(6,~10,16)(7,~13,10)(~9,18,~11)(11,13,19)(14,~18,~15)"
+        cols = "BBRBRRRBRBRBBRBRBRRR"
+        vt = VeeringTriangulation(fp, cols)
+        R = PolynomialRing(QQ, 'x')
+        x = R.gen()
+        K = NumberField(x**2 - 2, 'sqrt2', embedding=AA(2).sqrt())
+        sqrt2 = K.gen()
+        L = LinearExpressions(K)
+        cs = ConstraintSystem(20)
+        vt._set_switch_conditions(cs.insert, [L.variable(e) for e in range(20)])
+        cs.insert(L.variable(0) == sqrt2 * L.variable(3))
+        cs.insert(L.variable(1) == (sqrt2 - 1) * L.variable(11))
+        cs.insert(L.variable(17) == sqrt2 * L.variable(6))
+        cs.insert(L.variable(16) == sqrt2 * L.variable(12))
+        return VeeringTriangulationLinearFamily(vt, cs.linear_generators_matrix())
+
+    @staticmethod
+    def quadrilateral_1_2_2_11_unfolding_orbit_closure():
+        r"""
+        EXAMPLES::
+
+            sage: from veerer.linear_family import VeeringTriangulationLinearFamilies
+            sage: f = VeeringTriangulationLinearFamilies.quadrilateral_1_2_2_11_unfolding_orbit_closure()
+            sage: f
+            VeeringTriangulationLinearFamily("(0,~17,~6)(~0,~3,4)(1,7,18)(~1,12,3)(2,13,~14)(~2,10,9)(5,~9,~16)(~5,6,~7)(8,11,14)(~10,~13,15)(~11,16,17)", "RBBBRBRRBRBRRRRBRBB", [(1, 0, 0, 0, 1, 1/2*sqrt2, -1/2*sqrt2, 0, 1, 0, 0, -1, 0, 0, 0, 0, 1/2*sqrt2, 1/2*sqrt2 + 1, 0), (0, 1, 0, 0, 0, 1/2*sqrt2, -1/2*sqrt2 - 1, -1, 1, -1/2*sqrt2, 1/2*sqrt2, -1/2*sqrt2 - 1, -1, -1/2*sqrt2, -1/2*sqrt2, 0, 0, 1/2*sqrt2 + 1, 0), (0, 0, 1, 0, 0, -1, sqrt2 + 1, sqrt2, -sqrt2, 1, 0, sqrt2 + 1, 0, 0, 1, 0, 0, -sqrt2 - 1, sqrt2), (0, 0, 0, 1, -1, 0, 0, 0, sqrt2, -1/2*sqrt2, 1/2*sqrt2, -1/2*sqrt2, 1, 1/2*sqrt2, 1/2*sqrt2, sqrt2, -1/2*sqrt2, 0, 0)])
+            sage: f.stratum()  # optional - surface_dynamics
+            Q_2(9, -1^5)
+            sage: f.base_ring()
+            Number Field in sqrt2 with defining polynomial x^2 - 2 with sqrt2 = 1.414213562373095?
+            sage: f.dimension()
+            4
+            sage: f.rank()
+            2
+        """
+        from sage.rings.number_field.number_field import NumberField
+        from sage.rings.polynomial.polynomial_ring_constructor import PolynomialRing
+        from sage.rings.qqbar import AA
+        fp = "(0,~17,~6)(~0,~3,4)(1,7,18)(~1,12,3)(2,13,~14)(~2,10,9)(5,~9,~16)(~5,6,~7)(8,11,14)(~10,~13,15)(~11,16,17)"
+        cols = "RBBBRBRRBRBRRRRBRBB"
+        vt = VeeringTriangulation(fp, cols)
+        R = PolynomialRing(QQ, 'x')
+        x = R.gen()
+        K = NumberField(x**2 - 2, 'sqrt2', embedding=AA(2).sqrt())
+        sqrt2 = K.gen()
+        L = LinearExpressions(K)
+        cs = ConstraintSystem(19)
+        vt._set_switch_conditions(cs.insert, [L.variable(e) for e in range(19)])
+        cs.insert(L.variable(18) == sqrt2 * L.variable(2))
+        cs.insert(L.variable(15) == sqrt2 * L.variable(3))
+        cs.insert(L.variable(4) == sqrt2 * L.variable(16))
+        cs.insert(L.variable(5) == (sqrt2 - 1) * L.variable(17))
+        return VeeringTriangulationLinearFamily(vt, cs.linear_generators_matrix())
+
+    @staticmethod
+    def quadrilateral_1_2_2_15_unfolding_orbit_closure():
+        r"""
+        EXAMPLES::
+
+            sage: from veerer.linear_family import VeeringTriangulationLinearFamilies
+            sage: f = VeeringTriangulationLinearFamilies.quadrilateral_1_2_2_15_unfolding_orbit_closure()
+            sage: f
+            VeeringTriangulationLinearFamily("(0,11,9)(~0,5,20)(1,~11,17)(~1,4,~3)(2,18,~7)(~2,16,7)(3,12,~20)(~4,~16,6)(~5,~18,~13)(~6,~14,22)(8,19,~12)(~8,10,~21)(~9,21,~15)(~10,14,~17)(13,15,~19)", "RBBBRBRRBBRRRRRBBBBRBRB", [(1, 0, 0, 0, 0, 2, phi - 1, phi - 1, -1, phi - 1, 1, phi, 1, phi + 1, phi + 1, phi - 1, -phi + 1, phi, -phi + 1, 2, 1, 0, 2), (0, 1, 0, 0, -1, 0, -1, 0, 0, phi - 1, -phi + 1, phi - 1, 0, 0, 1, 0, 0, phi, 0, 0, 0, -phi + 1, 2), (0, 0, 1, 0, 0, phi, 0, 1, 0, 0, 0, 0, phi, phi, 0, 0, 0, 0, 0, phi, phi, 0, 0), (0, 0, 0, 1, 1, -phi + 1, 0, -1, phi - 1, 0, 0, 0, -phi, -phi, 0, phi - 1, 1, 0, 1, -2*phi + 1, -phi + 1, phi - 1, 0)])
+            sage: f.stratum()  # optional - surface_dynamics
+            Q_2(1^5, -1)
+            sage: f.base_ring()
+            Number Field in phi with defining polynomial x^2 - x - 1 with phi = 1.618033988749895?
+            sage: f.dimension()
+            4
+            sage: f.rank()
+            2
+        """
+        from sage.rings.number_field.number_field import NumberField
+        from sage.rings.polynomial.polynomial_ring_constructor import PolynomialRing
+        from sage.rings.qqbar import AA
+        fp = "(0,11,9)(~0,5,20)(1,~11,17)(~1,4,~3)(2,18,~7)(~2,16,7)(3,12,~20)(~4,~16,6)(~5,~18,~13)(~6,~14,22)(8,19,~12)(~8,10,~21)(~9,21,~15)(~10,14,~17)(13,15,~19)"
+        cols = "RBBBRBRRBBRRRRRBBBBRBRB"
+        vt = VeeringTriangulation(fp, cols)
+        R = PolynomialRing(QQ, 'x')
+        x = R.gen()
+        K = NumberField(x**2 - x - 1, 'phi', embedding=(1 + AA(5).sqrt()) / 2)
+        phi = K.gen()
+        L = LinearExpressions(K)
+        cs = ConstraintSystem(23)
+        vt._set_switch_conditions(cs.insert, [L.variable(e) for e in range(23)])
+        cs.insert(L.variable(4) == phi * L.variable(21))
+        cs.insert(L.variable(7) == (phi - 1) * L.variable(12))
+        cs.insert(L.variable(9) == (2 - phi) * L.variable(17))
+        cs.insert(L.variable(11) == (phi - 1) * L.variable(14))
+        return VeeringTriangulationLinearFamily(vt, cs.linear_generators_matrix())
