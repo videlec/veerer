@@ -4649,22 +4649,44 @@ class VeeringTriangulation(Triangulation):
             sage: _, f_low = vt.degeneration(edges_up=[1, 2, 4, 6, 7, 9, 10, 12, 13, 15, 16, 17, 20, 21, 22, 24, 25, 26], mutable=True)
             sage: f_low.set_canonical_labels()
 
+        An example with folded edges::
+
+            sage: vt = VeeringTriangulation("(0,2,7)(1,4,9)(3,12,14)(5,~7,8)(6,~9,~10)(~8,13,~11)(10,~12,11)", "BRBRRBRRBBBBRRB")
+            sage: vt.degeneration(edges_low=(14,))
+            (VeeringTriangulationLinearFamily("(0,2,6)(1,3,8)(4,~6,7)(5,~8,~9)(~7,12,~10)(9,11,10)", "BRBRBRRBBBBRR", [(1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, -1), (0, 1, 0, 0, 0, 0, 0, 0, -1, -1, 0, 1, 0), (0, 0, 1, 0, 0, 0, -1, -1, 0, 0, 0, 0, 1), (0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, -1, 0), (0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, -1), (0, 0, 0, 0, 0, 1, 0, 0, 0, -1, 0, 1, 0), (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1)]),
+             VeeringTriangulationLinearFamily("(0:7)", "B", [(1)]))
+            sage: vt.degeneration(edges_low=(0, 2, 6, 7, 14))
+            (VeeringTriangulationLinearFamily("(0,1,3)(2,6,~4)(~3,5,4)", "RRBBBRR", [(1, 0, 0, -1, 0, 1, 0), (0, 1, 0, 1, 0, -1, 0), (0, 0, 1, 0, 0, 0, -1), (0, 0, 0, 0, 1, 1, 1)]),
+             VeeringTriangulationLinearFamily("(0,1,3)(2:2,4:2,~3:1)", "BBRRB", [(1, 0, 0, 1, 0), (0, 1, 0, -1, 0), (0, 0, 1, 0, 0), (0, 0, 0, 0, 1)]))
+
         TESTS:
 
-        This example used to not work::
+        These examples used to not work::
 
             sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2:2,~3:2)", "BRRR")
             sage: vt.degeneration([0], [1, 2, 3])
             (VeeringTriangulationLinearFamily("(0:2,~0:2)", "R", [(1)]),
              VeeringTriangulationLinearFamily("(0:3)(~0:3)", "B", [(1)]))
+
+            sage: vt = VeeringTriangulation("(0,1,2)(~2,3,4)(~4,5,6)", "BRBRBRB")
+            sage: vt.degeneration(edges_low=[1], edges_up=[0, 2, 3, 4, 5, 6])
+            (VeeringTriangulationLinearFamily("(0,1,2)(~2,3,4)", "BRBRB", [(1, 0, 1, 0, 1), (0, 1, 1, 0, 1), (0, 0, 0, 1, 1)]),
+             VeeringTriangulationLinearFamily("(0:3)", "R", [(1)]))
+
+            sage: vt = VeeringTriangulation("(0,1,2)(~2,3,4)(~4,5,6)", "BRBRBRB")
+            sage: vt.degeneration(edges_low=[1, 3, 5], edges_up=[0, 2, 4, 6])
+            (None,
+             VeeringTriangulationLinearFamily("(0:1,1:1,2:1)(3:1)", "RRRR", [(1, 0, 0, 1), (0, 1, 0, 1), (0, 0, 1, 1)]))
+
+            sage: vt = VeeringTriangulation("(0,1,2)(~2,3,4)(~4,5,6)", "BRBRBRR")
+            sage: vt.degeneration(edges_low=[0, 1, 2, 3, 4], edges_up=[5, 6])
+            (None,
+             VeeringTriangulationLinearFamily("(0,1,2)(~2,3,4)(~4:1)(5:1)", "BRBRBB", [(1, 0, 1, 0, 1, 1), (0, 1, 1, 0, 1, 1), (0, 0, 0, 1, 1, 1)]))
         """
         # We distinguish three kinds of triangles
         # - up triangles: when the three edges are in the up partition
         # - down triangles: when the three edges are in the down partition
         # - mixed triangles: when the triangle has one down edge and two up edges
-        if self.has_folded_edge():
-            raise NotImplementedError
-
         n = 2 * self._ne
         m = self._ne
         ep = self._ep
@@ -4695,14 +4717,15 @@ class VeeringTriangulation(Triangulation):
         half_edges_up = set(2 * e for e in edges_up).union(2 * e + 1 for e in edges_up if vp[2 * e + 1] != -1)
         half_edges_low = set(2 * e for e in edges_low).union(2 * e + 1 for e in edges_low if vp[2 * e + 1] != -1)
 
-        n_mix = 0
-        mix_p = array('i', [-1] * n)
+        nt_mix = 0  # number of mixed triangles (ie triangle with two up edges and one low edge)
+        n_mix_folded = 0
+        mix_p = array('i', [-1] * n)  # involution on mixed edges (crossing triangles)
         for (a, b, c) in self.triangles():
-            n_up = (a in half_edges_up) + (b in half_edges_up) + (c in half_edges_up)
-            if n_up == 1:
+            x = (a in half_edges_up) + (b in half_edges_up) + (c in half_edges_up)
+            if x == 1:
                 raise ValueError('invalid set of edges: {} is a up-down-down triangle'.format(t))
-            elif n_up == 2:
-                n_mix += 1
+            elif x == 2:
+                nt_mix += 1
                 if a not in half_edges_up:
                     down = a
                     mix1, mix2 = b, c
@@ -4720,41 +4743,38 @@ class VeeringTriangulation(Triangulation):
                         colour_to_string(colouring[mix2 // 2])))
                 mix_p[mix1] = mix2
                 mix_p[mix2] = mix1
+                n_mix_folded += (vp[mix1 ^ 1] == -1) + (vp[mix2 ^ 1] == -1)
 
-        ne_low = len(edges_low)
-        n_low = len(half_edges_low)
-        ne_up = len(edges_up) - n_mix
-        n_up = len(half_edges_up) - 2 * n_mix
+        n_up = len(half_edges_up) - 2 * nt_mix  # actual number of half-edges in upper level
 
         # build the upper level (only the face permutation fp_up)
         relabelling_up = {}
         vertical_nodes = []
+        n_folded_up = 0
         if n_up:
-            fp_up = array('i', [-1] * n_up)
-            angle_excess_up = array('i', [0] * n_up)
-            colouring_up = array('i', [0] * ne_up)
-
             # If we only blow-up cylinders (horizontal degenerations) there is no
-            # upper level
-            j = 0
+            # upper level at all
+            ne_up = 0
             for a in half_edges_up:
                 if mix_p[a] != -1 or a in relabelling_up:
                     continue
 
                 # build ep
+                relabelling_up[a] = 2 * ne_up
                 A = ep(a)
-                if a == A:
-                    relabelling_up[a] = j
+                while mix_p[A] != -1:
+                    A = ep(mix_p[A])
+                if A != a:
+                    relabelling_up[A] = 2 * ne_up + 1
                 else:
-                    relabelling_up[a] = j
-                    # to find the matching half-edge we go through all mixed triangles
-                    A = ep(a)
-                    while mix_p[A] != -1:
-                        A = ep(mix_p[A])
-                    relabelling_up[A] = j + 1
-                j += 2
+                    n_folded_up += 1
+                ne_up += 1
 
-            assert j == n_up, (n_up, j)
+            assert ne_up <= n_up <= 2 * ne_up
+
+            fp_up = array('i', [-1] * (2 * ne_up))
+            angle_excess_up = array('i', [0] * (2 * ne_up))
+            colouring_up = array('i', [0] * ne_up)
 
             for e in half_edges_up:
                 if mix_p[e] != -1:
@@ -4789,16 +4809,52 @@ class VeeringTriangulation(Triangulation):
             vt_up = None
 
         # build the lower level
+        # First build horizontal nodes coming from cylinders blow-up (for horizontal degeneration)
+        # In the case of folded cylinder, we need to introduce special edges as
+        # circumference of cylinders (in the stratum Q_0(-1^2, -2))
+        folded_cylinders = []
+        cylinders = []
+        seen = [False] * 2 * self._ne
+        for h in range(0, 2 * self._ne, 2):
+            if seen[h] or mix_p[h] == -1:
+                continue
+            orbit = []
+            while not seen[h] and mix_p[h] != -1:
+                orbit.append(h)
+                seen[h] = True
+                h = ep(mix_p[h])
+            if mix_p[orbit[-1]] != -1 and ep(mix_p[orbit[-1]]) == orbit[0]:
+                folded = [h for h in orbit if vp[2 * (h // 2) + 1] == -1]
+                if len(folded) == 2:
+                    assert len(orbit) % 2 == 0
+                    i = orbit.index(folded[0])
+                    orbit = orbit[i:] + orbit[:i]
+                    assert orbit[0] == folded[0]
+                    assert orbit[len(orbit) // 2] == folded[1]
+                    folded_cylinders.append(orbit)
+                else:
+                    assert len(folded) == 0
+                    cylinders.append((orbit, [h ^ 1 for h in orbit[::-1]]))
+
+        if vt_up is not None and cylinders:
+            raise ValueError("mixed horizontal and vertical degeneration")
+
         relabelling_low = {}
         j = 0
+        n_folded_low = 0
         for e in sorted(edges_low):
             relabelling_low[2 * e] = j
             if vp[2 * e + 1] != -1:
                 relabelling_low[2 * e + 1] = j + 1
+            else:
+                n_folded_low += 1
             j += 2
 
-        vp_low = array('i', [0] * n_low)
-        angle_excess_low = array('i', [0] * n_low)
+        assert j == len(half_edges_low) + n_folded_low, (j, len(half_edges_low), n_folded_low)
+        ne_low = j // 2 + len(folded_cylinders)
+
+        vp_low = array('i', [-1] * (2 * ne_low))
+        angle_excess_low = array('i', [0] * (2 * ne_low))
         colouring_low = array('i', [0] * ne_low)
         for e in half_edges_low:
             colouring_low[relabelling_low[e] // 2] = colouring[e // 2]
@@ -4817,6 +4873,15 @@ class VeeringTriangulation(Triangulation):
             alternations += colouring[ee // 2] != col
             assert (alternations % 2 == 0) == (colouring[e // 2] == colouring[ee // 2])
             angle_excess_low[relabelling_low[e]] = excess + alternations // 2
+
+        # build Q_0(-1^2, -2) components for folded cylinders
+        for i, cylinder in enumerate(folded_cylinders):
+            j = 2 * (ne_low - i - 1)
+            vp_low[j] = j
+            angle_excess_low[j] = 1
+            col = colouring[cylinder[0] // 2]
+            assert all(colouring[h // 2] == col for h in cylinder)
+            colouring_low[ne_low - i - 1] = BLUE if col == RED else RED
 
         vt_low = VeeringTriangulation.from_permutations(vp_low, None, (angle_excess_low,), (colouring_low,), mutable=mutable, check=check)
 
@@ -4837,6 +4902,20 @@ class VeeringTriangulation(Triangulation):
         while j < constraints_low.nrows() and constraints_low[j]:
             j += 1
         constraints_low = constraints_low[:j]
+
+        if folded_cylinders:
+            constraints_low_extended = matrix(constraints_low.base_ring(), constraints_low.nrows() + len(folded_cylinders), constraints_low.ncols() + len(folded_cylinders))
+            constraints_low_extended[:constraints_low.nrows(), :constraints_low.ncols()] = constraints_low
+            for i, cylinder in enumerate(folded_cylinders):
+                j = 2 * (ne_low - i - 1)
+                col = colouring_low[ne_low - i - 1]
+                for h in cylinder:
+                    assert colouring[h // 2] != col
+                    if colouring[fp[h] // 2] == col:
+                        assert fp[h] in half_edges_low
+                        constraints_low_extended[constraints_low.nrows() + i, relabelling_low[fp[h]] // 2] += 1
+                constraints_low_extended[constraints_low.nrows() + i, ne_low - i - 1] = -1
+            constraints_low = constraints_low_extended
 
         from .linear_family import VeeringTriangulationLinearFamily
         if vt_up is not None:
@@ -4859,29 +4938,12 @@ class VeeringTriangulation(Triangulation):
 
         f_low = VeeringTriangulationLinearFamily(vt_low, constraints_low.right_kernel_matrix().__copy__(), mutable=mutable, check=check)
 
-        # Build horizontal nodes coming from cylinders blow-up (for horizontal degeneration)
-        cylinders = []
-        seen = [False] * 2 * self._ne
-        for e in range(2 * self._ne):
-            if vp[e] == -1 or seen[e] or mix_p[e] == -1:
-                continue
-            orbit = []
-            while not seen[e] and mix_p[e] != -1:
-                orbit.append(e)
-                seen[e] = seen[e ^ 1] = True
-                e = ep(mix_p[e])
-            if mix_p[orbit[-1]] != -1 and ep(mix_p[orbit[-1]]) == orbit[0]:
-                cylinders.append(orbit)
-
-        if vt_up is not None and cylinders:
-            raise ValueError("mixed horizontal and vertical degeneration")
-
         # TODO: the cycles are not ordered correctly wrt the face permutation
         horizontal_nodes = []
-        for cyl in cylinders:
+        for cyl_top, cyl_bot in cylinders:
             top = []
             bot = []
-            for a in cyl:
+            for a in cyl_top:
                 b = fp[a]
                 c = fp[b]
                 if b in relabelling_low:
