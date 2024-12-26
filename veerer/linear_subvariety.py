@@ -595,6 +595,17 @@ class MultiscaleCompactification:
         5 components in codimension 2
         3 components in codimension 3
 
+    Equivalently in Q(1,-1^5)::
+
+        sage: vt = VeeringTriangulation("(0,1,2)(~2,3,4)(~4,5,6)", "BRBRBRR")
+        sage: L = vt.linear_subvariety()
+        sage: M = L.multiscale_compactification()
+        sage: M  # optional - surface_dynamics
+        MultiscaleCompactification of Irreducible real linear subvariety of projective dimension 3 in [[Q_0(1, -1^5)]] made of
+        3 components in codimension 1
+        5 components in codimension 2
+        3 components in codimension 3
+
     The example of H(1,1)::
 
         sage: vt = VeeringTriangulation("(0,8,~7)(~0,~6,7)(1,11,~10)(~1,~11,4)(2,10,~9)(~2,~4,5)(3,9,~8)(~3,~5,6)", "RRRRBBBBBBBB")
@@ -602,6 +613,17 @@ class MultiscaleCompactification:
         sage: M = L.multiscale_compactification()
         sage: M # optional - surface_dynamics
         MultiscaleCompactification of Irreducible real linear subvariety of projective dimension 4 in [[H_2(1^2)]] made of
+        5 components in codimension 1
+        11 components in codimension 2
+        13 components in codimension 3
+        6 components in codimension 4
+
+    Equivalently in Q(2,-1^6)::
+
+        sage: vt = VeeringTriangulation("(0,~6,7)(1,8,4)(2,~4,5)(3,~5,6)", "RRRRBBBBB")
+        sage: L = vt.linear_subvariety()
+        sage: L.multiscale_compactification()
+        MultiscaleCompactification of Irreducible real linear subvariety of projective dimension 4 in [[Q_0(2, -1^6)]] made of
         5 components in codimension 1
         11 components in codimension 2
         13 components in codimension 3
