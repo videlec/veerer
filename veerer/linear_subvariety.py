@@ -139,7 +139,7 @@ class Degenerations:
         ds_graph = self._components[component_number]
         for state in ds_graph:
             if isinstance(state, VeeringTriangulation):
-                for (f_up, f_low) in state.codimension_one_horizontal_degenerations(mutable=True, check=False):
+                for (f_up, f_low, _, _) in state.codimension_one_horizontal_degenerations(mutable=True, check=False):
                     assert f_up is None
                     assert f_low.dimension() == state.dimension() - 1
                     known, unknown = self.find_and_decompose(f_low)
@@ -174,7 +174,7 @@ class Degenerations:
         ds_graph = self._components[component_number]
         for state in ds_graph:
             if isinstance(state, VeeringTriangulation):
-                for (f_up, f_low) in state.codimension_one_vertical_degenerations(mutable=True, check=False):
+                for (f_up, f_low, _, _) in state.codimension_one_vertical_degenerations(mutable=True, check=False):
                     assert f_up is not None, (state,)
                     # NOTE: the projectivization makes us loose one dimension
                     assert f_low.dimension() + f_up.dimension() == state.dimension()

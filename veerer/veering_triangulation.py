@@ -4600,6 +4600,11 @@ class VeeringTriangulation(Triangulation):
 
         This corresponds to a a two levels degeneration in the BCGGM compactification.
 
+        The output is a 4-tuple ``(f_up, f_low, relabelling_up, relabelling_low)`` where
+        - ``f_up`` and ``f_low`` are ``VeeringTriangulationLinearFamily``s
+        - ``relabelling_up``, ``relabelling_low`` are partial maps from the half-edges of this
+          veering triangulation to the half-edges in repsectively ``f_up`` and ``f_low``
+
         EXAMPLES::
 
             sage: from veerer import VeeringTriangulation, VeeringTriangulationLinearFamily
@@ -4607,23 +4612,25 @@ class VeeringTriangulation(Triangulation):
         Horizontal degeneration (cylinder blowup)::
 
             sage: vt = VeeringTriangulation("(0,1,2)(3,4,5)(6,7,8)(~2,~3,~7)(~1,~8,~6)(~5,~0,~4)", "RBRRBBRBR")
-            sage: f_up, f_low = vt.degeneration(edges_low=[0, 1, 2, 3, 4, 5, 7], edges_up=[6, 8])
+            sage: f_up, f_low, r_up, r_low = vt.degeneration(edges_low=[0, 1, 2, 3, 4, 5, 7], edges_up=[6, 8])
             sage: f_up is None
             True
             sage: f_low.stratum()  # optional - surface_dynamics
             H_1(2, -1^2)
 
-            sage: f_up, f_low = vt.degeneration(edges_low=[0, 1, 2, 3, 6, 7, 8], edges_up=[4, 5])
+            sage: f_up, f_low, r_up, r_low = vt.degeneration(edges_low=[0, 1, 2, 3, 6, 7, 8], edges_up=[4, 5])
             sage: f_up is None
             True
             sage: f_low.stratum()  # optional - surface_dynamics
             H_1(2, -1^2)
 
-            sage: f_up, f_low = vt.degeneration(edges_low=[0, 1, 2, 3, 7], edges_up=[4, 5, 6, 8])
+            sage: f_up, f_low, r_up, r_low = vt.degeneration(edges_low=[0, 1, 2, 3, 7], edges_up=[4, 5, 6, 8])
             sage: f_up is None
             True
             sage: f_low.stratum()  # optional - surface_dynamics
             H_0(2, -1^4)
+            sage: r_low
+            array('i', [0, 1, 2, 3, 4, 5, 6, 7, -1, -1, -1, -1, -1, -1, 8, 9, -1, -1])
 
         Note that when we degenerate two cylinders, the residue condition becomes codimension one
         in the associated stratum::
@@ -4637,7 +4644,7 @@ class VeeringTriangulation(Triangulation):
         Collapsing the two marked point of a torus in H(0,0)::
 
             sage: vt = VeeringTriangulation("(0,1,2)(~1,3,~0)(~3,4,5)(~5,~2,~4)", "BRRRRB")
-            sage: f_up, f_low = vt.degeneration(edges_low=[5], edges_up=[0, 1, 2, 3, 4])
+            sage: f_up, f_low, r_up, r_low = vt.degeneration(edges_low=[5], edges_up=[0, 1, 2, 3, 4])
             sage: f_up.stratum()  # optional - surface_dynamics
             H_1(0)
             sage: f_low.stratum()  # optional - surface_dynamics
@@ -4646,7 +4653,7 @@ class VeeringTriangulation(Triangulation):
         Examples related to parallel cylinder degeneration in the gothic locus::
 
             sage: vt = VeeringTriangulation("(0,13,~21)(1,3,~2)(2,9,~3)(4,20,~5)(5,~26,~6)(6,~19,~7)(7,~16,~8)(8,~10,~9)(10,15,~11)(11,24,~12)(12,~14,~13)(14,~25,~15)(16,18,~17)(17,26,~18)(19,25,~20)(21,23,~22)(22,~24,~23)(~4,~1,~0)", "RBBRBRBBRBBRBBRBBBRRBBBRBBB")
-            sage: _, f_low = vt.degeneration(edges_up=[1, 2, 4, 6, 7, 9, 10, 12, 13, 15, 16, 17, 20, 21, 22, 24, 25, 26], mutable=True)
+            sage: _, f_low, _, _ = vt.degeneration(edges_up=[1, 2, 4, 6, 7, 9, 10, 12, 13, 15, 16, 17, 20, 21, 22, 24, 25, 26], mutable=True)
             sage: f_low.set_canonical_labels()
 
         An example with folded edges::
@@ -4654,10 +4661,15 @@ class VeeringTriangulation(Triangulation):
             sage: vt = VeeringTriangulation("(0,2,7)(1,4,9)(3,12,14)(5,~7,8)(6,~9,~10)(~8,13,~11)(10,~12,11)", "BRBRRBRRBBBBRRB")
             sage: vt.degeneration(edges_low=(14,))
             (VeeringTriangulationLinearFamily("(0,2,6)(1,3,8)(4,~6,7)(5,~8,~9)(~7,12,~10)(9,11,10)", "BRBRBRRBBBBRR", [(1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, -1), (0, 1, 0, 0, 0, 0, 0, 0, -1, -1, 0, 1, 0), (0, 0, 1, 0, 0, 0, -1, -1, 0, 0, 0, 0, 1), (0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, -1, 0), (0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, -1), (0, 0, 0, 0, 0, 1, 0, 0, 0, -1, 0, 1, 0), (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1)]),
-             VeeringTriangulationLinearFamily("(0:7)", "B", [(1)]))
+                 VeeringTriangulationLinearFamily("(0:7)", "B", [(1)]),
+                 array('i', [0, -1, 2, -1, 4, -1, -1, -1, 6, -1, 8, -1, 10, -1, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, -1, 22, 24, -1, -1, -1]),
+                 array('i', [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, -1]))
+
             sage: vt.degeneration(edges_low=(0, 2, 6, 7, 14))
             (VeeringTriangulationLinearFamily("(0,1,3)(2,6,~4)(~3,5,4)", "RRBBBRR", [(1, 0, 0, -1, 0, 1, 0), (0, 1, 0, 1, 0, -1, 0), (0, 0, 1, 0, 0, 0, -1), (0, 0, 0, 0, 1, 1, 1)]),
-             VeeringTriangulationLinearFamily("(0,1,3)(2:2,4:2,~3:1)", "BBRRB", [(1, 0, 0, 1, 0), (0, 1, 0, -1, 0), (0, 0, 1, 0, 0), (0, 0, 0, 0, 1)]))
+             VeeringTriangulationLinearFamily("(0,1,3)(2:2,4:2,~3:1)", "BBRRB", [(1, 0, 0, 1, 0), (0, 1, 0, -1, 0), (0, 0, 1, 0, 0), (0, 0, 0, 0, 1)]),
+             array('i', [-1, -1, 0, -1, -1, -1, -1, -1, 2, -1, -1, -1, -1, -1, -1, -1, -1, 4, 6, -1, 7, -1, 8, 9, -1, 10, 12, -1, -1, -1]),
+             array('i', [0, -1, -1, -1, 2, -1, -1, -1, -1, -1, -1, -1, 4, -1, 6, 7, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 8, -1]))
 
         TESTS:
 
@@ -4666,22 +4678,37 @@ class VeeringTriangulation(Triangulation):
             sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2:2,~3:2)", "BRRR")
             sage: vt.degeneration([0], [1, 2, 3])
             (VeeringTriangulationLinearFamily("(0:2,~0:2)", "R", [(1)]),
-             VeeringTriangulationLinearFamily("(0:3)(~0:3)", "B", [(1)]))
+             VeeringTriangulationLinearFamily("(0:3)(~0:3)", "B", [(1)]),
+             array('i', [-1, -1, -1, -1, -1, 0, -1, 1]),
+             array('i', [0, 1, -1, -1, -1, -1, -1, -1]))
 
             sage: vt = VeeringTriangulation("(0,1,2)(~2,3,4)(~4,5,6)", "BRBRBRB")
             sage: vt.degeneration(edges_low=[1], edges_up=[0, 2, 3, 4, 5, 6])
             (VeeringTriangulationLinearFamily("(0,1,2)(~2,3,4)", "BRBRB", [(1, 0, 1, 0, 1), (0, 1, 1, 0, 1), (0, 0, 0, 1, 1)]),
-             VeeringTriangulationLinearFamily("(0:3)", "R", [(1)]))
+             VeeringTriangulationLinearFamily("(0:3)", "R", [(1)]),
+             array('i', [-1, -1, -1, -1, -1, 0, 2, -1, 4, 5, 6, -1, 8, -1]),
+             array('i', [-1, -1, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]))
 
             sage: vt = VeeringTriangulation("(0,1,2)(~2,3,4)(~4,5,6)", "BRBRBRB")
             sage: vt.degeneration(edges_low=[1, 3, 5], edges_up=[0, 2, 4, 6])
             (None,
-             VeeringTriangulationLinearFamily("(0:1,1:1,2:1)(3:1)", "RRRR", [(1, 0, 0, 1), (0, 1, 0, 1), (0, 0, 1, 1)]))
+             VeeringTriangulationLinearFamily("(0:1,1:1,2:1)(3:1)", "RRRR", [(1, 0, 0, 1), (0, 1, 0, 1), (0, 0, 1, 1)]),
+             array('i', [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]),
+             array('i', [-1, -1, 0, -1, -1, -1, 2, -1, -1, -1, 4, -1, -1, -1]))
 
             sage: vt = VeeringTriangulation("(0,1,2)(~2,3,4)(~4,5,6)", "BRBRBRR")
             sage: vt.degeneration(edges_low=[0, 1, 2, 3, 4], edges_up=[5, 6])
             (None,
-             VeeringTriangulationLinearFamily("(0,1,2)(~2,3,4)(~4:1)(5:1)", "BRBRBB", [(1, 0, 1, 0, 1, 1), (0, 1, 1, 0, 1, 1), (0, 0, 0, 1, 1, 1)]))
+             VeeringTriangulationLinearFamily("(0,1,2)(~2,3,4)(~4:1)(5:1)", "BRBRBB", [(1, 0, 1, 0, 1, 1), (0, 1, 1, 0, 1, 1), (0, 0, 0, 1, 1, 1)]),
+             array('i', [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]),
+             array('i', [0, -1, 2, -1, 4, 5, 6, -1, 8, 9, -1, -1, -1, -1]))
+
+            sage: vt = VeeringTriangulation("(0,1,2)(~2,3,4)(~3,5,6)(~6,7,8)", "RBBRRRBBR")
+            sage: vt.degeneration(edges_up=[3, 4, 5, 6, 7, 8], edges_low=[0, 1, 2])
+            (VeeringTriangulationLinearFamily("(0,~3,4)(1,2,3)", "RRRBB", [(1, 0, 0, 0, -1), (0, 1, 0, -1, -1), (0, 0, 1, 1, 1)]),
+             VeeringTriangulationLinearFamily("(0,1,2)(~2:3)", "RBB", [(1, 0, -1), (0, 1, 1)]),
+             array('i', [-1, -1, -1, -1, -1, -1, -1, 2, -1, -1, 4, -1, 6, 7, 8, -1, 0, -1]),
+             array('i', [0, -1, 2, -1, 4, 5, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]))
         """
         # We distinguish three kinds of triangles
         # - up triangles: when the three edges are in the up partition
@@ -4748,7 +4775,7 @@ class VeeringTriangulation(Triangulation):
         n_up = len(half_edges_up) - 2 * nt_mix  # actual number of half-edges in upper level
 
         # build the upper level (only the face permutation fp_up)
-        relabelling_up = {}
+        relabelling_up = array('i', [-1] * n)
         vertical_nodes = []
         n_folded_up = 0
         if n_up:
@@ -4756,7 +4783,7 @@ class VeeringTriangulation(Triangulation):
             # upper level at all
             ne_up = 0
             for a in half_edges_up:
-                if mix_p[a] != -1 or a in relabelling_up:
+                if mix_p[a] != -1 or relabelling_up[a] != -1:
                     continue
 
                 # build ep
@@ -4809,11 +4836,10 @@ class VeeringTriangulation(Triangulation):
             vt_up = None
 
         # build the lower level
-        # First build horizontal nodes coming from cylinders blow-up (for horizontal degeneration)
         # In the case of folded cylinder, we need to introduce special edges as
         # circumference of cylinders (in the stratum Q_0(-1^2, -2))
         folded_cylinders = []
-        cylinders = []
+        has_cylinder = False
         seen = [False] * 2 * self._ne
         for h in range(0, 2 * self._ne, 2):
             if seen[h] or mix_p[h] == -1:
@@ -4824,6 +4850,7 @@ class VeeringTriangulation(Triangulation):
                 seen[h] = True
                 h = ep(mix_p[h])
             if mix_p[orbit[-1]] != -1 and ep(mix_p[orbit[-1]]) == orbit[0]:
+                has_cylinder = True
                 folded = [h for h in orbit if vp[2 * (h // 2) + 1] == -1]
                 if len(folded) == 2:
                     assert len(orbit) % 2 == 0
@@ -4834,12 +4861,11 @@ class VeeringTriangulation(Triangulation):
                     folded_cylinders.append(orbit)
                 else:
                     assert len(folded) == 0
-                    cylinders.append((orbit, [h ^ 1 for h in orbit[::-1]]))
 
-        if vt_up is not None and cylinders:
+        if vt_up is not None and has_cylinder:
             raise ValueError("mixed horizontal and vertical degeneration")
 
-        relabelling_low = {}
+        relabelling_low = array('i', [-1] * n)
         j = 0
         n_folded_low = 0
         for e in sorted(edges_low):
@@ -4863,7 +4889,7 @@ class VeeringTriangulation(Triangulation):
             col = colouring[e // 2]
             alternations = 0
             ee = vp[e]
-            while ee not in relabelling_low:
+            while relabelling_low[ee] == -1:
                 excess += bdry[ee]
                 alternations += colouring[ee // 2] != col
                 col = colouring[ee // 2]
@@ -4928,47 +4954,21 @@ class VeeringTriangulation(Triangulation):
                 if generators_up.column(a) != generators_up.column(b):
                     raise RuntimeError('a={} b={}\ngenerators_matrix={}'.format(a, b, generators_up))
 
-            half_edges_up_to_edge_index = {2 * e: i for i, e in enumerate(edges_up)}
-            half_edges_up_to_edge_index.update({ep(e): i for e, i in half_edges_up_to_edge_index.items()})
-            representatives = [half_edges_up_to_edge_index[e] for e, e_up in relabelling_up.items() if e_up % 2 == 0]
+
+            edges_up_to_index = {e: i for i, e in enumerate(edges_up)}
+            representatives = [None] * ne_up
+            for h, h_up in enumerate(relabelling_up):
+                if h_up == -1:
+                    continue
+                if representatives[h_up // 2] is None:
+                    representatives[h_up // 2] = edges_up_to_index[h // 2]
+
             f_up = VeeringTriangulationLinearFamily(vt_up, generators_up.matrix_from_columns(representatives), mutable=mutable, check=check)
         else:
             # horizontal degeneration
             f_up = None
 
         f_low = VeeringTriangulationLinearFamily(vt_low, constraints_low.right_kernel_matrix().__copy__(), mutable=mutable, check=check)
-
-        # TODO: the cycles are not ordered correctly wrt the face permutation
-        horizontal_nodes = []
-        for cyl_top, cyl_bot in cylinders:
-            top = []
-            bot = []
-            for a in cyl_top:
-                b = fp[a]
-                c = fp[b]
-                if b in relabelling_low:
-                    assert c not in relabelling_low
-                    top.append(relabelling_low[b])
-                else:
-                    assert c in relabelling_low
-                    bot.append(relabelling_low[c])
-            assert top and bot
-
-            min_top = min(top)
-            i_top = top.index(min_top)
-            top = top[min_top:] + top[:min_top]
-
-            min_bot = min(bot)
-            i_bot = bot.index(min_bot)
-            bot = bot[min_bot:] + bot[:min_bot]
-
-            if min_top < min_bot:
-                top, bot = bot, top
-            else:
-                top, bot = bot, top
-            horizontal_nodes.append((top, bot))
-
-        horizontal_nodes.sort()
 
         if f_up is not None:
             # some additional checks for vertical degenerations
@@ -4981,8 +4981,6 @@ class VeeringTriangulation(Triangulation):
                 assert a in angles_deg
                 del angles_deg[angles_deg.index(a)]
             assert all(a != 0 for a in angles_deg)
-            # angle=2pi (Abelian degree=0) <-> -2pi (Abelian degree=-2)
-            # angle=4pi (Abelian degree=1) <-> -4pi (Abelian degree=-3)
             assert sorted(a for a in angles_deg if a > 0) == sorted(-a for a in angles_deg if a < 0)
         else:
             # some additional checks for horizontal degenerations
@@ -4996,8 +4994,7 @@ class VeeringTriangulation(Triangulation):
                 del angles_deg[angles_deg.index(a)]
             assert len(angles_deg) % 2 == 0 and all(a == 0 for a in angles_deg)
 
-        # TODO: also return relabelling and horiz/vert nodes data
-        return (f_up, f_low)
+        return (f_up, f_low, relabelling_up, relabelling_low)
 
     def horizontal_degeneration_up_edges_subsets(self):
         for col in [RED, BLUE]:
@@ -5022,12 +5019,12 @@ class VeeringTriangulation(Triangulation):
             sage: from veerer import VeeringTriangulation
 
             sage: vt = VeeringTriangulation("(0,1,2)(~1,3,4)(~3,5,6)(~6,~2,~5)(~4,7,8)(~8,~0,~7)", "RBBBRRBBR")
-            sage: [degeneration.stratum() for _, degeneration in vt.codimension_one_horizontal_degenerations()]  # optional - surface_dynamics
+            sage: [degeneration.stratum() for _, degeneration, _, _ in vt.codimension_one_horizontal_degenerations()]  # optional - surface_dynamics
             [H_1(2, -1^2)]
 
             sage: from veerer.linear_family import VeeringTriangulationLinearFamilies
             sage: X9 = VeeringTriangulationLinearFamilies.prototype_H1_1(0, 2, 1, -1)
-            sage: [degeneration.stratum() for _, degeneration in vt.codimension_one_horizontal_degenerations()]  # optional - surface_dynamics
+            sage: [degeneration.stratum() for _, degeneration, _, _ in vt.codimension_one_horizontal_degenerations()]  # optional - surface_dynamics
             [H_1(2, -1^2)]
         """
         if mapping:
@@ -5081,7 +5078,7 @@ class VeeringTriangulation(Triangulation):
              (0, 1, 2, 3, 4, 5, 15, 20, 21, 23, 25, 26),
              (0, 1, 2, 3, 4, 5, 9, 10, 14, 15, 20, 21, 23, 25, 26)]
             sage: for low_edges in vt.vertical_degeneration_low_edges_subsets():
-            ....:     fup, flow = vt.degeneration(edges_low=low_edges)
+            ....:     fup, flow, _, _ = vt.degeneration(edges_low=low_edges)
             ....:     assert fup is not None and flow is not None
             ....:     assert fup.is_delaunay() and flow.is_delaunay()
         """
@@ -5185,7 +5182,7 @@ class VeeringTriangulation(Triangulation):
 
             sage: from veerer import VeeringTriangulation
             sage: vt = VeeringTriangulation("(0,8,~7)(1,3,~2)(2,10,~3)(4,6,~5)(5,11,~6)(7,~9,~8)(9,~11,~10)(~4,~1,~0)", "RRBRBBRRBRRB")
-            sage: [(f_up.stratum(), f_low.stratum()) for (f_up, f_low) in vt.codimension_one_vertical_degenerations()]  # optional - surface_dynamics
+            sage: [(f_up.stratum(), f_low.stratum()) for (f_up, f_low, _, _) in vt.codimension_one_vertical_degenerations()]  # optional - surface_dynamics
             [(H_2(2), H_0(1^2, -4)),
              (H_2(2), H_0(1^2, -4)),
              (H_2(2), H_0(1^2, -4)),
@@ -5204,7 +5201,7 @@ class VeeringTriangulation(Triangulation):
             ....:             (0, 0, 0, 1, 1, 0, 0, -1, -1, 1, 0, 0, 0, -2, 1, 1, 0, 0, -1, 1, -1, 1, 0, 0, 0, 0, 1),
             ....:             (0, 0, 0, 0, 0, 1, -1, 1, 1, -1, 1, 1, 2, 2, -1, -1, 0, -1, 1, 0, 1, -1, 0, 1, 0, 0, 0)]
             sage: f = VeeringTriangulationLinearFamily(vt, subspace)
-            sage: assert all(f_up is not None for f_up in f.codimension_one_vertical_degenerations())
+            sage: assert all(f_up is not None for f_up, _, _, _ in f.codimension_one_vertical_degenerations())
             sage: half_edges = set(f.half_edges())
             sage: for edges_low in sorted(f.vertical_degeneration_low_edges_subsets(), key=lambda x: (len(x), x)):
             ....:     print(edges_low, tuple(sorted(half_edges.difference(edges_low))))
@@ -5219,7 +5216,7 @@ class VeeringTriangulation(Triangulation):
         Another example that used to be wrong::
 
             sage: vt = VeeringTriangulation("(0:1,1:1,~0:1,2:1,3:3)(~1:1,4:1,~3:1,~2:3,~4:1)", "BRRRB")
-            sage: f_up, f_low = vt.degeneration(edges_low=(1,))
+            sage: f_up, f_low, _, _ = vt.degeneration(edges_low=(1,))
             sage: f_up
             VeeringTriangulationLinearFamily("(0:1,~0:2,1:1,2:3)(~1:3,~3:1,3:2,~2:1)", "BRRB", [(1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)])
             sage: f_low
