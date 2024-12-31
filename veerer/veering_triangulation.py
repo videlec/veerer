@@ -4594,7 +4594,7 @@ class VeeringTriangulation(Triangulation):
         return parallel_families
 
     # TODO: change edges_low/edges_up to low_edges/up_edges
-    def degeneration(self, edges_low=None, edges_up=None, mutable=False, check=True):
+    def degeneration(self, edges_low=None, edges_up=None, mutable=False, collapsed_half_edge_relabelling=False, check=True):
         r"""
         Return the veering triangulation obtained by blowing-up the given subset of ``edges``.
 
@@ -4790,6 +4790,9 @@ class VeeringTriangulation(Triangulation):
                 relabelling_up[a] = 2 * ne_up
                 A = ep(a)
                 while mix_p[A] != -1:
+                    if collapsed_half_edge_relabelling:
+                        relabelling_up[A] = 2 * ne_up + 1
+                        relabelling_up[mix_p[A]] = 2 * ne_up
                     A = ep(mix_p[A])
                 if A != a:
                     relabelling_up[A] = 2 * ne_up + 1
@@ -4958,7 +4961,8 @@ class VeeringTriangulation(Triangulation):
             edges_up_to_index = {e: i for i, e in enumerate(edges_up)}
             representatives = [None] * ne_up
             for h, h_up in enumerate(relabelling_up):
-                if h_up == -1:
+                if mix_p[h] != -1 or h_up == -1:
+                    # collapsed half edge or edge in lower level
                     continue
                 if representatives[h_up // 2] is None:
                     representatives[h_up // 2] = edges_up_to_index[h // 2]
