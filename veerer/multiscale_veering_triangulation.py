@@ -1,5 +1,5 @@
 r"""
-Multi-scalle Veering Triangulations
+Multi-scale Veering Triangulations
 """
 
 from array import array
@@ -34,15 +34,10 @@ def _num_vertical_separatrices_in_corner(vt, halfedge):
 
     The method is only used to boundary half-edges.
     """
-    if isinstance(halfedge, str):
-        halfedge = str_to_label(halfedge)
 
     col = vt._colouring
     h1 = vt.vertex_permutation()[halfedge]
     a = vt.boundary_vector()[halfedge]
-    
-    if a == 0:
-        raise ValueError('the halfedge is not boundary')
     
     if (col[halfedge // 2] == RED) and (col[h1 // 2] == BLUE):
         num = a + 1
@@ -50,32 +45,6 @@ def _num_vertical_separatrices_in_corner(vt, halfedge):
         num = a
     
     return num
-
-def _num_lower_prongs_in_corner(vt,halfedge):
-    r"""
-    Return the number of valid prongs in the corner of the half-edge.
-     
-    This specific number is used later to construct a valid prong. The boundary face containing the input half-edge should be regarded as the pole of a vertical node.
-
-    Comparing to the method '_num_vertical_separatrices', we only count the red-blue colouring changes in the 'interior' of the corner.
-    """
-    alpha = vt.boundary_vector()
-    if alpha[halfedge] == 0:
-        raise ValueError("The half-edge is not boundary")
-    
-    vp = vt.vertex_permutation()
-    col = vt._colouring
-
-    hh = vp[halfedge]
-    num_p = _num_vertical_separatrices_in_corner(vt, halfedge)
-    if (col[halfedge // 2] == RED) and (col[hh // 2] == RED):
-        return num_p - 1
-    elif (col[halfedge // 2] == RED) and (col[hh // 2] == BLUE):
-        return num_p - 2
-    elif (col[halfedge // 2] == BLUE) and (col[hh // 2] == BLUE):
-        return num_p - 1
-    elif (col[halfedge // 2] == BLUE) and (col[hh // 2] == RED):
-        return num_p
 
 def in_connected_component(vt, h):
     r"""
@@ -85,7 +54,59 @@ def in_connected_component(vt, h):
     for comp in l_comp:
         if (h // 2) in comp:
             return l_comp.index(comp)
+        
+def track_prong(vt, r_up, r_low, prong):
+    
+    l, h, ang = prong
+    
+    for v in vt.vertices():
+        if h in v:
+            v1 = v
+    vh = [r_up[h] for h in v1]
+    
+    if min(vh) >= 0: #The case that vh is in f_up
+        h = r_up[h]
+        return (l, h, ang)
+    else: #The case that vh is in f_low
+        #step1: find the half-edge in f_low
+         if max(r_up) == -1:
+            return (l, r_low[h],ang)
+         else:
+            a = 0
+            while r_up[h] >= 0:
+                c1 = vt._colouring[h // 2]
+                h = vt.previous_at_vertex(h)
+                c2 = vt._colouring[h // 2]
+                if (c2 == RED) and (c1 == BLUE):
+                    a = a + 1
+            ang = ang + a
+            assert r_low[h] >= 0
+            return (l - 1, r_low[h], ang)
 
+def new_prong_matching(vt, f_low, r_low, r_up, level):
+    
+    nh = 2 * vt.num_edges()
+    newpm = []
+    lpoles = [] #the poles at nodes in f_low considered so far
+    for h in range(nh):
+        hh = vt.next_at_vertex(h)
+        if r_up[h] >= 0 and r_low[hh] >= 0:
+            #find the boundary face in f_low containing hh
+            for f in f_low.boundary_faces():
+                if r_low[hh] in f:
+                    f_pole = f
+            
+            if f_pole not in lpoles:
+                while (_num_vertical_separatrices_in_corner(vt, h) == 0) or (r_low[h] >= 0):
+                    h = vt.previous_at_vertex(h)
+                if _num_vertical_separatrices_in_corner(vt, h) > 0:
+                    prong1 = (level, r_up[h], 0)
+                    
+                    prong2 = track_prong(vt, r_up, r_low, prong1)
+                    assert prong2[0] == level - 1
+                    pm = [prong1, prong2]
+                    newpm.append(pm)
+    return newpm
 
 class MultiscaleVeeringTriangulation:
     r"""
@@ -95,7 +116,7 @@ class MultiscaleVeeringTriangulation:
 
     INPUT:
 
-    veering_triangulation : a list of veering triangulations of length N, where the veering triangulation at index i are at level -i.
+    veering_triangulation : a list of veering triangulations of length N, where the veering triangulation at index i is at level -i.
 
     horizontal_nodes : a list of length N, where the i-th entry consists of horizontal nodes (might be empty) in the form 
     "(h1,h2)"
@@ -107,9 +128,9 @@ class MultiscaleVeeringTriangulation:
     where: 
     - level1 > level2
     - h1 is an half-edge at a zero of the veering triangulation 'vt1' at level1, and h2 is an hal-edge in a boundary face of the veering triangulation 'vt2' at level2
-    - angle1 and angle 2 are the indices of the vertical separatrices in the corner of h1 and h2 respectively satisfying that: 
-    angle1 is in [0, vt1._num_vertical_separatrices_in_corner(h1)],
-    and angle2 is in [0, vt2._num_lower_prongs_in_corner(h2)]
+    - angle1 and angle2 are the indices of the vertical separatrices in the corner of h1 and h2 respectively satisfying that: 
+    the angle1 is in [0, vt1._num_vertical_separatrices_in_corner(h1)],
+    and the angle2 is in [0, vt2._num_vertical_separatrices_in_corner(h2)].
 
     EXAMPLES::
 
@@ -173,21 +194,55 @@ class MultiscaleVeeringTriangulation:
             for l in range(len(horizontal_nodes)):
                 self._horizontal_nodes.append([])
                 level = -l
-                for node in horizontal_nodes[l]:
+                nodes = horizontal_nodes[l]
+                if isinstance(nodes, str):
+                    nodes = str_to_cycles(nodes)
+                    for i in range(len(nodes)):
+                        node = nodes[i]
+                        for j in range(2):
+                            h = node[j]
+                            if h < 0:
+                                h = -2 * h - 1
+                            else:
+                                h = 2 * h
+                            node[j] = h
+                        nodes[i] = node                        
+                for node in nodes:
                     if check:
                         self._check_horizontal_node(level, node)
                     self._horizontal_nodes[l].append(node)
         else:
-            raise ValueError("The 'horizontal_nodes' must be a list.")
+            raise ValueError("The 'horizontal_nodes' must be a list.") 
         
         if isinstance(prong_matching, list):
             self._prong_matching = []
             for pm in prong_matching:
+                prong1, prong2 = pm
+                if isinstance(prong1[1], str):
+                    h = str_to_label(prong1[1])
+                    prong1 = (prong1[0],h,prong1[2])
+                if isinstance(prong2[1], str):
+                    h = str_to_label(prong2[1])
+                    prong2 = (prong2[0],h,prong2[2])
+                pm = (prong1, prong2)
                 if check:
                     self._check_prong_matching(pm)
                 self._prong_matching.append(pm)
         else:
             raise ValueError("The 'prong_matching' must be a list.")
+
+    def _levels(self):
+        return len(self._veering_triangulations)
+
+    def _check_level(self, level):
+        if not isinstance(level, numbers.Integral):
+            raise TypeError("level must be integral")
+        level = int(level)
+        if level < 0:
+            level = -level
+        if not 0 <= level < len(self._levels):
+            raise ValueError("level out of range")
+        return level
     
     def _check_horizontal_node(self, level, node):
         r"""
@@ -211,14 +266,12 @@ class MultiscaleVeeringTriangulation:
         #check if the horizontal nodes are valid.
         vt = self._veering_triangulations[abs(level)]
         
-        b1, b2 = node.strip("()").split(",")
-        h1 = str_to_label(b1)
-        h2 = str_to_label(b2)
+        h1, h2 = node
 
         if (vt.face_angle(h1) != 0):
-            raise ValueError(f"The half-edge {b1} is not in the face of simple pole")
+            raise ValueError(f"The half-edge {h1} is not in the face of simple pole")
         elif (vt.face_angle(h2) != 0):
-            raise ValueError(f"The half-edge {b2} is not in the face of simple pole")
+            raise ValueError(f"The half-edge {h2} is not in the face of simple pole")
 
     def _check_prong_matching(self, pm):
         r"""
@@ -248,10 +301,8 @@ class MultiscaleVeeringTriangulation:
         NN = len(self._veering_triangulations)
         prong1, prong2= pm
         
-        l1, str1, a1 = prong1
-        l2, str2, a2 = prong2            
-        h1 = str_to_label(str1)
-        h2 = str_to_label(str2)
+        l1, h1, a1 = prong1
+        l2, h2, a2 = prong2            
 
         #check the levels are valid
         if (l1 > 0) or (l2 > 0) or (-l1 >= NN) or (-l2 >= NN):
@@ -266,7 +317,7 @@ class MultiscaleVeeringTriangulation:
         if vt2.face_angle(h2) == 0:
             raise ValueError(f"The prong {prong2} is contained in a face of simple pole")
         if (vt1.vertex_angle(h1) + vt2.face_angle(h2) != 0):
-            raise ValueError("The orders of the zero and pole are not matched")
+            raise ValueError(f"The orders of the zero in {prong1} and  the pole in {prong2} are not matched")
         
         alpha1 = vt1.boundary_vector()
         alpha2 = vt2.boundary_vector()
@@ -289,9 +340,9 @@ class MultiscaleVeeringTriangulation:
         if alpha2[h2] == 0:
             raise ValueError(f"The input {prong2} is not in boundary")
         else:
-            num_p = _num_lower_prongs_in_corner(vt2,h2)
+            num_p = _num_vertical_separatrices_in_corner(vt2,h2)
             if a2 not in range(num_p):
-                raise ValueError(f"The angle label of {prong2} is out of the valid range [0, {num_p - 1}].")
+                raise ValueError(f"The angle label of {prong2} is out of the valid range [0, {num_p}].")
 
     def __str__(self):
         
@@ -320,6 +371,18 @@ class MultiscaleVeeringTriangulation:
             raise ValueError('levels are non-positive')
         return self._veering_triangulations[abs(i)]
     
+    def horizontal_faces(self, level, node):
+        r"""
+        Return a pair of faces corresponding to the node
+        """
+        vt = self.veering_triangulation_at_level(level)
+        for f in vt.boundary_faces(): 
+            if node[0] in f:
+                f0 = f
+            if node[1] in f:
+                f1 = f
+        return (f0, f1)
+
     def horizontal_nodes_at_level(self, i):
         r"""
         Return the list of horizontal nodes at the level of the input 'i'.
@@ -340,29 +403,10 @@ class MultiscaleVeeringTriangulation:
         """
 
         l = self._horizontal_nodes[abs(i)]
-        vt = self.veering_triangulation_at_level(i)
-        list_faces = vt.boundary_faces()
-
         list_horiz_nodes = []
-
         if len(l) != 0:
-            for c in l:
-                cc = str_to_cycles(c)[0]
-                cc1 = []
-
-                #turn the strings of the edges into the labels
-                for j in range(2):
-                    if cc[j] < 0:
-                        cc1.append(2*abs(cc[j]) - 1)
-                    else:
-                        cc1.append(2*cc[j])
-                
-                #find the faces containing the half-edges
-                for f in list_faces: 
-                    if cc1[0] in f:
-                        f0 = f
-                    if cc1[1] in f:
-                        f1 = f
+            for node in l:
+                f0, f1 = self.horizontal_faces(i, node)
                 list_horiz_nodes.append((i,f0,f1))
 
         return list_horiz_nodes
@@ -418,17 +462,13 @@ class MultiscaleVeeringTriangulation:
             ll1, h1, angle1 = prong1
             ll2, h2, angle2 = prong2
             if (ll1 == l1) and (ll2 == l2):
-                
-                label_h1 = str_to_label(h1)
-                label_h2 = str_to_label(h2)
-
                 #find out the vertices and faces
                 for v in list_vertices:
-                    if label_h1 in v:
+                    if h1 in v:
                         v1 = v
                         break
                 for f in list_bdry_faces:
-                    if label_h2 in f:
+                    if h2 in f:
                         f1 = f
                         break
                 l_vert_nodes.append((l1,v1,l2,f1))
@@ -501,7 +541,7 @@ class MultiscaleVeeringTriangulation:
         pole.reverse()
         for h in pole:
             hh = vp2[h]
-            num_p = _num_lower_prongs_in_corner(vt2, h)
+            num_p = _num_vertical_separatrices_in_corner(vt2, h) - 1
             for j in range(num_p):
                     prongs2.append((l2,h,j))
         
@@ -511,18 +551,11 @@ class MultiscaleVeeringTriangulation:
         list_pm = self._prong_matching
         for pm in list_pm:
             p1, p2 = pm
-            level1, string1, angle1 = p1
-            level2, string2, angle2 = p2
-            h1 = str_to_label(string1)
-            h2 = str_to_label(string2)
-            pp1 = (level1, h1, angle1)
-            pp2 = (level2, h2, angle2)
-            
-            if (pp1 in prongs1) and (pp2 in prongs2):
-                index1 = prongs1.index(pp1)
+            if (p1 in prongs1) and (p2 in prongs2):
+                index1 = prongs1.index(p1)
                 shiftprong1 = prongs1[index1:] + prongs1[:index1]
                 
-                index2 = prongs2.index(pp2)
+                index2 = prongs2.index(p2)
                 shiftprong2 = prongs2[index2:] + prongs2[:index2]
                 break
         
@@ -566,7 +599,6 @@ class MultiscaleVeeringTriangulation:
         Return the indices of the components that have horizontal nodes with the input component
         """
         vt = self.veering_triangulation_at_level(level)
-        l_comp = vt.connected_components()
         l_node = self.horizontal_nodes_at_level(level)
         
         l = []
@@ -582,7 +614,6 @@ class MultiscaleVeeringTriangulation:
             if c2 == comp_index:
                 if (level,c1) not in l:
                     l.append((level,c1))
-        
         return l
     
     def is_abelian(self, certificate=False):
@@ -597,16 +628,16 @@ class MultiscaleVeeringTriangulation:
         A horizontal node between the same components::
 
             sage: vt = VeeringTriangulation("(0,1,4)(~4,2,3)(~0:1)(~1:1)(~2:1)(~3:1)","RBBRR")
-            sage: mvt = MultiscaleVeeringTriangulation([vt],[["(~1,~2)"]],[])
+            sage: mvt = MultiscaleVeeringTriangulation([vt],["(~1,~2)"],[])
             sage: mvt.is_abelian()
             False
 
         Horizontal nodes between different components::
             sage: vt = VeeringTriangulation("(0,1,2)(3,4,5)(6,7,8)(~0:1)(~2:1)(~1:1)(~3:1)(~5:1)(~4:1)(~6:1)(~8:1)(~7:1)","RBRRBRRBR")
-            sage: mvt = MultiscaleVeeringTriangulation([vt],[["(~2,~5)","(~1,~3)"]],[])
+            sage: mvt = MultiscaleVeeringTriangulation([vt],["(~2,~5)(~1,~3)"],[])
             sage: mvt.is_abelian()
             False
-            sage: mvt = MultiscaleVeeringTriangulation([vt],[["(~2,~5)","(~1,~6)"]],[])
+            sage: mvt = MultiscaleVeeringTriangulation([vt],["(~2,~5)(~1,~6)"],[])
             sage: mvt.is_abelian()
             True
 
@@ -617,15 +648,13 @@ class MultiscaleVeeringTriangulation:
             True
             sage: vt1.is_abelian()
             True
-            sage: mvt0 = MultiscaleVeeringTriangulation([vt0,vt1],[[],["(~4,7)"]],[[(0,"0",0),(-1,"0",1)],[(0,"2",0),(-1,"5",1)]])
+            sage: mvt0 = MultiscaleVeeringTriangulation([vt0,vt1],[[],"(~4,7)"],[[(0,"0",0),(-1,"0",1)],[(0,"2",0),(-1,"5",1)]])
             sage: mvt0.is_abelian()
             False
-            sage: mvt1 = MultiscaleVeeringTriangulation([vt0,vt1],[[],["(~3,~8)"]],[[(0,"0",0),(-1,"0",1)],[(0,"2",0),(-1,"5",1)]])
-            sage: print(mvt11.is_abelian(certificate=True))
+            sage: mvt1 = MultiscaleVeeringTriangulation([vt0,vt1],[[],"(~3,~8)"],[[(0,"0",0),(-1,"0",1)],[(0,"2",0),(-1,"5",1)]])
+            sage: print(mvt1.is_abelian(certificate=True))
             (True, [[True, False, True, False, False, True, False, True, False, True], [False, True, False, True, False, True, False, True, False, True, True, False, True, False, True, False, True, False, True, False]])
         """
-
-
 
         NN = self.num_levels()
         oris = [[]] * NN
@@ -648,7 +677,7 @@ class MultiscaleVeeringTriangulation:
             ne = len(lo)
             
             l_nodes = self.horizontal_nodes_at_level(-i)
-            lc = [] #the list of components in the level-i adjusted so far
+            lc = [] #the list of components in the level-(-i) adjusted so far
             
             for level, f1, f2 in l_nodes:
                 # find out the components containing the matched poles
@@ -694,10 +723,8 @@ class MultiscaleVeeringTriangulation:
         
         for pm in self._prong_matching:
             
-            level1, str1, ang1 = pm[0]
-            level2, str2, ang2 = pm[1]
-            h1 = str_to_label(str1)
-            h2 = str_to_label(str2)
+            level1, h1, ang1 = pm[0]
+            level2, h2, ang2 = pm[1]
             
             vt1 = self.veering_triangulation_at_level(level1)
             vt2 = self.veering_triangulation_at_level(level2)
@@ -710,12 +737,8 @@ class MultiscaleVeeringTriangulation:
                 o1 = not o1
             
             #decide the orietation of the prong pm[1]
-            if vt2._colouring[h2 // 2] == RED:
-                if (ang2)%2 == 0:
-                    o2 = not o2
-            elif vt2._colouring[h2 // 2] == BLUE:
-                if (ang2)%2 == 1:
-                    o2 = not o2 
+            if (ang2)%2 == 1:
+                o2 = not o2 
             
             #find the labels of the components where the prongs are. 
             #the labels are in the form: (level, index of the component in this level)
@@ -776,3 +799,114 @@ class MultiscaleVeeringTriangulation:
                 
         return (True, oris) if certificate else True
     
+    def degeneration(self, level, edges_low=None, edges_up=None):
+        r"""
+        Return the multi-scale veering triangulation by blowing-up the given subset of ``edge``.
+
+        This corresponds to a two levels degeneration in the BCGGM compactification.
+
+        EXAMPLES::
+
+            sage: from veerer import *
+            sage: from veerer.multiscale_veering_triangulation import *
+            sage: vt00 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)","RBRBB")
+            sage: vt01 = VeeringTriangulation("(~0,1,2)(~1,~2,3)(~4,~6,~7)(6,7,~5)(0:5)(~3:1)(4:4,5:4)","BBRBBBRR")
+            sage: mvt0 = MultiscaleVeeringTriangulation([vt00,vt01],[[],[]],[[(0,"0",0),(-1,"0",1)],[(0,"2",0),(-1,"5",1)]])
+            sage: mvt0.degeneration(0, edges_low=[2], edges_up=[0, 1, 3, 4])
+            MultiscaleVeeringTriangulation(
+            veering_triangulations=[
+                VeeringTriangulationLinearFamily("(~0,~2,~1)(0:3,1:1,2:6)", "RBB", [(1, 0, 1), (0, 1, 1)]),
+                VeeringTriangulationLinearFamily("(0:6,~0:2)", "R", [(1)]),
+                VeeringTriangulation("(~0,1,2)(~1,~2,3)(~4,~6,~7)(~5,6,7)(0:5)(~3:1)(4:4,5:4)", "BBRBBBRR")
+            ],
+            horizontal_nodes=[[], [], []]
+            prong_matching=[((0, 0, 0), (-2, 0, 1)), ((-1, 0, 0), (-2, 10, 1)), ((0, 4, 0), (-1, 0, 0))],
+            )
+
+            sage: vt00 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)","RBRBB")
+            sage: vt01 = VeeringTriangulation("(~0,1,2)(~1,~2,3)(~4,~6,~7)(6,7,~5)(0:5)(~3:1)(4:4,5:4)","BBRBBBRR")
+            sage: mvt0 = MultiscaleVeeringTriangulation([vt00,vt01],[[],[]],[[(0,"0",0),(-1,"0",1)],[(0,"2",0),(-1,"5",1)]])
+            sage: mvt0.degeneration( -1, edges_low=[0, 1, 2, 3, 4, 5], edges_up=[6, 7])
+            MultiscaleVeeringTriangulation(
+            veering_triangulations=[
+                VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)", "RBRBB"),
+                VeeringTriangulationLinearFamily("(~0,1,2)(~1,~2,3)(0:5)(~3:1)(4:4,5:4)(~4:1)(~5:1)", "BBRBBB", [(1, 0, 1, 1, 0, 0), (0, 1, -1, 0, 0, 0), (0, 0, 0, 0, 1, 1)])
+            ],
+            horizontal_nodes=[[], [[9, 11]]]
+            prong_matching=[((0, 0, 0), (-1, 0, 1)), ((0, 4, 0), (-1, 10, 1))],
+            )
+        """
+
+        vt = self.veering_triangulation_at_level(level)
+        nh = 2 * (vt.num_edges())
+        ep = vt.edge_permutation()
+    
+        f_up ,f_low, r_up, r_low = vt.degeneration(edges_low=edges_low, edges_up=edges_up)
+        
+        #build list of veering triangulations
+        vts = self._veering_triangulations
+        if f_up is None:
+            vts[abs(level)] = f_low
+        else:
+            vts[abs(level)] = f_up
+            vts.insert(abs(level) + 1, f_low)
+        
+        #build the horizontal nodes
+        l1 = []
+        l_horiz = self._horizontal_nodes
+        #existing horizontal nodes
+        for a1, a2 in self._horizontal_nodes[abs(level)]:
+            a1 = r_low[a1]
+            a2 = r_low[a2]
+            l1.append([a1,a2])
+        #new horizontal nodes
+        if f_up is None:
+            for h in range(nh):
+                if (r_up[h] == r_low[h] == -1):
+
+                    def bdry_of_cyl(vt, r_low, h):
+                        while r_low[h] == -1:
+                            h = vt.previous_at_vertex(h)
+                        return r_low[h]
+
+                    b1 = bdry_of_cyl(vt, r_low, h)
+                    h1 = ep[h]
+                    b2 = bdry_of_cyl(vt, r_low, h1)
+
+                    #add the corresponding horizontal node
+                    assert f_low.face_angle(b1) == f_low.face_angle(b2) == 0
+                    for f in f_low.boundary_faces():
+                        if b1 in f:
+                            b1 = min(f)
+                        if b2 in f:
+                            b2 = min(f)
+                    node = sorted([b1, b2])
+                    if node not in l1:
+                        l1.append(node)
+            l_horiz[abs(level)] = l1
+        else:
+            l_horiz.append([])
+        
+        #build the vertical nodes
+        l_pm = []
+        #existing vertical nodes
+        original_pm = self._prong_matching
+        for pm in original_pm:
+            prong1, prong2 = pm
+            if prong1[0] == level:
+                prong1 = track_prong(vt, r_up, r_low, prong1)
+                if f_up is None:
+                    l_pm.append([prong1,prong2])
+                else:
+                    prong2 = (prong2[0] - 1, prong2[1], prong2[2])
+                    l_pm.append([prong1,prong2])
+            elif prong2[0] == level:
+                prong2 = track_prong(vt, r_up, r_low, prong2)
+                l_pm.append([prong1,prong2])
+            else:
+                l_pm.append(pm)
+        #new vertical nodes
+        l_pm  = l_pm + new_prong_matching(vt, f_low, r_low, r_up, level)
+        
+        #build the degeneration
+        return MultiscaleVeeringTriangulation(vts,l_horiz,l_pm)
