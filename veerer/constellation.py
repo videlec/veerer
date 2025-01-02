@@ -152,27 +152,25 @@ class Constellation:
             if (self._vp[i] == -1) != (self._fp[i] == -1):
                 raise ValueError("vp and fp with different domains")
 
-        for l in self._half_edges_data:
-            if not isinstance(l, collections.abc.Sequence):
-                raise error('each half-edges data must be a sequence of same length as the underlying permutations got a {}'.format(type(l).__name__))
-            if len(l) != 2 * ne:
-                raise error('half-edges data of wrong length: got a {} of length {}'.format(type(l).__name__, len(l)))
-            if self._mutable and not isinstance(l, collections.abc.MutableSequence):
-                raise error('immutable data in mutable object')
-
-        for l in self._edges_data:
-            if not isinstance(l, collections.abc.Sequence) or len(l) != ne:
-                raise error('each edges data must be a sequence of length the number of edges; got a {} of length {}'.format(type(l).__name__, len(l)))
-            if self._mutable and not isinstance(l, collections.abc.MutableSequence):
-                raise error('immutable data in mutable object')
-
         for i in range(2 * ne):
-            if self._vp[i] == -1:
-                for l in self._half_edges_data:
+            if self._vp[i] != -1 and self._fp[self._ep(self._vp[i])] != i:
+                raise error('fev relation not satisfied at half-edge i={}'.format(self._half_edge_string(i)))
+
+        if not isinstance(self._half_edges_data, tuple):
+            raise ValueError("half_edges_data must be a tuple")
+        for l in self._half_edges_data:
+            if not isinstance(l, array) or l.typecode != 'i' or len(l) != 2 * ne:
+                raise ValueError("each half edge data must be an array of length twice the number of edges: got a {} of length {}".format(type(l).__name__, len(l)))
+            for i in range(2 * ne):
+                if self._vp[i] == -1:
                     if l[i]:
                         raise error('non-zero entry {} in half-edge data at the non-active half-edge {}'.format(l[i], i))
-            elif self._fp[self._ep(self._vp[i])] != i:
-                raise error('fev relation not satisfied at half-edge i={}'.format(self._half_edge_string(i)))
+
+        if not isinstance(self._edges_data, tuple):
+            raise ValueError("edges_data must be a tuple")
+        for l in self._edges_data:
+            if not isinstance(l, array) or l.typecode != 'i' or len(l) != ne:
+                raise error("each edges data must be an array of length the number of edges; got a {} of length {}".format(type(l).__name__, len(l)))
 
     def _check_alloc(self, n):
         if len(self._vp) < n or len(self._ep) < n or len(self._fp) < n:
@@ -485,8 +483,8 @@ class Constellation:
         C._ne = n // 2
         C._vp = vp
         C._fp = fp
-        C._half_edges_data = half_edges_data
-        C._edges_data = edges_data
+        C._half_edges_data = tuple(half_edges_data)
+        C._edges_data = tuple(edges_data)
         C._mutable = mutable
         C._set_data_pointers()
 
@@ -1597,10 +1595,10 @@ class Constellation:
                     shift += 2 * len(comp)
 
             fp_best = perm_conjugate(self._fp, relabelling_best)
-            half_edges_data_best = [l[:] for l in self._half_edges_data]
+            half_edges_data_best = tuple(l[:] for l in self._half_edges_data)
             for ldest, lsrc in zip(half_edges_data_best, self._half_edges_data):
                 perm_on_array(ldest, lsrc, relabelling_best, n)
-            edges_data_best = [l[:] for l in self._edges_data]
+            edges_data_best = tuple(l[:] for l in self._edges_data)
             for ldest, lsrc in zip(edges_data_best, self._edges_data):
                 perm_on_edge_array(ldest, lsrc, relabelling_best, n)
 
@@ -1638,10 +1636,10 @@ class Constellation:
             relabelling_best = array('i', [-1] * n)
             fp_new = array('i', [-1] * n)
             fp_best = array('i', [-1] * n)
-            half_edges_data_new = [l[:] for l in half_edges_data]
-            half_edges_data_best = [l[:] for l in half_edges_data]
-            edges_data_new = [l[:] for l in edges_data]
-            edges_data_best = [l[:] for l in edges_data]
+            half_edges_data_new = tuple(l[:] for l in half_edges_data)
+            half_edges_data_best = tuple(l[:] for l in half_edges_data)
+            edges_data_new = tuple(l[:] for l in edges_data)
+            edges_data_best = tuple(l[:] for l in edges_data)
             k_half_edges = len(half_edges_data)
             k_edges = len(edges_data)
 
@@ -1724,9 +1722,11 @@ class Constellation:
             sage: T = Triangulation(t, mutable=True)
             sage: T
             Triangulation("(0,10,~9)(~0,11,~10)(1,~8,9)(~1,~7,8)(2,~6,7)(~2,~5,6)(3,~4,5)(~3,~11,4)")
+            sage: T._check()
             sage: T.set_canonical_labels()
             sage: T
             Triangulation("(0,1,2)(~0,~2,3)(~1,4,5)(~3,6,7)(~4,8,~5)(~6,9,~7)(~8,10,11)(~9,~11,~10)")
+            sage: T._check()
         """
         if not self._mutable:
             raise ValueError('immutable triangulation; use a mutable copy instead')
