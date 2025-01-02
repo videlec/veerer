@@ -58,8 +58,8 @@ The examples below is Q(1^2, -1^2) with two folded edges::
 Exploring strata::
 
     sage: from surface_dynamics import Stratum                       # optional - surface_dynamics
-    sage: strata = [Stratum([2], 1), Stratum([2,-1,-1], 2),          # optional - surface_dynamics
-    ....:           Stratum([2,2], 2), Stratum([1,1], 1)]
+    sage: strata = [Stratum([2], 1), Stratum([2, -1, -1], 2),        # optional - surface_dynamics
+    ....:           Stratum([2, 2], 2), Stratum([1,1], 1)]
     sage: for stratum in strata:                                     # optional - surface_dynamics
     ....:     print(stratum)
     ....:     vt = VeeringTriangulation.from_stratum(stratum)
@@ -116,7 +116,7 @@ from .veering_triangulation import VeeringTriangulation
 from .strebel_graph import StrebelGraph
 from .linear_family import VeeringTriangulationLinearFamily
 from .constants import RED, BLUE, PURPLE, VERTICAL, HORIZONTAL, PROPERTIES_COLOURS, colour_to_char, colour_to_string
-from .permutation import perm_invert
+from .permutation import perm_invert, perm_compose
 
 from sage.graphs.digraph import DiGraph
 
@@ -940,9 +940,9 @@ class FlipGraph(Automaton):
         for e in state.flippable_edges():
             new_state = state.copy(mutable=True)
             new_state.flip(e)
-            new_state.set_canonical_labels()
+            r = new_state.set_canonical_labels(mapping=True)
             new_state.set_immutable()
-            yield (new_state, e)
+            yield (new_state, (e, r))
 
     _in_neighbors = _out_neighbors
 
@@ -967,9 +967,9 @@ class CoreAutomaton(Automaton):
                 state.flip(e, col, check=CHECK)
                 if state.edge_has_curve(e):
                     new_state = state.copy(mutable=True)
-                    new_state.set_canonical_labels()
+                    r = new_state.set_canonical_labels(mapping=True)
                     new_state.set_immutable()
-                    yield (new_state, (e, col))
+                    yield (new_state, (e, col, r))
                 state.flip_back(e, old_col, check=CHECK)
 
     def _in_neighbors(self, state):
@@ -980,9 +980,9 @@ class CoreAutomaton(Automaton):
                 state.flip_back(e, col, check=CHECK)
                 if state.edge_has_curve(e):
                     new_state = state.copy(mutable=True)
-                    new_state.set_canonical_labels()
+                    r = new_state.set_canonical_labels(mapping=True)
                     new_state.set_immutable()
-                    yield (new_state, (e, col))
+                    yield (new_state, (e, col, r))
                 state.flip(e, col, check=CHECK)
 
 
@@ -1116,9 +1116,9 @@ class ReducedCoreAutomaton(Automaton):
                 status, recolorings = self._flip(state, e, col, check=CHECK)
                 if state.edge_has_curve(e):
                     new_state = state.copy(mutable=True)
-                    new_state.set_canonical_labels()
+                    r = new_state.set_canonical_labels(mapping=True)
                     new_state.set_immutable()
-                    yield (new_state, (e, col))
+                    yield (new_state, (e, col, r))
                 self._flip_back(state, e, recolorings, check=CHECK)
 
     # TODO: implement in_neighbors
@@ -1497,6 +1497,32 @@ class DelaunayStrebelAutomaton(Automaton):
             if len(s) != 1:
                 raise ValueError('got different strata: {}'.format(sorted(s)))
 
+        for source, target, label in self._graph.edges():
+            kind = label[0]
+            if kind == "flip":
+                assert len(label) == 5
+                edges = label[1]
+                old_col = label[2]
+                new_col = label[3]
+                r = label[4]
+                state = source.copy(mutable=True)
+                for e in edges:
+                    assert state.edge_colour(e) == old_col
+                    state.flip(e, new_col)
+                state.relabel(r)
+                assert state == target, (source, state, target)
+            elif kind == "rotate":
+                assert len(label) == 2
+                r = label[1]
+                state = source.copy(mutable=True)
+                state.rotate()
+                state.relabel(r)
+                assert state == target, (source, state, target)
+            elif kind == "strebel":
+                assert len(label) == 2
+                r = label[1]
+                sg = source.strebel_graph()
+
     def _setup(self, backend=None):
         self._backend = backend
 
@@ -1534,36 +1560,37 @@ class DelaunayStrebelAutomaton(Automaton):
                     print('[_out_neighbors] strebelization')
                 if CHECK:
                     assert state.is_strebel(VERTICAL)
-                out_neighbor = state.strebel_graph(VERTICAL, mutable=True)
-                out_neighbor.set_canonical_labels()
+                out_neighbor, r1 = state.strebel_graph(VERTICAL, mapping=True, mutable=True)
+                r2 = out_neighbor.set_canonical_labels(mapping=True)
                 out_neighbor.set_immutable()
-                yield (out_neighbor, 'strebel')
+                yield (out_neighbor, ('strebel', perm_compose(r1, r2)))
 
                 # rotation
                 if self._verbosity >= 2:
                     print('[_out_neighbors] rotate')
                 out_neighbor = state.copy(mutable=True)
                 out_neighbor.rotate()
-                out_neighbor.set_canonical_labels()
+                r = out_neighbor.set_canonical_labels(mapping=True)
                 out_neighbor.set_immutable()
-                yield (out_neighbor, 'rotate')
+                yield (out_neighbor, ('rotate', r))
 
             else:
                 # forward flips
                 if self._verbosity >= 2:
                     print('[_out_neighbors] forward_flips')
-                for edges, col in flips:
-                    assert all(state.edge_colour(e) == state.edge_colour(edges[0]) for e in edges)
+                for edges, new_col in flips:
+                    old_col = state.edge_colour(edges[0])
+                    assert all(state.edge_colour(e) == old_col for e in edges)
                     out_neighbor = state.copy(mutable=True)
                     for e in edges:
-                        out_neighbor.flip(e, col, check=CHECK)
+                        out_neighbor.flip(e, new_col, check=CHECK)
                     if CHECK:
                         out_neighbor._check(RuntimeError)
                         if not out_neighbor.is_delaunay(backend=self._backend):
                             raise RuntimeError
-                    out_neighbor.set_canonical_labels()
+                    r = out_neighbor.set_canonical_labels(mapping=True)
                     out_neighbor.set_immutable()
-                    yield (out_neighbor, (edges, col))
+                    yield (out_neighbor, ('flip', edges, old_col, new_col, r))
 
     def _in_neighbors(self, state, check=CHECK):
         if isinstance(state, StrebelGraph):

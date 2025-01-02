@@ -170,6 +170,16 @@ class VeeringTriangulation(Triangulation):
         Triangulation._set_data_pointers(self)
         self._colouring = self._edges_data[0]
 
+    def _check_separatrix(self, half_edge, angle):
+        half_edge = self._check_half_edge(half_edge)
+        if not isinstance(angle, numbers.Integral):
+            raise ValueError("invalid angle for separatrix")
+        angle = int(angle)
+        num_seps = self._bdry[half_edge] + (self._colouring[half_edge // 2] == RED and self._colouring[self._vp[half_edge] // 2] == BLUE)
+        if angle < 0 or angle > num_seps:
+            raise ValueError("angle (={}) out of range for separatrix; must be >= 0 and <= {}".format(angle, num_seps))
+        return (half_edge, angle)
+
     def _check(self, error=RuntimeError):
         """
         EXAMPLES::
@@ -3470,14 +3480,14 @@ class VeeringTriangulation(Triangulation):
         from .automaton import DelaunayStrebelAutomaton
         if backward is None:
             backward = any(self._bdry)
-        components = self.prime_decomposition()
-        for comp in components:
-            pass
         A = DelaunayStrebelAutomaton(backward=backward, verbosity=verbosity, backend=backend)
         A.add_seed(self)
         if run:
             A.run()
         return A
+
+    def delaunay_strebel_graph(self):
+        return self.delaunay_strebel_automaton()._graph
 
     def _complexify_generators(self, Gx):
         r"""
@@ -5275,7 +5285,7 @@ class VeeringTriangulation(Triangulation):
             else:
                 raise ValueError('invalid slope parameter')
 
-    def strebel_graph(self, slope=VERTICAL, mutable=False):
+    def strebel_graph(self, slope=VERTICAL, mapping=False, mutable=False):
         r"""
         Return the Strebel graph associated to this veering triangulation.
 
@@ -5284,6 +5294,9 @@ class VeeringTriangulation(Triangulation):
         - ``slope`` (optional, default ``VERTICAL``) -- either ``VERTICAL`` or ``HORIZONTAL``
 
         - ``mutable`` (optional, default ``False``) -- whether the output Strebel graph is mutable
+
+        - ``mapping`` -- whether to return the mapping of edges (the Strebel
+          graph is a subgraph of the triangulation)
 
         EXAMPLES::
 
@@ -5323,6 +5336,9 @@ class VeeringTriangulation(Triangulation):
             sage: sg
             StrebelGraph("(0:1,1,~1:1,~0,2)(~2,~3:2,4,~4:1,3)")
             sage: assert sg.stratum() == vt.stratum() == Stratum((5, 0, 0, 0, 0, -4, -5), 2) # optional - surface_dynamics
+            sage: vt.strebel_graph(mapping=True)
+            (StrebelGraph("(0:1,1,~1:1,~0,2)(~2,~3:2,4,~4:1,3)"),
+             array('i', [-1, -1, 0, 1, 2, 3, 4, 5, -1, -1, -1, -1, 6, 7, 8, 9, -1, -1]))
 
             sage: vt = VeeringTriangulation("(0,1,2)(3,4,5)(6,7,8)", "(~8:2,~7:1,~6:1,~5:2,~4:1,~3:1,~2:2,~1:1,~0:1)", "RBRRBBRRB")
             sage: sg = vt.strebel_graph()
@@ -5358,7 +5374,7 @@ class VeeringTriangulation(Triangulation):
         m = 2 * dim # number of half-edges
 
         # index of half-edges that remain in the strebel graph
-        index_strebel = [-1] * n
+        index_strebel = array('i', [-1] * n)
         j = 0
         for e in range(0, n, 2):
             E = ep(e)
@@ -5407,7 +5423,8 @@ class VeeringTriangulation(Triangulation):
 
         #STEP3: build the Strebel graph
         from .strebel_graph import StrebelGraph
-        return StrebelGraph.from_permutations(vertex_permutation, None, (beta,), (), mutable=mutable, check=True)
+        sg = StrebelGraph.from_permutations(vertex_permutation, None, (beta,), (), mutable=mutable, check=True)
+        return (sg, index_strebel) if mapping else sg
 
 
 class VeeringTriangulations:
