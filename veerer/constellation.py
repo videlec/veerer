@@ -1710,7 +1710,7 @@ class Constellation:
 
             return (relabellings, fp_best, half_edges_data_best, edges_data_best) if return_all else (relabelling_best, fp_best, half_edges_data_best, edges_data_best)
 
-    def set_canonical_labels(self):
+    def set_canonical_labels(self, mapping=False):
         r"""
         Set labels in a canonical way in its automorphism class.
 
@@ -1737,6 +1737,8 @@ class Constellation:
         self._half_edges_data = half_edges_data_best
         self._edges_data = edges_data_best
         self._set_data_pointers()
+        if mapping:
+            return r
 
     def iso_sig(self):
         r"""
