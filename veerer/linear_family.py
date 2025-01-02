@@ -604,7 +604,7 @@ class LinearFamily:
 
         return (family_relabellings, fp_best, half_edges_data_best, edges_data_best, subspace_best) if return_all else (relabelling_best, fp_best, half_edges_data_best, edges_data_best, subspace_best)
 
-    def set_canonical_labels(self):
+    def set_canonical_labels(self, mapping=False):
         r"""
         Set labels in a canonical way in its automorphism class.
         """
@@ -618,6 +618,8 @@ class LinearFamily:
         self._edges_data = edges_data_best
         self._set_data_pointers()
         self._subspace = subspace_best
+        if mapping:
+            return r
 
     def _non_isom_easy(self, other):
         return (self._constellation_class._non_isom_easy(self, other) or
