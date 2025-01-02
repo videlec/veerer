@@ -932,7 +932,7 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
                 else:
                     self.flip_back(e, old_col)
 
-    def strebel_graph(self, slope=VERTICAL, mutable=False):
+    def strebel_graph(self, slope=VERTICAL, mapping=False, mutable=False):
         r"""
         EXAMPLES::
 
@@ -979,9 +979,10 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
             if self.is_half_edge_strebel(2 * e, slope) and (fp[2 * e + 1] == -1 or self.is_half_edge_strebel(2 * e + 1)):
                 indices.append(e)
 
-        G = VeeringTriangulation.strebel_graph(self, slope, mutable=False)
+        G, index_strebel = VeeringTriangulation.strebel_graph(self, slope, mapping=True, mutable=False)
         subspace = self.generators_matrix(slope).matrix_from_columns(indices)
-        return StrebelGraphLinearFamily(G, subspace, mutable=mutable)
+        sg = StrebelGraphLinearFamily(G, subspace, mutable=mutable)
+        return (sg, index_strebel) if mapping else sg
 
 
 class StrebelGraphLinearFamily(LinearFamily, StrebelGraph):
