@@ -240,15 +240,17 @@ class MultiscaleVeeringTriangulation:
                 # adjust prong2 according to our convention that we do not consider the last prong in the each corner
                 level2, h2, ang = prong2
                 vt = self._veering_triangulations[abs(level2)]
+                assert vt.face_angle(h2) != 0
                 last_ang = _num_vertical_separatrices_in_corner(vt, h2) - 1 #the valide range is between 1 and the number of vertical separatrices 
                 while ang == last_ang:
-                    hh2 = vt.previous_in_face(h2)
+                    h2 = vt.previous_in_face(h2)
                     ang = 0
-                    prong2 = (level2, hh2, ang)
-
-                pm = [prong1, prong2]
-
+                    prong2 = (level2, h2, ang)
+                    last_ang = _num_vertical_separatrices_in_corner(vt, h2) - 1
                 #Note that the resulting prong2 is always equivalent to the original prong2
+                    
+                pm = [prong1, prong2]
+                
                 prongs1, prongs2 = self._local_prong_matching(pm)
                 assert prongs1.index(prong1) == prongs2.index(prong2)
                 
@@ -813,9 +815,19 @@ class MultiscaleVeeringTriangulation:
 
             sage: from veerer import *
             sage: from veerer.multiscale_veering_triangulation import *
+            sage: import surface_dynamics
 
-        Reach all vertical boundary component of H_1(2) from a single veering triangulaiton::
+        Reach all vertical boundary component of H_1(2) from a single veering triangulaiton (TO BE COMPLETED)::
 
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "BRBBRBBRB")
+            sage: vt.stratum()
+            H_2(2)
+            sage: mvt = MultiscaleVeeringTriangulation([vt],[[]],[])
+            sage: vt.vertical_degeneration_low_edges_subsets()
+            [(1,), (4,), (7,), (4, 7), (1, 4)]
+            sage: mvt1 = mvt.degeneration(0, edges_low=(1,))
+            sage: mvt2 = mvt.degeneration(0, edges_low=(4,))
+            sage: mvt3 = mvt1.degeneration(0,edges_low=(4,))
 
         More examples::
             
