@@ -749,8 +749,8 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
 
         subspace = self._horizontal_subspace()
         subspace.echelonize()
-        super().rotate()
         self._subspace = subspace
+        super().rotate()
 
         # TODO: remove check
         self._check()
