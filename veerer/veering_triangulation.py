@@ -176,7 +176,7 @@ class VeeringTriangulation(Triangulation):
             raise ValueError("invalid angle for separatrix")
         angle = int(angle)
         num_seps = self._bdry[half_edge] + (self._colouring[half_edge // 2] == RED and self._colouring[self._vp[half_edge] // 2] == BLUE)
-        if angle < 0 or angle > num_seps:
+        if angle < 0 or angle >= num_seps:
             raise ValueError("angle (={}) out of range for separatrix; must be >= 0 and <= {}".format(angle, num_seps))
         return (half_edge, angle)
 

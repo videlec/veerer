@@ -202,8 +202,8 @@ class DelaunayStrebelPath(DiGraphPath):
         elif half_edge == d:
             assert angle == 0
             return (2 * e, 0) if col == RED else (half_edge, angle)
-        else:
-            return (half_edge, angle)
+
+        return (half_edge, angle)
 
     @staticmethod
     def _vertex_separatrix_flip_back(state, e, col, half_edge, angle):
@@ -217,8 +217,8 @@ class DelaunayStrebelPath(DiGraphPath):
             assert angle == 0
             a, b, c, d = state.square_about_half_edge(2 * e)
             return (a, 0)
-        else:
-            return (half_edge, angle)
+
+        return (half_edge, angle)
 
     @staticmethod
     def _vertex_separatrix_rotate(state, half_edge, angle):
@@ -251,9 +251,18 @@ class DelaunayStrebelPath(DiGraphPath):
             target = self._vertices[i + 1]
             transition = self._edge_labels[i]
 
-            source._check_vertex_separatrix(half_edge, angle)
-
             reverse = self._signs[i]
+            if reverse:
+                source, target = target, source
+
+            # (source, target) follows the orientation of the graph
+            assert self._graph.has_edge(source, target, transition)
+
+            if reverse:
+                target._check_vertex_separatrix(half_edge, angle)
+            else:
+                source._check_vertex_separatrix(half_edge, angle)
+
             kind = transition[0]
             if kind == "flip":
                 edges = transition[1]
@@ -262,12 +271,13 @@ class DelaunayStrebelPath(DiGraphPath):
                 relabelling = transition[4]
                 if reverse:
                     for e in edges:
-                        half_edge, angle = self._vertex_separatrix_flip_back(target, relabelling[e], old_col, half_edge, angle)
+                        half_edge, angle = self._vertex_separatrix_flip_back(target, relabelling[2 * e] // 2, old_col, half_edge, angle)
                     half_edge, angle = self._separatrix_relabelling_back(relabelling, half_edge, angle)
                 else:
                     for e in edges:
                         half_edge, angle = self._vertex_separatrix_flip(source, e, new_col, half_edge, angle)
                     half_edge, angle = self._separatrix_relabelling(relabelling, half_edge, angle)
+
             elif kind == "rotate":
                 relabelling = transition[1]
                 if reverse:
@@ -279,7 +289,10 @@ class DelaunayStrebelPath(DiGraphPath):
             elif kind == "strebel":
                 raise NotImplementedError
 
-            target._check_vertex_separatrix(half_edge, angle)
+            if reverse:
+                source._check_vertex_separatrix(half_edge, angle)
+            else:
+                target._check_vertex_separatrix(half_edge, angle)
 
         return (half_edge, angle)
 
