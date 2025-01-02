@@ -264,14 +264,57 @@ class DelaunayStrebelPath(DiGraphPath):
             target._check_separatrix(half_edge, angle)
             return (half_edge, angle)
 
-    def face_separatrix_transport(self, sep_half_edge, sep_angle):
-        for i in range(len(self)):
-            source = self._vertices[i]
-            target = self._vertices[i + 1]
-            edge_label = self._edge_labels[i]
-            reverse = self._signs[i]
-            sep_half_edge, sep_angle = self._transition_face_separatrix_transport(source, target, edge_label, reverse, sep_half_edge, sep_angle)
+    @staticmethod
+    def _face_separatrix_flip(source, target, e, col, sep_half_edge, sep_angle):
+        raise NotImplementedError
 
-        return sep_half_edge, sep_angle
+    @staticmethod
+    def _face_separatrix_flip_back(source, target, e, col, sep_half_edge, sep_angle):
+        raise NotImplementedError
+
+    @staticmethod
+    def _face_separatrix_rotate(source, target):
+        raise NotImplementedError
+
+    @staticmethod
+    def _face_separatrix_rotate_back(source, target):
+        raise NotImplementedError
+
+    @staticmethod
+    def _face_separatrix_relabelling(source, target, relabelling, sep_half_edge, sep_angle):
+        raise NotImplementedError
+
+    @staticmethod
+    def _face_separatrix_relabelling_back(source, target, relabelling, sep_half_edge, sep_angle):
+        raise NotImplementedError
+
+    def face_separatrix_transport(self, half_edge, angle):
+        source = self._vertices[i]
+        target = self._vertices[i + 1]
+        transition = self._edge_labels[i]
+
+        source._check_separatrix(half_edge, angle)
+
+        reverse = self._signs[i]
+        kind = transition[0]
+        if kind == "flip":
+            edges = transition[1]
+            old_col = transition[2]
+            new_col = transition[3]
+            relabelling = transition[4]
+            if reverse:
+                for e in edges:
+                    half_edge, angle = self._vertex_separatrix_flip_back(target, source, relabelling[e], old_col, half_edge, angle)
+                half_edge, angle = self._vertex_separatrix_relabelling_back(target, source, relabelling, half_edge, angle)
+            else:
+                for e in edges:
+                    half_edge, angle = self._vertex_separatrix_flip(source, target, e, new_col, half_edge, angle)
+                half_edge, angle = self._vertex_separatrix_relabelling(source, target, relabelling, half_edge, angle)
+        elif kind == "rotate":
+            raise NotImplementedError
+        elif kind == "strebel":
+            raise NotImplementedError
+
+        return half_edge, angle
 
 
