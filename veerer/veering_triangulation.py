@@ -175,9 +175,9 @@ class VeeringTriangulation(Triangulation):
         if not isinstance(angle, numbers.Integral):
             raise ValueError("invalid angle for separatrix")
         angle = int(angle)
-        num_seps = self._bdry[half_edge] + (self._colouring[half_edge // 2] == RED and self._colouring[self._vp[half_edge] // 2] == BLUE)
+        num_seps =  self.half_edge_num_separatrices(half_edge)
         if angle < 0 or angle >= num_seps:
-            raise ValueError("angle (={}) out of range for separatrix; must be >= 0 and <= {}".format(angle, num_seps))
+            raise ValueError("angle (={}) out of range for separatrix at half_edge={}; must be >= 0 and <= {}".format(angle, half_edge, num_seps))
         return (half_edge, angle)
 
     def _check_face_separatrix(self, half_edge, angle):
@@ -856,6 +856,74 @@ class VeeringTriangulation(Triangulation):
             graph = self.constellation().subgraph(atom)
             ans.append((atom, VeeringTriangulationLinearFamily(graph, subspace, mutable=mutable, check=check)))
         return ans
+
+    def half_edge_num_separatrices(self, h, slope=VERTICAL, check=True):
+        h = self._check_half_edge(h)
+        if slope == VERTICAL:
+            return self._bdry[h] + (self._colouring[h // 2] == RED and self._colouring[self._vp[h] // 2] == BLUE)
+        elif slope == HORIZONTAL:
+            return self._bdry[h] + (self._colouring[h // 2] == BLUE and self._colouring[self._vp[h] // 2] == RED)
+        else:
+            raise ValueError("invalid slope argument")
+
+    def vertex_separatrices(self, flat=True, slope=VERTICAL):
+        r"""
+        Return the pairs ``(h, a)`` encoding vertex separatrices on this veering triangulation.
+
+        INPUT:
+
+        - ``flat`` (boolean, default ``False``) -- whether to return the result
+          as a plain list or as a list of cycles corresponding to each vertex
+
+        - ``slope`` -- either ``VERTICAL`` (default) or ``HORIZONTAL``
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,12,~11)(~0,~10,11)(1,16,~15)(~1,~17,6)(2,15,~14)(~2,~6,7)(3,14,~13)(~3,~7,8)(4,17,~16)(~4,~8,9)(5,13,~12)(~5,~9,10)", "RRRRRRBBBBBBBBBBBB")
+            sage: vt.vertex_separatrices()
+            [(0, 0),
+             (9, 0),
+             (10, 0),
+             (1, 0),
+             (2, 0),
+             (5, 0),
+             (6, 0),
+             (11, 0),
+             (3, 0),
+             (4, 0),
+             (7, 0),
+             (8, 0)]
+            sage: vt.vertex_separatrices(flat=False)
+            [[(0, 0), (9, 0), (10, 0), (1, 0), (2, 0), (5, 0), (6, 0), (11, 0)],
+             [(3, 0), (4, 0), (7, 0), (8, 0)]]
+
+            sage: VeeringTriangulation("(0,1,2)(~0,~1,3)(~2:1,~4:2)(~3:3,4:1)", "BRRRR").vertex_separatrices()
+            [(5, 0), (8, 0), (2, 0), (7, 0), (7, 1), (7, 2), (9, 0), (9, 1), (3, 0)]
+            sage: VeeringTriangulation("(0,1,2)(~0,~1,3)(~2:1,~4:2)(~3:3,4:1)", "BRRRR").vertex_separatrices(flat=False)
+            [[(5, 0), (8, 0), (2, 0), (7, 0), (7, 1), (7, 2), (9, 0), (9, 1), (3, 0)]]
+        """
+        if slope == VERTICAL:
+            right = RED
+            left = BLUE
+        else:
+            right = BLUE
+            left = RED
+
+        if any(col == GREEN or col == PURPLE for col in self._colouring):
+            raise NotImplementedError
+
+        separatrices = []
+        for cycle in self.vertices():
+            orbit = []
+            for h in cycle:
+                for a in range(self.half_edge_num_separatrices(h, slope, check=False)):
+                    orbit.append((h, a))
+            if flat:
+                separatrices.extend(orbit)
+            else:
+                separatrices.append(orbit)
+        return separatrices
 
     def vertex_angle(self, h):
         r"""

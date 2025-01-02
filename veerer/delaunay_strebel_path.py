@@ -6,7 +6,7 @@ from collections import deque
 
 from sage.misc.prandom import choice, randrange
 
-from veerer.constants import BLUE, RED
+from veerer.constants import BLUE, RED, HORIZONTAL, VERTICAL
 from veerer.permutation import perm_preimage
 
 
@@ -24,13 +24,20 @@ class DiGraphPath:
         sage: path.appendleft(('01000', 1), reverse=True)
         sage: path.appendleft(('11000', 0))
         sage: path
-        Closed path of length 4 in 5-dimensional Butterfly from ('11000', 0) to ('11000', 0)
+        Closed path of length 4 in 5-dimensional Butterfly at ('11000', 0)
     """
     def __init__(self, graph, start):
         self._graph = graph
         self._vertices = deque([start])  # vertices
         self._edge_labels = deque([])    # edge labels
         self._signs = deque([])          # 1 if edge is taken backward
+
+    def copy(self):
+        ans = type(self).__new__(type(self))
+        ans._vertices = self._vertices[:]
+        ans._edge_labels = self._edge_labels[:]
+        ans._signs = self._signs[:]
+        return ans
 
     def __bool__(self):
         return bool(self._edge_labels)
@@ -39,13 +46,35 @@ class DiGraphPath:
         return len(self._edge_labels)
 
     def __repr__(self):
-        return "{} of length {} in {} from {} to {}".format("Closed path" if self.is_closed() else "Path", len(self), self._graph, self.start(), self.end())
+        if self.is_closed():
+            return "Closed path of length {} in {} at {}".format(len(self), self._graph, self.start())
+
+        else:
+            return "Path of length {} in {} from {} to {}".format(len(self), self._graph, self.start(), self.end())
 
     def start(self):
         return self._vertices[0]
 
     def end(self):
         return self._vertices[-1]
+
+    def __invert__(self):
+        ans = self.copy()
+        ans._vertices.reverse()
+        ans._edges.reverse()
+        ans._signs.reverse()
+        for i, s in ans._signs:
+            ans[i] = 1 - s
+
+    def __mul__(self, other):
+        if type(self) != type(other):
+            raise TypeError
+
+        ans = self.copy()
+        ans._vertices.extend(other._vertices[1:])
+        ans._edge_labels.extend(other._edge_labels)
+        ans._signs.extend(other._signs)
+        return ans
 
     def append(self, target=None, edge_label=None, reverse=False):
         source = self.end()
@@ -222,25 +251,59 @@ class DelaunayStrebelPath(DiGraphPath):
 
     @staticmethod
     def _vertex_separatrix_rotate(state, half_edge, angle):
-        half_edge = state.previous_at_vertex(half_edge)
-        while state.half_edge_colour(sep_half_edge) == BLUE:
-            half_edge = state.previous_at_vertex(half_edge)
+        # blue half-edge: nothing on angle, always fine
+        # red half-edge: do -1 on angle, need to explore previous if angle=0
+        next_half_edge = state.next_at_vertex(half_edge)
+        if state._colouring[half_edge // 2] == RED:
+            if angle == 0:
+                half_edge = state.previous_at_vertex(half_edge)
+                num_seps = state.half_edge_num_separatrices(half_edge, HORIZONTAL)
+                while num_seps == 0:
+                    half_edge = state.previous_at_vertex(half_edge)
+                    num_seps = state.half_edge_num_separatrices(half_edge, HORIZONTAL)
+                angle = num_seps - 1
+            else:
+                angle -= 1
+
         return (half_edge, angle)
 
     @staticmethod
     def _vertex_separatrix_rotate_back(state, half_edge, angle):
-        half_edge = state.next_at_vertex(half_edge)
-        while state.half_edge_colour(half_edge) == BLUE:
-            half_edge = state.next_at_vertex(half_edge)
+        # blue half-edge: +1 on angle, if next half-edge is blue and angle=max need to explore next
+        # red half-edge: nothing on angle, if next half-edge is blue and angle=max need to explore next
+        if state._colouring[half_edge // 2] == BLUE:
+            angle += 1
+
+        next_half_edge = state.next_at_vertex(half_edge)
+        if state._colouring[next_half_edge // 2] == BLUE:
+            num_seps = state.half_edge_num_separatrices(half_edge, HORIZONTAL)
+            if num_seps == angle:
+                half_edge = next_half_edge
+                num_seps = state.half_edge_num_separatrices(half_edge, HORIZONTAL)
+                while num_seps == 0:
+                    half_edge = state.next_at_vertex(half_edge)
+                    num_seps = state.half_edge_num_separatrices(half_edge, HORIZONTAL)
+                angle = 0
+
         return (half_edge, angle)
 
     @staticmethod
     def _vertex_separatrix_strebel(state, mapping, half_edge, angle):
-        raise NotImplementedError
+        while mapping[half_edge] == -1:
+            half_edge = state.previous_at_vertex(half_edge)
+            angle += state._bdry[half_edge] + (state._colouring[half_edge // 2] == RED and state._colouring[state._vp[half_edge] // 2] == BLUE)
+        return (mapping[half_edge], angle)
 
     @staticmethod
     def _vertex_separatrix_strebel_back(state, mapping, half_edge, angle):
-        raise NotImplementedError
+        half_edge = next(h for h in range(len(mapping)) if mapping[h] == half_edge)
+        num_seps = state._bdry[half_edge] + (state._colouring[half_edge // 2] == RED and state._colouring[state._vp[half_edge] // 2] == BLUE)
+        while angle >= num_seps:
+            angle -= num_seps
+            half_edge = state.next_at_vertex(half_edge)
+            num_seps = state._bdry[half_edge] + (state._colouring[half_edge // 2] == RED and state._colouring[state._vp[half_edge] // 2] == BLUE)
+
+        return (half_edge, angle)
 
     def vertex_separatrix_transport(self, half_edge, angle):
         r"""
@@ -286,8 +349,14 @@ class DelaunayStrebelPath(DiGraphPath):
                 else:
                     half_edge, angle = self._vertex_separatrix_rotate(source, half_edge, angle)
                     half_edge, angle = self._separatrix_relabelling(relabelling, half_edge, angle)
+
             elif kind == "strebel":
-                raise NotImplementedError
+                mapping = transition[1]
+                if reverse:
+                    # NOTE: for Strebel operation the argument is always the veering triangulation
+                    half_edge, angle = self._vertex_separatrix_strebel_back(source, mapping, half_edge, angle)
+                else:
+                    half_edge, angle = self._vertex_separatrix_strebel(source, mapping, half_edge, angle)
 
             if reverse:
                 source._check_vertex_separatrix(half_edge, angle)
@@ -329,7 +398,7 @@ class DelaunayStrebelPath(DiGraphPath):
     @staticmethod
     def _face_separatrix_rotate(state, half_edge, angle):
         half_edge = state.previous_at_vertex(half_edge)
-        while state.half_edge_colour(sep_half_edge) == BLUE:
+        while state.half_edge_colour(half_edge) == BLUE:
             half_edge = state.previous_at_vertex(half_edge)
         return (half_edge, angle)
 

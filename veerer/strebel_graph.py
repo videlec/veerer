@@ -223,6 +223,14 @@ class StrebelGraph(Constellation):
 
         Constellation.__init__(self, len(fp) // 2, None, fp, (excess,), (), mutable, check)
 
+    def _check_vertex_separatrix(self, half_edge, angle):
+        half_edge = self._check_half_edge(half_edge)
+        if not isinstance(angle, numbers.Integral):
+            raise ValueError("invalid angle for separatrix")
+        angle = int(angle)
+        if angle < 0 or angle > self._excess[half_edge]:
+            raise ValueError("angle (={}) out of range for separatrix; must be >= 0 and <= {}".format(angle, self._excess[half_edge]))
+
     def _set_data_pointers(self):
         self._excess = self._half_edges_data[0]
 
@@ -306,6 +314,28 @@ class StrebelGraph(Constellation):
                 e, f = f, vp[f]
 
         return (True, oris) if certificate else True
+
+    def vertex_separatrices(self, flat=True):
+        r"""
+        Return the pairs ``(h, a)`` encoding vertex separatrices on this Strebel graph.
+
+        EXAMPLES::
+
+            sage: from veerer import StrebelGraph
+            sage: StrebelGraph("(0,1,2)(~0,~1:1,~2:2)").vertex_separatrices()
+            [(0, 0), (5, 0), (5, 1), (5, 2), (2, 0), (1, 0), (4, 0), (3, 0), (3, 1)]
+        """
+        separatrices = []
+        for cycle in self.vertices():
+            orbit = []
+            for h in cycle:
+                for a in range(self._excess[h] + 1):
+                    orbit.append((h, a))
+            if flat:
+                separatrices.extend(orbit)
+            else:
+                separatrices.append(orbit)
+        return separatrices
 
     def stratum(self):
         r"""
