@@ -281,7 +281,7 @@ class DelaunayStrebelPath(DiGraphPath):
 
             target._check_vertex_separatrix(half_edge, angle)
 
-            return (half_edge, angle)
+        return (half_edge, angle)
 
     # Transport of face separatrices (separatrices of a higher order poles)
 
