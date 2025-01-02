@@ -267,7 +267,7 @@ class DelaunayStrebelPath(DiGraphPath):
                 else:
                     for e in edges:
                         half_edge, angle = self._vertex_separatrix_flip(source, e, new_col, half_edge, angle)
-                    half_edge, angle = self._separatrix_relabelling(source, target, relabelling, half_edge, angle)
+                    half_edge, angle = self._separatrix_relabelling(relabelling, half_edge, angle)
             elif kind == "rotate":
                 relabelling = transition[1]
                 if reverse:
@@ -335,9 +335,9 @@ class DelaunayStrebelPath(DiGraphPath):
     def _face_separatrix_strebel_back(state, mapping, half_edge, angle):
         raise NotImplementedError
 
-    def vertex_separatrix_transport(self, half_edge, angle):
+    def face_separatrix_transport(self, half_edge, angle):
         r"""
-        Transport the vertex separatrix ``(half_edge, angle)`` along this path.
+        Transport the face separatrix ``(half_edge, angle)`` along this path.
         """
         for i in range(len(self)):
             source = self._vertices[i]
@@ -360,7 +360,7 @@ class DelaunayStrebelPath(DiGraphPath):
                 else:
                     for e in edges:
                         half_edge, angle = self._face_separatrix_flip(source, e, new_col, half_edge, angle)
-                    half_edge, angle = self._separatrix_relabelling(source, target, relabelling, half_edge, angle)
+                    half_edge, angle = self._separatrix_relabelling(relabelling, half_edge, angle)
             elif kind == "rotate":
                 relabelling = transition[1]
                 if reverse:
@@ -375,5 +375,3 @@ class DelaunayStrebelPath(DiGraphPath):
             target._check_face_separatrix(half_edge, angle)
 
             return (half_edge, angle)
-
-
