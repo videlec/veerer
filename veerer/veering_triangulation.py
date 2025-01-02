@@ -170,7 +170,7 @@ class VeeringTriangulation(Triangulation):
         Triangulation._set_data_pointers(self)
         self._colouring = self._edges_data[0]
 
-    def _check_separatrix(self, half_edge, angle):
+    def _check_vertex_separatrix(self, half_edge, angle):
         half_edge = self._check_half_edge(half_edge)
         if not isinstance(angle, numbers.Integral):
             raise ValueError("invalid angle for separatrix")
@@ -179,6 +179,9 @@ class VeeringTriangulation(Triangulation):
         if angle < 0 or angle > num_seps:
             raise ValueError("angle (={}) out of range for separatrix; must be >= 0 and <= {}".format(angle, num_seps))
         return (half_edge, angle)
+
+    def _check_face_separatrix(self, half_edge, angle):
+        raise NotImplementedError
 
     def _check(self, error=RuntimeError):
         """
