@@ -166,7 +166,7 @@ class MultiscaleVeeringTriangulation:
             VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:3,3:1)", "RBRBB"),
             VeeringTriangulation("(~0,1,4)(~1,~2,3)(~5,6,9)(~6,~7,8)(0:5)(2:1)(~3:1)(~4:1)(5:5)(7:1)(~8:1)(~9:1)", "BBRBRBBRBR")
         ],
-        horizontal_nodes=[[], [[9, 14], [7, 17]]]
+        horizontal_nodes=[[], [[7, 17], [9, 14]]]
         prong_matching=[[(0, 0, 0), (-1, 0, 1)], [(0, 4, 0), (-1, 10, 1)]],
         )
         sage: vt10.is_abelian()
@@ -194,7 +194,6 @@ class MultiscaleVeeringTriangulation:
         if isinstance(horizontal_nodes, list):
             if len(horizontal_nodes) != len(self._veering_triangulations):
                 raise ValueError("Miss information of horizontal nodes at some levels")
-            
             self._horizontal_nodes = []
             for level in range(len(horizontal_nodes)):
                 self._horizontal_nodes.append([])
@@ -219,6 +218,7 @@ class MultiscaleVeeringTriangulation:
                     if check:
                         self._check_horizontal_node(level, node)
                     self._horizontal_nodes[level].append(node)
+                self._horizontal_nodes[level] = sorted(self._horizontal_nodes[level], key=lambda x: x[0])              
         else:
             raise ValueError("The 'horizontal_nodes' must be a list.") 
         
@@ -260,6 +260,7 @@ class MultiscaleVeeringTriangulation:
                 prong2 = prongs2[prongs1.index(prong1)]
                 
                 self._prong_matching.append([prong1, prong2])
+            self._prong_matching = sorted(self._prong_matching, key=lambda x: (-x[0][0], x[0][1]))
         else:
             raise ValueError("The 'prong_matching' must be a list.")
         
@@ -390,13 +391,9 @@ class MultiscaleVeeringTriangulation:
                         l2.append(f)
 
     def __str__(self):
-        
         vt_strings = ",\n    ".join(str(vt) for vt in self._veering_triangulations)
-
         horizontal_nodes_str = "[" + ", ".join(str(hn) for hn in self._horizontal_nodes) + "]"
-
         prong_matching_str = "[" + ", ".join(str(pm) for pm in self._prong_matching) + "]"
-
         return (
             f"MultiscaleVeeringTriangulation(\n"
             f"  veering_triangulations=[\n    {vt_strings}\n  ],\n"
@@ -407,6 +404,16 @@ class MultiscaleVeeringTriangulation:
 
     def __repr__(self):
         return str(self)
+    
+    def __eq__(self, other):
+        if type(self) != type(other):
+            raise TypeError
+        return (self._veering_triangulations == other._veering_triangulations) and (self._horizontal_nodes == other._horizontal_nodes) and (self._prong_matching == other._prong_matching)
+    
+    def __ne__(self, other):
+        if type(self) != type(other):
+            raise TypeError
+        return self._veering_triangulations != other._veering_triangulations and self._horizontal_nodes != other._horizontal_nodes and self._prong_matching != other._prong_matching
 
     def num_levels(self):
         return len(self._veering_triangulations)
@@ -446,7 +453,7 @@ class MultiscaleVeeringTriangulation:
             sage: vt11 = VeeringTriangulation("(~0,1,4)(~1,~2,3)(~5,6,9)(~6,~7,8)(0:5)(~4:1)(~3:1)(2:1)(5:5)(~9:1)(~8:1)(7:1)","BBRBRBBRBR")
             sage: mvt1 = MultiscaleVeeringTriangulation([vt10,vt11],["","(~4,7)(~3,~8)"],[[(0,"0",0),(-1,"0",1)],[(0,"2",0),(-1,"5",1)]])
             sage: mvt1.horizontal_nodes_at_level(-1)
-            [(-1, [9], [14]), (-1, [7], [17])]
+            [(-1, [7], [17]), (-1, [9], [14])]
             sage: mvt1.horizontal_nodes_at_level(0)
             []
         """
@@ -842,7 +849,7 @@ class MultiscaleVeeringTriangulation:
                 VeeringTriangulation("(~0,1,2)(~1,~2,3)(~4,~6,~7)(~5,6,7)(0:5)(~3:1)(4:4,5:4)", "BBRBBBRR")
             ],
             horizontal_nodes=[[], [], []]
-            prong_matching=[[(0, 0, 0), (-2, 0, 1)], [(-1, 0, 0), (-2, 10, 1)], [(0, 4, 0), (-1, 0, 0)]],
+            prong_matching=[[(0, 0, 0), (-2, 0, 1)], [(0, 4, 0), (-1, 0, 0)], [(-1, 0, 0), (-2, 10, 1)]],
             )
 
             sage: vt00 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)","RBRBB")
