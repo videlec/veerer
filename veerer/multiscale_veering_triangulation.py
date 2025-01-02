@@ -97,15 +97,16 @@ def new_prong_matching(vt, f_low, r_low, r_up, level):
                     f_pole = f
             
             if f_pole not in lpoles:
-                lpoles.append(f_pole)
-                while (_num_vertical_separatrices_in_corner(vt, h) == 0) or (r_low[h] >= 0):
+                while (_num_vertical_separatrices_in_corner(vt, h) == 0) and (r_up[h] >= 0):
                     h = vt.previous_at_vertex(h)
-                if _num_vertical_separatrices_in_corner(vt, h) > 0:
+                if (_num_vertical_separatrices_in_corner(vt, h) > 0) and (r_up[h] >= 0):
+                    vert_sep = (level, h, 0)
                     prong1 = (level, r_up[h], 0)
-                    prong2 = track_prong(vt, r_up, r_low, prong1)
+                    prong2 = track_prong(vt, r_up, r_low, vert_sep)
                     assert prong2[0] == level - 1
                     pm = [prong1, prong2]
                     newpm.append(pm)
+                    lpoles.append(f_pole)
     return newpm
 
 class MultiscaleVeeringTriangulation:
@@ -134,9 +135,9 @@ class MultiscaleVeeringTriangulation:
 
     EXAMPLES::
 
-        sage: from veerer.veerer import VeeringTriangulation
-        sage: from veerer.veerer.multiscale_veering_triangulation import *
-
+        sage: from veerer import VeeringTriangulation
+        sage: from veerer.multiscale_veering_triangulation import *
+    
     A multi-scale veering triangulation of two levels and two vertical nodes::
 
         sage: vt00 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)","RBRBB")
@@ -144,12 +145,12 @@ class MultiscaleVeeringTriangulation:
         sage: mvt0 = MultiscaleVeeringTriangulation([vt00,vt01],[[],[]],[[(0,"0",0),(-1,"0",1)],[(0,"2",0),(-1,"5",1)]])
         sage: mvt0
         MultiscaleVeeringTriangulation(
-          veering_triangulations=[
+        veering_triangulations=[
             VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)", "RBRBB"),
             VeeringTriangulation("(~0,1,2)(~1,~2,3)(~4,~6,~7)(~5,6,7)(0:5)(~3:1)(4:4,5:4)", "BBRBBBRR")
-          ],
-          horizontal_nodes=[[], []]
-          prong_matching=[[(0, '0', 0), (-1, '0', 1)], [(0, '2', 0), (-1, '5', 1)]],
+        ],
+        horizontal_nodes=[[], []]
+        prong_matching=[[(0, 0, 0), (-1, 0, 1)], [(0, 4, 0), (-1, 10, 1)]],
         )
         sage: mvt0.is_abelian()
         True
@@ -158,16 +159,20 @@ class MultiscaleVeeringTriangulation:
 
         sage: vt10 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:3,3:1)","RBRBB")
         sage: vt11 = VeeringTriangulation("(~0,1,4)(~1,~2,3)(~5,6,9)(~6,~7,8)(0:5)(~4:1)(~3:1)(2:1)(5:5)(~9:1)(~8:1)(7:1)","BBRBRBBRBR")
-        sage: mvt1 = MultiscaleVeeringTriangulation([vt10,vt11],[[],["(~4,7)","(~3,~8)"]],[[(0,"0",0),(-1,"0",1)],[(0,"2",0),(-1,"5",1)]])
+        sage: mvt1 = MultiscaleVeeringTriangulation([vt10,vt11],["","(~4,7)(~3,~8)"],[[(0,"0",0),(-1,"0",1)],[(0,"2",0),(-1,"5",1)]])
         sage: mvt1
         MultiscaleVeeringTriangulation(
-          veering_triangulations=[
+        veering_triangulations=[
             VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:3,3:1)", "RBRBB"),
             VeeringTriangulation("(~0,1,4)(~1,~2,3)(~5,6,9)(~6,~7,8)(0:5)(2:1)(~3:1)(~4:1)(5:5)(7:1)(~8:1)(~9:1)", "BBRBRBBRBR")
-          ],
-          horizontal_nodes=[[], ['(~4,7)', '(~3,~8)']]
-          prong_matching=[[(0, '0', 0), (-1, '0', 1)], [(0, '2', 0), (-1, '5', 1)]],
+        ],
+        horizontal_nodes=[[], [[9, 14], [7, 17]]]
+        prong_matching=[[(0, 0, 0), (-1, 0, 1)], [(0, 4, 0), (-1, 10, 1)]],
         )
+        sage: vt10.is_abelian()
+        True
+        sage: vt11.is_abelian()
+        True
         sage: mvt1.is_abelian()
         False
     """
@@ -244,7 +249,7 @@ class MultiscaleVeeringTriangulation:
                 pm = [prong1, prong2]
 
                 #Note that the resulting prong2 is always equivalent to the original prong2
-                prongs1, prongs2 = self.local_prong_matching(pm)
+                prongs1, prongs2 = self._local_prong_matching(pm)
                 assert prongs1.index(prong1) == prongs2.index(prong2)
                 
                 # normalization of prong1
@@ -273,24 +278,7 @@ class MultiscaleVeeringTriangulation:
         return level
 
     def _check_horizontal_node(self, level, node):
-        r"""
-        EXAMPLES::
 
-            sage: from veerer.veerer import VeeringTriangulation
-            sage: from veerer.veerer.multiscale_veering_triangulation import *
-            sage: vt10 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:3,3:1)","RBRBB")
-            sage: vt11 = VeeringTriangulation("(~0,1,4)(~1,~2,3)(~5,6,9)(~6,~7,8)(0:5)(~4:1)(~3:1)(2:1)(5:5)(~9:1)(~8:1)(7:1)","BBRBRBBRBR")
-            sage: node = "(8,~7)"
-            sage: mvt = MultiscaleVeeringTriangulation([vt10,vt11],[[],[node]],[[(0,"0",0),(-1,"0",1)],[(0,"2",0),(-1,"5",1)]])
-            Traceback (most recent call last)
-            ...
-            ValueError: h=8 not on a boundary face
-            sage: node = "(0,~7)"
-            sage: mvt = MultiscaleVeeringTriangulation([vt10,vt11],[[],[node]],[[(0,"0",0),(-1,"0",1)],[(0,"2",0),(-1,"5",1)]])
-            Traceback (most recent call last)
-            ...
-            ValueError: The half-edge 0 is not in the face of simple pole
-        """
         level = self._check_level(level)
         vt = self._veering_triangulations[abs(level)]
         h1, h2 = node
@@ -312,25 +300,25 @@ class MultiscaleVeeringTriangulation:
         r"""
         EXAMPLES::
 
-            sage: from veerer.veerer import VeeringTriangulation
-            sage: from veerer.veerer.multiscale_veering_triangulation import *
+            sage: from veerer import VeeringTriangulation
+            sage: from veerer.multiscale_veering_triangulation import *
             sage: vt00 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)","RBRBB")
             sage: vt01 = VeeringTriangulation("(~0,1,2)(~1,~2,3)(~4,~6,~7)(6,7,~5)(0:5)(~3:1)(4:4,5:4)","BBRBBBRR")
-            sage: pm = [(0,"0",4),(-1,"0",1)] 
-            sage: mvt = MultiscaleVeeringTriangulation([vt00,vt01],[[],[]],[pm])
-            Traceback (most recent call last)
+            sage: pm = [(0,0,4),(-1,0,1)] 
+            sage: MultiscaleVeeringTriangulation([vt00,vt01],[[],[]],[pm])
+            Traceback (most recent call last):
             ...
-            ValueError: The angle label of (0, '0', 4) is out of the valid range [0, 3].
-            sage: pm = [(0,"~3",0),(-1,"0",1)] 
-            sage: mvt = MultiscaleVeeringTriangulation([vt00,vt01],[[],[]],[pm])
-            Traceback (most recent call last)
+            ValueError: The angle label of (0, 0, 4) is out of the valid range [0, 3].
+            sage: pm = [(0,7,0),(-1,0,1)] 
+            sage: MultiscaleVeeringTriangulation([vt00,vt01],[[],[]],[pm])
+            Traceback (most recent call last):
             ...
-            ValueError: The corner of (0, '~3', 0) is not a red-blue corner
-            sage: pm = [(0,"1",0),(-1,"0",1)] 
-            sage: mvt = MultiscaleVeeringTriangulation([vt00,vt01],[[],[]],[pm])
-            Traceback (most recent call last)
+            ValueError: The corner of (0, 7, 0) is not a red-blue corner
+            sage: pm = [(0,1,0),(-1,0,1)] 
+            sage: MultiscaleVeeringTriangulation([vt00,vt01],[[],[]],[pm])
+            Traceback (most recent call last):
             ...
-            ValueError: The orders of the zero and pole are not matched
+            ValueError: The orders of the zero in (0, 1, 0) and  the pole in (-1, 0, 1) are not matched
         """ 
         
         NN = len(self._veering_triangulations)
@@ -387,13 +375,13 @@ class MultiscaleVeeringTriangulation:
             l2 = []
             for pm in pms:
                 if pm[0][0] == level:
-                    v = self.vertical_nodes(pm)[0]
+                    v = self.vertical_node(pm)[0]
                     if v in l1:
                         raise ValueError(f"There are prongs at the same zero as {pm[0]}")
                     else:
                         l1.append(v)
                 if pm[1][0] == level:
-                    f = self.vertical_nodes(pm)[1]
+                    f = self.vertical_node(pm)[1]
                     if f in l2:
                         raise ValueError(f"There are prongs at the same pole as {pm[1]}")
                     else:
@@ -431,11 +419,15 @@ class MultiscaleVeeringTriangulation:
         """
         level = self._check_level(level)
         vt = self.veering_triangulation_at_level(level)
+        f0 = None
+        f1 = None
         for f in vt.boundary_faces(): 
             if node[0] in f:
                 f0 = f
             if node[1] in f:
                 f1 = f
+        if f0 is None or f1 is None:
+            raise ValueError(f"The horizontal node {node} at level {level} is not between boundary faces")
         return (f0, f1)
 
     def horizontal_nodes_at_level(self, i):
@@ -446,23 +438,24 @@ class MultiscaleVeeringTriangulation:
 
         EXAMPLES::
 
-            sage: from veerer.veerer import VeeringTriangulation
-            sage: from veerer.veerer.multiscale_veering_triangulation import *
+            sage: from veerer import VeeringTriangulation
+            sage: from veerer.multiscale_veering_triangulation import *
             sage: vt10 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:3,3:1)","RBRBB")
             sage: vt11 = VeeringTriangulation("(~0,1,4)(~1,~2,3)(~5,6,9)(~6,~7,8)(0:5)(~4:1)(~3:1)(2:1)(5:5)(~9:1)(~8:1)(7:1)","BBRBRBBRBR")
-            sage: mvt1 = MultiscaleVeeringTriangulation([vt10,vt11],[[],["(~4,7)","(~3,~8)"]],[[(0,"0",0),(-1,"0",1)],[(0,"2",0),(-1,"5",1)]])
+            sage: mvt1 = MultiscaleVeeringTriangulation([vt10,vt11],["","(~4,7)(~3,~8)"],[[(0,"0",0),(-1,"0",1)],[(0,"2",0),(-1,"5",1)]])
             sage: mvt1.horizontal_nodes_at_level(-1)
             [(-1, [9], [14]), (-1, [7], [17])]
             sage: mvt1.horizontal_nodes_at_level(0)
             []
         """
+        i = self._check_level(i)
 
         l = self._horizontal_nodes[abs(i)]
         list_horiz_nodes = []
         if len(l) != 0:
             for node in l:
                 f0, f1 = self.horizontal_faces(i, node)
-                list_horiz_nodes.append((i,f0,f1))
+                list_horiz_nodes.append((-i,f0,f1))
 
         return list_horiz_nodes
     
@@ -479,7 +472,7 @@ class MultiscaleVeeringTriangulation:
             l = l + self.horizontal_nodes_at_level(-i)
         return l
     
-    def vertical_nodes(self, pm):
+    def vertical_node(self, pm):
         r"""
         Return the underlying node of the prong matching.
 
@@ -498,7 +491,23 @@ class MultiscaleVeeringTriangulation:
                 f1 = f
         return (v1, f1)
     
-    def local_prong_matching(self, pm):
+    def vertical_nodes(self):
+        r"""
+        Return all the vertical nodes.
+
+        Each vertical node is represented as (level1, vertex, level2, pole)
+        """
+        l_nodes = []
+        pms = self._prong_matching
+        for pm in pms:
+            l1 = pm[0][0]
+            l2 = pm[1][0]
+            v, f = self.vertical_node(pm)
+            l_nodes.append((l1, v, l2, f))
+        
+        return l_nodes
+    
+    def _local_prong_matching(self, pm):
         r"""
         Returns the local prong matching at a vertical node.
 
@@ -511,17 +520,15 @@ class MultiscaleVeeringTriangulation:
 
         EXAMPLES::
 
-            sage: from veerer.veerer import VeeringTriangulation
-            sage: from veerer.veerer.multiscale_veering_triangulation import *
+            sage: from veerer import VeeringTriangulation
+            sage: from veerer.multiscale_veering_triangulation import *
             sage: vt00 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)","RBRBB")
             sage: vt01 = VeeringTriangulation("(~0,1,2)(~1,~2,3)(~4,~6,~7)(6,7,~5)(0:5)(~3:1)(4:4,5:4)","BBRBBBRR")
             sage: mvt0 = MultiscaleVeeringTriangulation([vt00,vt01],[[],[]],[[(0,"0",0),(-1,"0",1)],[(0,"2",0),(-1,"5",1)]])
-            sage: mvt0.vertical_nodes_between_levels(-1,0)
-            [(0, [0, 7], -1, [0]), (0, [3, 4], -1, [8, 10])]
-            sage: mvt0.local_prong_matching((0, [0, 7], -1, [0]))
+            sage: mvt0._local_prong_matching([(0,0,0),(-1,0,1)])
             [[(0, 0, 0), (0, 0, 1), (0, 0, 2), (0, 0, 3)],
             [(-1, 0, 1), (-1, 0, 2), (-1, 0, 3), (-1, 0, 0)]]
-            sage: mvt0.local_prong_matching((0, [3, 4], -1, [8, 10]))
+            sage: mvt0._local_prong_matching([(0,4,0),(-1,10,1)])
             [[(0, 4, 0), (0, 4, 1), (0, 4, 2), (0, 4, 3), (0, 4, 4), (0, 4, 5)],
             [(-1, 10, 1), (-1, 10, 2), (-1, 8, 0), (-1, 8, 1), (-1, 8, 2), (-1, 10, 0)]]
         """
@@ -583,32 +590,24 @@ class MultiscaleVeeringTriangulation:
 
         EXAMPLES::
 
-            sage: from veerer.veerer import VeeringTriangulation
-            sage: from veerer.veerer.multiscale_veering_triangulation import *
+            sage: from veerer import VeeringTriangulation
+            sage: from veerer.multiscale_veering_triangulation import *
             sage: vt00 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)","RBRBB")
             sage: vt01 = VeeringTriangulation("(~0,1,2)(~1,~2,3)(~4,~6,~7)(6,7,~5)(0:5)(~3:1)(4:4,5:4)","BBRBBBRR")
             sage: mvt0 = MultiscaleVeeringTriangulation([vt00,vt01],[[],[]],[[(0,"0",0),(-1,"0",1)],[(0,"2",0),(-1,"5",1)]])
-            sage: mvt0.vertical_nodes_between_levels(-1,0)
-            [(0, [0, 7], -1, [0]), (0, [3, 4], -1, [8, 10])]
-            sage:mvt0.prong_matching_map((0, 4, 1))
+            sage: mvt0.prong_matching_map((0, 4, 1))
             (-1, 10, 2)
         """
-        level, h, a = prong
-        nodes = self.vertical_nodes()
-        for node in nodes:
-            l1, v, l2, f = node
-            if (l1 == level) and (h in v):
-                prongs1, prongs2 = self.local_prong_matching(node)
-                assert prong in prongs1
+        for pm in self._prong_matching:
+            prongs1, prongs2 = self._local_prong_matching(pm)
+            if prong in prongs1:
                 j = prongs1.index(prong)
                 return prongs2[j]
-            if (l2 == level) and (h in f):
-                prongs1, prongs2 = self.local_prong_matching(node)
-                assert prong in prongs2
+            if prong in prongs2:
                 j = prongs2.index(prong)
                 return prongs1[j]
             
-    def components_have_horiztal_nodes_with(self, level, comp_index):
+    def _components_have_horiztal_nodes_with(self, level, comp_index):
         r"""
         Return the indices of the components that have horizontal nodes with the input component
         """
@@ -636,8 +635,8 @@ class MultiscaleVeeringTriangulation:
 
         EXAMPLES::
 
-            sage: from veerer.veerer import VeeringTriangulation
-            sage: from veerer.veerer.multiscale_veering_triangulation import *
+            sage: from veerer import VeeringTriangulation
+            sage: from veerer.multiscale_veering_triangulation import *
 
         A horizontal node between the same components::
 
@@ -645,15 +644,6 @@ class MultiscaleVeeringTriangulation:
             sage: mvt = MultiscaleVeeringTriangulation([vt],["(~1,~2)"],[])
             sage: mvt.is_abelian()
             False
-
-        Horizontal nodes between different components::
-            sage: vt = VeeringTriangulation("(0,1,2)(3,4,5)(6,7,8)(~0:1)(~2:1)(~1:1)(~3:1)(~5:1)(~4:1)(~6:1)(~8:1)(~7:1)","RBRRBRRBR")
-            sage: mvt = MultiscaleVeeringTriangulation([vt],["(~2,~5)(~1,~3)"],[])
-            sage: mvt.is_abelian()
-            False
-            sage: mvt = MultiscaleVeeringTriangulation([vt],["(~2,~5)(~1,~6)"],[])
-            sage: mvt.is_abelian()
-            True
 
         Mix of horizontal and vertical nodes::
             sage: vt0 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:3,3:1)","RBRBB")
@@ -758,12 +748,12 @@ class MultiscaleVeeringTriangulation:
             #the labels are in the form: (level, index of the component in this level)
             #moreover find out all the components that have horizontal nodes with the components containing the prongs
             c1 = in_connected_component(vt1, h1) 
-            l1 = self.components_have_horiztal_nodes_with(level1, c1)
+            l1 = self._components_have_horiztal_nodes_with(level1, c1)
             if (level1, c1) not in l1:
                 l1.append((level1, c1))
             
             c2 = in_connected_component(vt2, h2)
-            l2 = self.components_have_horiztal_nodes_with(level2, c2)
+            l2 = self._components_have_horiztal_nodes_with(level2, c2)
             if (level2, c2) not in l2:
                 l2.append((level2, c2))
             
@@ -823,18 +813,24 @@ class MultiscaleVeeringTriangulation:
 
             sage: from veerer import *
             sage: from veerer.multiscale_veering_triangulation import *
+
+        Reach all vertical boundary component of H_1(2) from a single veering triangulaiton::
+
+
+        More examples::
+            
             sage: vt00 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)","RBRBB")
             sage: vt01 = VeeringTriangulation("(~0,1,2)(~1,~2,3)(~4,~6,~7)(6,7,~5)(0:5)(~3:1)(4:4,5:4)","BBRBBBRR")
             sage: mvt0 = MultiscaleVeeringTriangulation([vt00,vt01],[[],[]],[[(0,"0",0),(-1,"0",1)],[(0,"2",0),(-1,"5",1)]])
             sage: mvt0.degeneration(0, edges_low=[2], edges_up=[0, 1, 3, 4])
             MultiscaleVeeringTriangulation(
-            veering_triangulations=[
+              veering_triangulations=[
                 VeeringTriangulationLinearFamily("(~0,~2,~1)(0:3,1:1,2:6)", "RBB", [(1, 0, 1), (0, 1, 1)]),
                 VeeringTriangulationLinearFamily("(0:6,~0:2)", "R", [(1)]),
                 VeeringTriangulation("(~0,1,2)(~1,~2,3)(~4,~6,~7)(~5,6,7)(0:5)(~3:1)(4:4,5:4)", "BBRBBBRR")
             ],
             horizontal_nodes=[[], [], []]
-            prong_matching=[((0, 0, 0), (-2, 0, 1)), ((-1, 0, 0), (-2, 10, 1)), ((0, 4, 0), (-1, 0, 0))],
+            prong_matching=[[(0, 0, 0), (-2, 0, 1)], [(-1, 0, 0), (-2, 10, 1)], [(0, 4, 0), (-1, 0, 0)]],
             )
 
             sage: vt00 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)","RBRBB")
@@ -842,12 +838,12 @@ class MultiscaleVeeringTriangulation:
             sage: mvt0 = MultiscaleVeeringTriangulation([vt00,vt01],[[],[]],[[(0,"0",0),(-1,"0",1)],[(0,"2",0),(-1,"5",1)]])
             sage: mvt0.degeneration( -1, edges_low=[0, 1, 2, 3, 4, 5], edges_up=[6, 7])
             MultiscaleVeeringTriangulation(
-            veering_triangulations=[
+              veering_triangulations=[
                 VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)", "RBRBB"),
                 VeeringTriangulationLinearFamily("(~0,1,2)(~1,~2,3)(0:5)(~3:1)(4:4,5:4)(~4:1)(~5:1)", "BBRBBB", [(1, 0, 1, 1, 0, 0), (0, 1, -1, 0, 0, 0), (0, 0, 0, 0, 1, 1)])
             ],
             horizontal_nodes=[[], [[9, 11]]]
-            prong_matching=[((0, 0, 0), (-1, 0, 1)), ((0, 4, 0), (-1, 10, 1))],
+            prong_matching=[[(0, 0, 0), (-1, 0, 1)], [(0, 4, 0), (-1, 10, 1)]],
             )
         """
 
