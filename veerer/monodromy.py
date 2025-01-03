@@ -1,9 +1,9 @@
 from sage.graphs.digraph import DiGraph
 from sage.groups.perm_gps.permgroup_named import SymmetricGroup
 
-from .constants import RED, BLUE
+from .constants import RED, BLUE, HORIZONTAL, VERTICAL
 from .permutation import perm_preimage
-from .delaunay_strebel_path import DiGraphPath, DelaunayStrebelPath
+from .veering_triangulation import VeeringTriangulation
 from .labelled_digraph import LabelledDiGraph
 
 
@@ -164,7 +164,7 @@ class SeparatrixMonodromy:
                 mapping = transition[1]
                 if reverse:
                     # NOTE: for Strebel operation the argument is always the veering triangulation
-                    half_edge, angle = self._vertex_separatrix_strebel_back(source, mapping, half_edge, angle)
+                    half_edge, angle = self._vertex_separatrix_strebel_back(target, mapping, half_edge, angle)
                 else:
                     half_edge, angle = self._vertex_separatrix_strebel(source, mapping, half_edge, angle)
 
@@ -246,7 +246,7 @@ class SeparatrixMonodromy:
                 relabelling = transition[4]
                 if reverse:
                     for e in edges:
-                        half_edge, angle = self._face_separatrix_flip_back(target, relabelling[e], old_col, half_edge, angle)
+                        half_edge, angle = self._face_separatrix_flip_back(source, relabelling[e], old_col, half_edge, angle)
                     half_edge, angle = self._separatrix_relabelling_back(relabelling, half_edge, angle)
                 else:
                     for e in edges:
@@ -255,7 +255,7 @@ class SeparatrixMonodromy:
             elif kind == "rotate":
                 relabelling = transition[1]
                 if reverse:
-                    half_edge, angle = self._face_separatrix_rotate_back(target, half_edge, angle)
+                    half_edge, angle = self._face_separatrix_rotate_back(source, half_edge, angle)
                     half_edge, angle = self._separatrix_relabelling_back(relabelling, half_edge, angle)
                 else:
                     half_edge, angle = self._face_separatrix_rotate(source, half_edge, angle)
@@ -275,21 +275,31 @@ def vertex_separatrices_monodromy(ds_graph, root=None):
         sage: from veerer import VeeringTriangulation
         sage: from veerer.monodromy import vertex_separatrices_monodromy
 
-    The case of H(1,1)::
+    The case of H(1^2)::
 
         sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,9)(~8,10,11)(~9,~10,~11)", "BRBBRBBRBBRB")
         sage: ds_graph = vt.delaunay_strebel_graph()
-        sage: assert vt in ds_graph  # we pick a veering triangulation in canonical form
-        sage: G = vertex_separatrices_monodromy(ds_graph, vt)
+        sage: G = vertex_separatrices_monodromy(ds_graph)
+        sage: G.cardinality()
+        8
+        sage: G.structure_description()
+        'C4 x C2'
+
+    The case of H(1^2, -1^2)::
+
+        sage: vt = VeeringTriangulation("(~0,1,2)(~1,3,4)(~2,5,6)(~3,~5,7)(~6,8,9)(~7,~8,~9)(0:1)(~4:1)", "BRRRBBRRRB")
+        sage: ds_graph = vt.delaunay_strebel_graph()
+        sage: G = vertex_separatrices_monodromy(ds_graph)
         sage: G.cardinality()
         8
         sage: G.structure_description()
         'C4 x C2'
     """
     if root is None:
-        root = next(state for state in DS if isinstance(state, VeeringTriangulation))
+        root = next(state for state in ds_graph if isinstance(state, VeeringTriangulation))
 
-    # TODO: we should stored the LabelledDiGraph rather than the sage DiGraph
+    # TODO: the Delaunay-Strebel graph ought to be a LabelledDiGraph rather
+    # than a sage DiGraph
     G = LabelledDiGraph(ds_graph)
     monodromy = SeparatrixMonodromy(G)
 
