@@ -352,6 +352,9 @@ class VeeringTriangulation(Triangulation):
             sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", [RED, RED, BLUE])
             sage: vt.as_linear_family()
             VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)])
+
+            sage: VeeringTriangulation("(0:2,~0:4)", "R").as_linear_family()
+            VeeringTriangulationLinearFamily("(0:2,~0:4)", "R", [(1)])
         """
         from .linear_family import VeeringTriangulationLinearFamily
         return VeeringTriangulationLinearFamily(self, self.train_track_linear_space().lines(), mutable=mutable)
@@ -3248,11 +3251,14 @@ class VeeringTriangulation(Triangulation):
             Cone of dimension 2 in ambient dimension 3 made of 0 facets (backend=ppl)
             sage: T.train_track_linear_space(backend='sage')
             Cone of dimension 2 in ambient dimension 3 made of 0 facets (backend=sage)
+
+            sage: VeeringTriangulation("(0:2,~0:4)", "R").train_track_linear_space()
+            Cone of dimension 1 in ambient dimension 1 made of 0 facets (backend=ppl)
         """
         from sage.rings.integer_ring import ZZ
-        cs = ConstraintSystem()
-        L = LinearExpressions(ZZ)
         ne = self.num_edges()
+        L = LinearExpressions(ZZ)
+        cs = ConstraintSystem(ne)
         x = [L.variable(e) for e in range(ne)]
         self._set_switch_conditions(cs.insert, x, slope)
         return cs.cone(backend)
