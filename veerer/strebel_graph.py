@@ -852,3 +852,40 @@ class StrebelGraph(Constellation):
         if run:
             A.run()
         return A
+    
+    def half_edge_num_separatrices(self, half_edge):
+        r"""
+        Return the number of vertical separatrices in the corner of the half-edge
+        """
+        bdry = self.half_plane_excess()
+        return bdry[half_edge] + 1
+    
+    def _normalization_face_separatrix(self, half_edge, angle):
+        r"""
+        Return a normalized vertical separatrix.
+
+        The normailzed vertical separatrix is not at the last vertical separatrix in the corner of the half-edge.
+
+        EXAMPLES::
+            
+            sage: from veerer import *
+            sage: G = StrebelGraph("(0:1, 1:0, ~1:1, ~0:0)")
+            sage: G._normalization_face_separatrix(2, 0)
+            (0, 0)
+        """
+        last_angle = self.half_edge_num_separatrices(half_edge) - 1 #the valide range is between 1 and the number of vertical separatrices 
+        while angle == last_angle:
+            half_edge = self.previous_in_face(half_edge)
+            angle = 0
+            last_angle = self.half_edge_num_separatrices(half_edge) - 1
+        return (half_edge, angle)
+    
+    def _check_face_separatrix(self, half_edge, angle):
+        half_edge = self._check_half_edge(half_edge)
+        if not isinstance(angle, numbers.Integral):
+            raise ValueError("invalid angle for separatrix")
+        angle = int(angle)
+        num_seps =  self.half_edge_num_separatrices(half_edge)
+        if angle < 0 or angle >= num_seps:
+            raise ValueError("angle (={}) out of range for separatrix at half_edge={}; must be >= 0 and <= {}".format(angle, half_edge, num_seps))
+        return self._normalization_face_separatrix(half_edge, angle)
