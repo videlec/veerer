@@ -9,8 +9,11 @@ from .labelled_digraph import LabelledDiGraph
 
 # TODO: make this a proper morphism from the fundamental group of the labelled digraph
 # to some permutation group of the separatrices
-class SeparatrixMonodromy:
+class VertexSeparatrixMonodromy:
     r"""
+    Monodromy of separatrices at a zero (or simple pole of quadratic differential) in a prime
+    component.
+
     EXAMPLES::
 
         sage: from veerer import VeeringTriangulation
@@ -29,17 +32,17 @@ class SeparatrixMonodromy:
         self._graph = graph
 
     @staticmethod
-    def _separatrix_relabelling(relabelling, half_edge, angle):
+    def _relabelling(relabelling, half_edge, angle):
         return (relabelling[half_edge], angle)
 
     @staticmethod
-    def _separatrix_relabelling_back(relabelling, half_edge, angle):
+    def _relabelling_back(relabelling, half_edge, angle):
         return (perm_preimage(relabelling, half_edge), angle)
 
     # Transport of vertex separatrices (separatrices of a zero of a simple pole of a quadratic differential)
 
     @staticmethod
-    def _vertex_separatrix_flip(state, e, col, half_edge, angle):
+    def _flip(state, e, col, half_edge, angle):
         assert half_edge != 2 * e and half_edge != (2 * e + 1)
         a, b, c, d = state.square_about_half_edge(2 * e, check=False)
         if half_edge == b:
@@ -52,7 +55,7 @@ class SeparatrixMonodromy:
         return (half_edge, angle)
 
     @staticmethod
-    def _vertex_separatrix_flip_back(state, e, col, half_edge, angle):
+    def _flip_back(state, e, col, half_edge, angle):
         if half_edge == 2 * e:
             assert state._colouring[e] == RED
             assert angle == 0
@@ -67,7 +70,7 @@ class SeparatrixMonodromy:
         return (half_edge, angle)
 
     @staticmethod
-    def _vertex_separatrix_rotate(state, half_edge, angle):
+    def _rotate(state, half_edge, angle):
         # blue half-edge: nothing on angle, always fine
         # red half-edge: do -1 on angle, need to explore previous if angle=0
         next_half_edge = state.next_at_vertex(half_edge)
@@ -85,7 +88,7 @@ class SeparatrixMonodromy:
         return (half_edge, angle)
 
     @staticmethod
-    def _vertex_separatrix_rotate_back(state, half_edge, angle):
+    def _rotate_back(state, half_edge, angle):
         # blue half-edge: +1 on angle, if next half-edge is blue and angle=max need to explore next
         # red half-edge: nothing on angle, if next half-edge is blue and angle=max need to explore next
         if state._colouring[half_edge // 2] == BLUE:
@@ -105,14 +108,14 @@ class SeparatrixMonodromy:
         return (half_edge, angle)
 
     @staticmethod
-    def _vertex_separatrix_strebel(state, mapping, half_edge, angle):
+    def _strebel(state, mapping, half_edge, angle):
         while mapping[half_edge] == -1:
             half_edge = state.previous_at_vertex(half_edge)
             angle += state._bdry[half_edge] + (state._colouring[half_edge // 2] == RED and state._colouring[state._vp[half_edge] // 2] == BLUE)
         return (mapping[half_edge], angle)
 
     @staticmethod
-    def _vertex_separatrix_strebel_back(state, mapping, half_edge, angle):
+    def _strebel_back(state, mapping, half_edge, angle):
         half_edge = next(h for h in range(len(mapping)) if mapping[h] == half_edge)
         num_seps = state._bdry[half_edge] + (state._colouring[half_edge // 2] == RED and state._colouring[state._vp[half_edge] // 2] == BLUE)
         while angle >= num_seps:
@@ -122,10 +125,15 @@ class SeparatrixMonodromy:
 
         return (half_edge, angle)
 
-    def vertex_separatrix_transport(self, path, half_edge, angle):
+    def __call__(self, path, x):
         r"""
         Transport the vertex separatrix ``(half_edge, angle)`` along ``path``.
         """
+        if path._graph is not self._graph:
+            raise ValueError("invalid path for vertex monodromy")
+
+        half_edge, angle = x
+
         for i in path:
             source = self._graph.vertex_label(self._graph.edge_source(i))
             target = self._graph.vertex_label(self._graph.edge_target(i))
@@ -144,128 +152,99 @@ class SeparatrixMonodromy:
                 relabelling = transition[4]
                 if reverse:
                     for e in edges:
-                        half_edge, angle = self._vertex_separatrix_flip_back(source, relabelling[2 * e] // 2, old_col, half_edge, angle)
-                    half_edge, angle = self._separatrix_relabelling_back(relabelling, half_edge, angle)
+                        half_edge, angle = self._flip_back(source, relabelling[2 * e] // 2, old_col, half_edge, angle)
+                    half_edge, angle = self._relabelling_back(relabelling, half_edge, angle)
                 else:
                     for e in edges:
-                        half_edge, angle = self._vertex_separatrix_flip(source, e, new_col, half_edge, angle)
-                    half_edge, angle = self._separatrix_relabelling(relabelling, half_edge, angle)
+                        half_edge, angle = self._flip(source, e, new_col, half_edge, angle)
+                    half_edge, angle = self._relabelling(relabelling, half_edge, angle)
 
             elif kind == "rotate":
                 relabelling = transition[1]
                 if reverse:
-                    half_edge, angle = self._vertex_separatrix_rotate_back(source, half_edge, angle)
-                    half_edge, angle = self._separatrix_relabelling_back(relabelling, half_edge, angle)
+                    half_edge, angle = self._rotate_back(source, half_edge, angle)
+                    half_edge, angle = self._relabelling_back(relabelling, half_edge, angle)
                 else:
-                    half_edge, angle = self._vertex_separatrix_rotate(source, half_edge, angle)
-                    half_edge, angle = self._separatrix_relabelling(relabelling, half_edge, angle)
+                    half_edge, angle = self._rotate(source, half_edge, angle)
+                    half_edge, angle = self._relabelling(relabelling, half_edge, angle)
 
             elif kind == "strebel":
                 mapping = transition[1]
                 if reverse:
                     # NOTE: for Strebel operation the argument is always the veering triangulation
-                    half_edge, angle = self._vertex_separatrix_strebel_back(target, mapping, half_edge, angle)
+                    half_edge, angle = self._strebel_back(target, mapping, half_edge, angle)
                 else:
-                    half_edge, angle = self._vertex_separatrix_strebel(source, mapping, half_edge, angle)
+                    half_edge, angle = self._strebel(source, mapping, half_edge, angle)
 
             # too expensive!!
             # target._check_vertex_separatrix(half_edge, angle)
 
-
         return (half_edge, angle)
 
+
+# TODO: there is nothing implemented yet
+class FaceSeparatrixMonodromy:
     # Transport of face separatrices (separatrices of a higher order poles)
 
     @staticmethod
-    def _face_separatrix_flip(state, e, col, half_edge, angle):
-        assert half_edge != 2 * e and half_edge != (2 * e + 1)
-        a, b, c, d = state.square_about_half_edge(2 * e, check=False)
-        if half_edge == b:
-            assert angle == 0
-            return (2 * e + 1, 0) if col == RED else (half_edge, angle)
-        elif half_edge == d:
-            assert angle == 0
-            return (2 * e, 0) if col == RED else (half_edge, angle)
-        else:
-            return (half_edge, angle)
-
-    @staticmethod
-    def _face_separatrix_flip_back(state, e, col, half_edge, angle):
-        if half_edge == 2 * e:
-            assert state._colouring[e] == RED
-            assert angle == 0
-            a, b, c, d = state.square_about_half_edge(2 * e, check=False)
-            return (c, 0)
-        elif half_edge == 2 * e + 1:
-            assert state._colouring[e] == RED
-            assert angle == 0
-            a, b, c, d = state.square_about_half_edge(2 * e, check=False)
-            return (a, 0)
-        else:
-            return (half_edge, angle)
-
-    @staticmethod
-    def _face_separatrix_rotate(state, half_edge, angle):
-        half_edge = state.previous_at_vertex(half_edge)
-        while state.half_edge_colour(half_edge) == BLUE:
-            half_edge = state.previous_at_vertex(half_edge)
-        return (half_edge, angle)
-
-    @staticmethod
-    def _face_separatrix_rotate_back(state, half_edge, angle):
-        half_edge = state.next_at_vertex(half_edge)
-        while state.half_edge_colour(half_edge) == BLUE:
-            half_edge = state.next_at_vertex(half_edge)
-        return (half_edge, angle)
-
-    @staticmethod
-    def _face_separatrix_strebel(state, mapping, half_edge, angle):
+    def _rotate(state, half_edge, angle):
         raise NotImplementedError
 
     @staticmethod
-    def _face_separatrix_strebel_back(state, mapping, half_edge, angle):
+    def _rotate_back(state, half_edge, angle):
         raise NotImplementedError
 
-    def face_separatrix_transport(self, half_edge, angle):
+    @staticmethod
+    def _strebel(state, mapping, half_edge, angle):
+        raise NotImplementedError
+
+    @staticmethod
+    def _strebel_back(state, mapping, half_edge, angle):
+        raise NotImplementedError
+
+    def __call__(self, path, x):
         r"""
         Transport the face separatrix ``(half_edge, angle)`` along this path.
         """
-        for i in range(len(self)):
-            source = self._vertices[i]
-            target = self._vertices[i + 1]
-            transition = self._edge_labels[i]
+        half_edge, angle = x
 
-            source._check_face_separatrix(half_edge, angle)
+        for i in path:
+            source = self._graph.vertex_label(self._graph.edge_source(i))
+            target = self._graph.vertex_label(self._graph.edge_target(i))
+            transition = self._graph.edge_label(i)
 
-            reverse = self._signs[i]
+            reverse = i < 0
+
+            # too expensive!!
+            # source._check_face_separatrix(half_edge, angle)
+
             kind = transition[0]
             if kind == "flip":
-                edges = transition[1]
-                old_col = transition[2]
-                new_col = transition[3]
-                relabelling = transition[4]
-                if reverse:
-                    for e in edges:
-                        half_edge, angle = self._face_separatrix_flip_back(source, relabelling[e], old_col, half_edge, angle)
-                    half_edge, angle = self._separatrix_relabelling_back(relabelling, half_edge, angle)
-                else:
-                    for e in edges:
-                        half_edge, angle = self._face_separatrix_flip(source, e, new_col, half_edge, angle)
-                    half_edge, angle = self._separatrix_relabelling(relabelling, half_edge, angle)
+                continue
+
             elif kind == "rotate":
                 relabelling = transition[1]
                 if reverse:
-                    half_edge, angle = self._face_separatrix_rotate_back(source, half_edge, angle)
-                    half_edge, angle = self._separatrix_relabelling_back(relabelling, half_edge, angle)
+                    half_edge, angle = self._rotate_back(source, half_edge, angle)
+                    half_edge, angle = self._relabelling_back(relabelling, half_edge, angle)
                 else:
-                    half_edge, angle = self._face_separatrix_rotate(source, half_edge, angle)
-                    half_edge, angle = self._separatrix_relabelling(relabelling, half_edge, angle)
+                    half_edge, angle = self._rotate(source, half_edge, angle)
+                    half_edge, angle = self._relabelling(relabelling, half_edge, angle)
+
             elif kind == "strebel":
-                raise NotImplementedError
+                mapping = transition[1]
+                if reverse:
+                    # NOTE: for Strebel operation the argument is always the veering triangulation
+                    half_edge, angle = self._strebel_back(target, mapping, half_edge, angle)
+                else:
+                    half_edge, angle = self._strebel(source, mapping, half_edge, angle)
 
-            target._check_face_separatrix(half_edge, angle)
+            # too expensive!!
+            # target._check_face_separatrix(half_edge, angle)
 
-            return (half_edge, angle)
+        # TODO: canonicalize the output
+        return (half_edge, angle)
+
 
 # TODO: this function has to move closer to Delaunay-Strebel graphs and linear subvarieties
 def vertex_separatrices_monodromy(ds_graph, root=None):
@@ -301,7 +280,7 @@ def vertex_separatrices_monodromy(ds_graph, root=None):
     # TODO: the Delaunay-Strebel graph ought to be a LabelledDiGraph rather
     # than a sage DiGraph
     G = LabelledDiGraph(ds_graph)
-    monodromy = SeparatrixMonodromy(G)
+    monodromy = VertexSeparatrixMonodromy(G)
 
     separatrix_vertex_angle = {}
     separatrix_index = {}
@@ -316,7 +295,7 @@ def vertex_separatrices_monodromy(ds_graph, root=None):
 
     perms = set()
     for path in G.fundamental_group_basis():
-        p = [separatrix_index[monodromy.vertex_separatrix_transport(path, h, a)] for (h, a) in separatrices]
+        p = [separatrix_index[monodromy(path, (h, a))] for (h, a) in separatrices]
         perms.add(tuple(p))
 
     S = SymmetricGroup(range(len(separatrices)))
