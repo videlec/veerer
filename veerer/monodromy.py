@@ -1,94 +1,268 @@
 from sage.graphs.digraph import DiGraph
 from sage.groups.perm_gps.permgroup_named import SymmetricGroup
 
+from .constants import RED, BLUE
+from .permutation import perm_preimage
 from .delaunay_strebel_path import DiGraphPath, DelaunayStrebelPath
+from .labelled_digraph import LabelledDiGraph
 
 
-def digraph_spanning_tree(G, root):
+# TODO: make this a proper morphism from the fundamental group of the labelled digraph
+# to some permutation group of the separatrices
+class SeparatrixMonodromy:
     r"""
-    Return a pair ``(tree, complementary_edges)`` that form a spanning
-    tree of ``G``.
-
-    The edges in the tree are directed towards the ``root`` vertex.  The edge
-    labels are pairs ``(edge_label, reverse)`` where reverse is ``0`` if the
-    direction of the edge in ``G`` and the tree coincide and ``1`` otherwise.
-    """
-    # oriented towards the root
-    # make a spanning tree
-    T = DiGraph(loops=False, multiedges=False)
-    T.add_vertex(root)
-    complementary_edges = []
-    todo = [root]
-    while todo:
-        u = todo.pop()
-        for (v, _, edge_label) in G.incoming_edges(u):
-            if v not in T:
-                T.add_edge((v, u, (edge_label, 0)))
-                todo.append(v)
-            else:
-                complementary_edges.append((v, u, edge_label))
-        for (_, v, edge_label) in G.outgoing_edges(u):
-            if v not in T:
-                T.add_edge((v, u, (edge_label, 1)))
-                todo.append(v)
-
-    return T, complementary_edges
-
-
-def graph_fundamental_group_basis(G, root, path_class=DiGraphPath):
-    r"""
-    Iterate through a basis of the fundamental group of the digraph ``G``.
-
     EXAMPLES::
 
-        sage: from veerer.monodromy import graph_fundamental_group_basis
-        sage: G = digraphs.DeBruijn(2, 3)
-        sage: for path in graph_fundamental_group_basis(G, '000'):
-        ....:     print(path)
-        Closed path of length 1 in De Bruijn digraph (k=2, n=3) at 000
-        Closed path of length 2 in De Bruijn digraph (k=2, n=3) at 000
-        Closed path of length 3 in De Bruijn digraph (k=2, n=3) at 000
-        Closed path of length 4 in De Bruijn digraph (k=2, n=3) at 000
-        Closed path of length 6 in De Bruijn digraph (k=2, n=3) at 000
-        Closed path of length 7 in De Bruijn digraph (k=2, n=3) at 000
-        Closed path of length 6 in De Bruijn digraph (k=2, n=3) at 000
-        Closed path of length 7 in De Bruijn digraph (k=2, n=3) at 000
-        Closed path of length 6 in De Bruijn digraph (k=2, n=3) at 000
-        Closed path of length 7 in De Bruijn digraph (k=2, n=3) at 000
-        Closed path of length 4 in De Bruijn digraph (k=2, n=3) at 000
-        Closed path of length 6 in De Bruijn digraph (k=2, n=3) at 000
-        Closed path of length 4 in De Bruijn digraph (k=2, n=3) at 000
-        Closed path of length 5 in De Bruijn digraph (k=2, n=3) at 000
+        sage: from veerer import VeeringTriangulation
+        sage: from surface_dynamics import Stratum
+        sage: from veerer.delaunay_strebel_path import DelaunayStrebelPath
+        sage: DS = VeeringTriangulation.from_stratum(Stratum([1, 1])).delaunay_strebel_graph()
+        sage: start = next(iter(DS))
+        sage: path = DelaunayStrebelPath(DS, start)
+        sage: path.random_append(10, reverse=False)
+        sage: separatrices = [(h, 0) for h in path.start().right_wedges()]
+        sage: separatrices_image = [path.vertex_separatrix_transport(h, a) for (h, a) in separatrices]
+        sage: separatrices_target = [(h, 0) for h in path.end().right_wedges()]
+        sage: assert set(separatrices_image) == set(separatrices_target), (separatrices, separatrices_image, separatrices_target)
     """
-    T, complementary_edges = digraph_spanning_tree(G, root)
-    for source, target, transition in complementary_edges:
-        path = path_class(G, source)
-        path.append(target, transition)
+    def __init__(self, graph):
+        self._graph = graph
 
-        while path.start() != root:
-            edges = T.outgoing_edges(path.start())
-            assert len(edges) == 1
-            u, v, (transition, sign) = edges[0]
-            if sign:
-                assert G.has_edge(v, u, transition)
-                path.appendleft(v, transition, reverse=False)
+    @staticmethod
+    def _separatrix_relabelling(relabelling, half_edge, angle):
+        return (relabelling[half_edge], angle)
+
+    @staticmethod
+    def _separatrix_relabelling_back(relabelling, half_edge, angle):
+        return (perm_preimage(relabelling, half_edge), angle)
+
+    # Transport of vertex separatrices (separatrices of a zero of a simple pole of a quadratic differential)
+
+    @staticmethod
+    def _vertex_separatrix_flip(state, e, col, half_edge, angle):
+        assert half_edge != 2 * e and half_edge != (2 * e + 1)
+        a, b, c, d = state.square_about_half_edge(2 * e)
+        if half_edge == b:
+            assert angle == 0
+            return (2 * e + 1, 0) if col == RED else (half_edge, angle)
+        elif half_edge == d:
+            assert angle == 0
+            return (2 * e, 0) if col == RED else (half_edge, angle)
+
+        return (half_edge, angle)
+
+    @staticmethod
+    def _vertex_separatrix_flip_back(state, e, col, half_edge, angle):
+        if half_edge == 2 * e:
+            assert state._colouring[e] == RED
+            assert angle == 0
+            a, b, c, d = state.square_about_half_edge(2 * e)
+            return (c, 0)
+        elif half_edge == 2 * e + 1:
+            assert state._colouring[e] == RED
+            assert angle == 0
+            a, b, c, d = state.square_about_half_edge(2 * e)
+            return (a, 0)
+
+        return (half_edge, angle)
+
+    @staticmethod
+    def _vertex_separatrix_rotate(state, half_edge, angle):
+        # blue half-edge: nothing on angle, always fine
+        # red half-edge: do -1 on angle, need to explore previous if angle=0
+        next_half_edge = state.next_at_vertex(half_edge)
+        if state._colouring[half_edge // 2] == RED:
+            if angle == 0:
+                half_edge = state.previous_at_vertex(half_edge)
+                num_seps = state.half_edge_num_separatrices(half_edge, HORIZONTAL)
+                while num_seps == 0:
+                    half_edge = state.previous_at_vertex(half_edge)
+                    num_seps = state.half_edge_num_separatrices(half_edge, HORIZONTAL)
+                angle = num_seps - 1
             else:
-                assert G.has_edge(u, v, transition)
-                path.appendleft(v, transition, reverse=True)
+                angle -= 1
 
-        while path.end() != root:
-            edges = T.outgoing_edges(path.end())
-            assert len(edges) == 1
-            u, v, (transition, sign) = edges[0]
-            if sign:
-                assert G.has_edge(v, u, transition)
-                path.append(v, transition, reverse=True)
-            else:
-                assert G.has_edge(u, v, transition)
-                path.append(v, transition, reverse=False)
+        return (half_edge, angle)
 
-        yield path
+    @staticmethod
+    def _vertex_separatrix_rotate_back(state, half_edge, angle):
+        # blue half-edge: +1 on angle, if next half-edge is blue and angle=max need to explore next
+        # red half-edge: nothing on angle, if next half-edge is blue and angle=max need to explore next
+        if state._colouring[half_edge // 2] == BLUE:
+            angle += 1
 
+        next_half_edge = state.next_at_vertex(half_edge)
+        if state._colouring[next_half_edge // 2] == BLUE:
+            num_seps = state.half_edge_num_separatrices(half_edge, HORIZONTAL)
+            if num_seps == angle:
+                half_edge = next_half_edge
+                num_seps = state.half_edge_num_separatrices(half_edge, HORIZONTAL)
+                while num_seps == 0:
+                    half_edge = state.next_at_vertex(half_edge)
+                    num_seps = state.half_edge_num_separatrices(half_edge, HORIZONTAL)
+                angle = 0
+
+        return (half_edge, angle)
+
+    @staticmethod
+    def _vertex_separatrix_strebel(state, mapping, half_edge, angle):
+        while mapping[half_edge] == -1:
+            half_edge = state.previous_at_vertex(half_edge)
+            angle += state._bdry[half_edge] + (state._colouring[half_edge // 2] == RED and state._colouring[state._vp[half_edge] // 2] == BLUE)
+        return (mapping[half_edge], angle)
+
+    @staticmethod
+    def _vertex_separatrix_strebel_back(state, mapping, half_edge, angle):
+        half_edge = next(h for h in range(len(mapping)) if mapping[h] == half_edge)
+        num_seps = state._bdry[half_edge] + (state._colouring[half_edge // 2] == RED and state._colouring[state._vp[half_edge] // 2] == BLUE)
+        while angle >= num_seps:
+            angle -= num_seps
+            half_edge = state.next_at_vertex(half_edge)
+            num_seps = state._bdry[half_edge] + (state._colouring[half_edge // 2] == RED and state._colouring[state._vp[half_edge] // 2] == BLUE)
+
+        return (half_edge, angle)
+
+    def vertex_separatrix_transport(self, path, half_edge, angle):
+        r"""
+        Transport the vertex separatrix ``(half_edge, angle)`` along ``path``.
+        """
+        for i in path:
+            source = self._graph.vertex_label(self._graph.edge_source(i))
+            target = self._graph.vertex_label(self._graph.edge_target(i))
+            transition = self._graph.edge_label(i)
+
+            reverse = i < 0
+            
+            source._check_vertex_separatrix(half_edge, angle)
+
+            kind = transition[0]
+            if kind == "flip":
+                edges = transition[1]
+                old_col = transition[2]
+                new_col = transition[3]
+                relabelling = transition[4]
+                if reverse:
+                    for e in edges:
+                        half_edge, angle = self._vertex_separatrix_flip_back(source, relabelling[2 * e] // 2, old_col, half_edge, angle)
+                    half_edge, angle = self._separatrix_relabelling_back(relabelling, half_edge, angle)
+                else:
+                    for e in edges:
+                        half_edge, angle = self._vertex_separatrix_flip(source, e, new_col, half_edge, angle)
+                    half_edge, angle = self._separatrix_relabelling(relabelling, half_edge, angle)
+
+            elif kind == "rotate":
+                relabelling = transition[1]
+                if reverse:
+                    half_edge, angle = self._vertex_separatrix_rotate_back(source, half_edge, angle)
+                    half_edge, angle = self._separatrix_relabelling_back(relabelling, half_edge, angle)
+                else:
+                    half_edge, angle = self._vertex_separatrix_rotate(source, half_edge, angle)
+                    half_edge, angle = self._separatrix_relabelling(relabelling, half_edge, angle)
+
+            elif kind == "strebel":
+                mapping = transition[1]
+                if reverse:
+                    # NOTE: for Strebel operation the argument is always the veering triangulation
+                    half_edge, angle = self._vertex_separatrix_strebel_back(source, mapping, half_edge, angle)
+                else:
+                    half_edge, angle = self._vertex_separatrix_strebel(source, mapping, half_edge, angle)
+
+            target._check_vertex_separatrix(half_edge, angle)
+
+        return (half_edge, angle)
+
+    # Transport of face separatrices (separatrices of a higher order poles)
+
+    @staticmethod
+    def _face_separatrix_flip(state, e, col, half_edge, angle):
+        assert half_edge != 2 * e and half_edge != (2 * e + 1)
+        a, b, c, d = state.square_about_half_edge(2 * e)
+        if half_edge == b:
+            assert angle == 0
+            return (2 * e + 1, 0) if col == RED else (half_edge, angle)
+        elif half_edge == d:
+            assert angle == 0
+            return (2 * e, 0) if col == RED else (half_edge, angle)
+        else:
+            return (half_edge, angle)
+
+    @staticmethod
+    def _face_separatrix_flip_back(state, e, col, half_edge, angle):
+        if half_edge == 2 * e:
+            assert state._colouring[e] == RED
+            assert angle == 0
+            a, b, c, d = state.square_about_half_edge(2 * e)
+            return (c, 0)
+        elif half_edge == 2 * e + 1:
+            assert state._colouring[e] == RED
+            assert angle == 0
+            a, b, c, d = state.square_about_half_edge(2 * e)
+            return (a, 0)
+        else:
+            return (half_edge, angle)
+
+    @staticmethod
+    def _face_separatrix_rotate(state, half_edge, angle):
+        half_edge = state.previous_at_vertex(half_edge)
+        while state.half_edge_colour(half_edge) == BLUE:
+            half_edge = state.previous_at_vertex(half_edge)
+        return (half_edge, angle)
+
+    @staticmethod
+    def _face_separatrix_rotate_back(state, half_edge, angle):
+        half_edge = state.next_at_vertex(half_edge)
+        while state.half_edge_colour(half_edge) == BLUE:
+            half_edge = state.next_at_vertex(half_edge)
+        return (half_edge, angle)
+
+    @staticmethod
+    def _face_separatrix_strebel(state, mapping, half_edge, angle):
+        raise NotImplementedError
+
+    @staticmethod
+    def _face_separatrix_strebel_back(state, mapping, half_edge, angle):
+        raise NotImplementedError
+
+    def face_separatrix_transport(self, half_edge, angle):
+        r"""
+        Transport the face separatrix ``(half_edge, angle)`` along this path.
+        """
+        for i in range(len(self)):
+            source = self._vertices[i]
+            target = self._vertices[i + 1]
+            transition = self._edge_labels[i]
+
+            source._check_face_separatrix(half_edge, angle)
+
+            reverse = self._signs[i]
+            kind = transition[0]
+            if kind == "flip":
+                edges = transition[1]
+                old_col = transition[2]
+                new_col = transition[3]
+                relabelling = transition[4]
+                if reverse:
+                    for e in edges:
+                        half_edge, angle = self._face_separatrix_flip_back(target, relabelling[e], old_col, half_edge, angle)
+                    half_edge, angle = self._separatrix_relabelling_back(relabelling, half_edge, angle)
+                else:
+                    for e in edges:
+                        half_edge, angle = self._face_separatrix_flip(source, e, new_col, half_edge, angle)
+                    half_edge, angle = self._separatrix_relabelling(relabelling, half_edge, angle)
+            elif kind == "rotate":
+                relabelling = transition[1]
+                if reverse:
+                    half_edge, angle = self._face_separatrix_rotate_back(target, half_edge, angle)
+                    half_edge, angle = self._separatrix_relabelling_back(relabelling, half_edge, angle)
+                else:
+                    half_edge, angle = self._face_separatrix_rotate(source, half_edge, angle)
+                    half_edge, angle = self._separatrix_relabelling(relabelling, half_edge, angle)
+            elif kind == "strebel":
+                raise NotImplementedError
+
+            target._check_face_separatrix(half_edge, angle)
+
+            return (half_edge, angle)
 
 # TODO: this function has to move closer to Delaunay-Strebel graphs and linear subvarieties
 def vertex_separatrices_monodromy(ds_graph, root=None):
@@ -112,6 +286,10 @@ def vertex_separatrices_monodromy(ds_graph, root=None):
     if root is None:
         root = next(state for state in DS if isinstance(state, VeeringTriangulation))
 
+    # TODO: we should stored the LabelledDiGraph rather than the sage DiGraph
+    G = LabelledDiGraph(ds_graph)
+    monodromy = SeparatrixMonodromy(G)
+
     separatrix_vertex_angle = {}
     separatrix_index = {}
     separatrices = []
@@ -123,7 +301,10 @@ def vertex_separatrices_monodromy(ds_graph, root=None):
             separatrices.append(s)
             i += 1
 
-    perms = set(tuple(separatrix_index[path.vertex_separatrix_transport(h, a)] for (h, a) in separatrices)
-               for path in graph_fundamental_group_basis(ds_graph, root, DelaunayStrebelPath))
+    perms = set()
+    for path in G.fundamental_group_basis():
+        p = [separatrix_index[monodromy.vertex_separatrix_transport(path, h, a)] for (h, a) in separatrices]
+        perms.add(tuple(p))
+
     S = SymmetricGroup(range(len(separatrices)))
     return S.subgroup([S(list(p)) for p in perms])
