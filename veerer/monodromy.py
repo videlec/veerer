@@ -41,7 +41,7 @@ class SeparatrixMonodromy:
     @staticmethod
     def _vertex_separatrix_flip(state, e, col, half_edge, angle):
         assert half_edge != 2 * e and half_edge != (2 * e + 1)
-        a, b, c, d = state.square_about_half_edge(2 * e)
+        a, b, c, d = state.square_about_half_edge(2 * e, check=False)
         if half_edge == b:
             assert angle == 0
             return (2 * e + 1, 0) if col == RED else (half_edge, angle)
@@ -56,12 +56,12 @@ class SeparatrixMonodromy:
         if half_edge == 2 * e:
             assert state._colouring[e] == RED
             assert angle == 0
-            a, b, c, d = state.square_about_half_edge(2 * e)
+            a, b, c, d = state.square_about_half_edge(2 * e, check=False)
             return (c, 0)
         elif half_edge == 2 * e + 1:
             assert state._colouring[e] == RED
             assert angle == 0
-            a, b, c, d = state.square_about_half_edge(2 * e)
+            a, b, c, d = state.square_about_half_edge(2 * e, check=False)
             return (a, 0)
 
         return (half_edge, angle)
@@ -132,8 +132,9 @@ class SeparatrixMonodromy:
             transition = self._graph.edge_label(i)
 
             reverse = i < 0
-            
-            source._check_vertex_separatrix(half_edge, angle)
+
+            # too expensive!!
+            # source._check_vertex_separatrix(half_edge, angle)
 
             kind = transition[0]
             if kind == "flip":
@@ -167,7 +168,9 @@ class SeparatrixMonodromy:
                 else:
                     half_edge, angle = self._vertex_separatrix_strebel(source, mapping, half_edge, angle)
 
-            target._check_vertex_separatrix(half_edge, angle)
+            # too expensive!!
+            # target._check_vertex_separatrix(half_edge, angle)
+
 
         return (half_edge, angle)
 
@@ -176,7 +179,7 @@ class SeparatrixMonodromy:
     @staticmethod
     def _face_separatrix_flip(state, e, col, half_edge, angle):
         assert half_edge != 2 * e and half_edge != (2 * e + 1)
-        a, b, c, d = state.square_about_half_edge(2 * e)
+        a, b, c, d = state.square_about_half_edge(2 * e, check=False)
         if half_edge == b:
             assert angle == 0
             return (2 * e + 1, 0) if col == RED else (half_edge, angle)
@@ -191,12 +194,12 @@ class SeparatrixMonodromy:
         if half_edge == 2 * e:
             assert state._colouring[e] == RED
             assert angle == 0
-            a, b, c, d = state.square_about_half_edge(2 * e)
+            a, b, c, d = state.square_about_half_edge(2 * e, check=False)
             return (c, 0)
         elif half_edge == 2 * e + 1:
             assert state._colouring[e] == RED
             assert angle == 0
-            a, b, c, d = state.square_about_half_edge(2 * e)
+            a, b, c, d = state.square_about_half_edge(2 * e, check=False)
             return (a, 0)
         else:
             return (half_edge, angle)
