@@ -1,3 +1,26 @@
+r"""
+Labelled directed graphs and fundamental group
+"""
+# ****************************************************************************
+#  This file is part of veerer
+#
+#       Copyright (C) 2024 Vincent Delecroix
+#
+#  This program is free software; you can redistribute it and/or
+#  modify it under the terms of the GNU General Public License
+#  as published by the Free Software Foundation; either version 2
+#  of the License, or (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+# ****************************************************************************
+
 import collections
 
 from sage.graphs.digraph import DiGraph
@@ -13,20 +36,22 @@ class LabelledDiGraph:
     EXAMPLES::
 
         sage: from veerer.labelled_digraph import LabelledDiGraph, LabelledDiGraphPath
-        sage: G = LabelledDiGraph(digraphs.ButterflyGraph(5))
+        sage: G = LabelledDiGraph(digraphs.ButterflyGraph(5), sort=True)
         sage: G.vertex_label(3)
-        ('11111', 3)
-        sage: G.vertex_index(('11111', 3))
+        ('00000', 3)
+        sage: G.vertex_index(('00000', 3))
         3
         sage: G.outgoing_edges(3)
-        [6, 7, -5, -45]
+        [7, 6, -5, -45]
         sage: G.incoming_edges(3)
-        [4, 44, -7, -8]
+        [4, 44, -8, -7]
     """
-    def __init__(self, digraph, root=None):
+    def __init__(self, digraph, root=None, sort=False):
         self._digraph = DiGraph(len(digraph), loops=digraph.allows_loops(), multiedges=digraph.allows_multiple_edges())
 
         self._vertices = list(digraph)
+        if sort:
+            self._vertices.sort()
         if root is not None:
             i = self._vertices.index(root)
             self._vertices[0], self._vertices[i] = self._vertices[i], self._vertices[0]
@@ -36,7 +61,10 @@ class LabelledDiGraph:
         self._edge_targets = []
         self._edge_labels = []
 
-        for k, (u, v, label) in enumerate(digraph.edges()):
+        edges = list(digraph.edges())
+        if sort:
+            edges.sort()
+        for k, (u, v, label) in enumerate(edges):
             i = self._vertex_index[u]
             j = self._vertex_index[v]
             self._edge_sources.append(i)
@@ -69,7 +97,7 @@ class LabelledDiGraph:
         TESTS::
 
             sage: from veerer.labelled_digraph import LabelledDiGraph, LabelledDiGraphPath
-            sage: G = LabelledDiGraph(digraphs.ButterflyGraph(5))
+            sage: G = LabelledDiGraph(digraphs.ButterflyGraph(5), sort=True)
             sage: for e in range(G.num_edges()):
             ....:     assert G.edge_source(e) == G.edge_target(~e)
             ....:     assert G.edge_source(~e) == G.edge_target(e)
@@ -92,7 +120,7 @@ class LabelledDiGraph:
         TESTS::
 
             sage: from veerer.labelled_digraph import LabelledDiGraph, LabelledDiGraphPath
-            sage: G = LabelledDiGraph(digraphs.ButterflyGraph(5))
+            sage: G = LabelledDiGraph(digraphs.ButterflyGraph(5), sort=True)
             sage: for v in range(G.num_verts()):
             ....:     assert all(G.edge_source(e) == v for e in G.outgoing_edges(v))
             ....:     assert all(G.edge_target(e) == v for e in G.incoming_edges(v))
@@ -116,7 +144,7 @@ class LabelledDiGraph:
         EXAMPLES::
 
             sage: from veerer.labelled_digraph import LabelledDiGraph
-            sage: G = LabelledDiGraph(digraphs.ButterflyGraph(5))
+            sage: G = LabelledDiGraph(digraphs.ButterflyGraph(5), sort=True)
             sage: tree, edges = G.spanning_tree()
             sage: tree[0] is None
             True
@@ -152,18 +180,18 @@ class LabelledDiGraph:
         EXAMPLES::
 
             sage: from veerer.labelled_digraph import LabelledDiGraph
-            sage: G = LabelledDiGraph(digraphs.DeBruijn(2, 3))
+            sage: G = LabelledDiGraph(digraphs.DeBruijn(2, 3), sort=True)
             sage: for path in G.fundamental_group_basis():
             ....:     print(path)
-            Closed path of length 1 in LabelledDiGraph on 8 vertices and 16 edge at vertex=0 made of edges=[0]
-            Closed path of length 3 in LabelledDiGraph on 8 vertices and 16 edge at vertex=0 made of edges=[-9, 9, -2]
-            Closed path of length 7 in LabelledDiGraph on 8 vertices and 16 edge at vertex=0 made of edges=[1, 3, 7, 15, -8, -4, -2]
-            Closed path of length 7 in LabelledDiGraph on 8 vertices and 16 edge at vertex=0 made of edges=[1, 3, 7, 14, -7, -4, -2]
-            Closed path of length 6 in LabelledDiGraph on 8 vertices and 16 edge at vertex=0 made of edges=[1, 2, 5, 11, -4, -2]
-            Closed path of length 7 in LabelledDiGraph on 8 vertices and 16 edge at vertex=0 made of edges=[1, 3, 6, 13, 11, -4, -2]
-            Closed path of length 6 in LabelledDiGraph on 8 vertices and 16 edge at vertex=0 made of edges=[1, 3, -12, 10, -3, -2]
-            Closed path of length 4 in LabelledDiGraph on 8 vertices and 16 edge at vertex=0 made of edges=[1, 2, 4, 8]
-            Closed path of length 5 in LabelledDiGraph on 8 vertices and 16 edge at vertex=0 made of edges=[1, 3, 6, 12, 8]
+            Path of length 1 in LabelledDiGraph on 8 vertices and 16 edge from start=0 to target=0 made of edges=[0]
+            Path of length 3 in LabelledDiGraph on 8 vertices and 16 edge from start=0 to target=0 made of edges=[-9, 9, -2]
+            Path of length 7 in LabelledDiGraph on 8 vertices and 16 edge from start=0 to target=0 made of edges=[1, 3, 7, 15, -8, -4, -2]
+            Path of length 7 in LabelledDiGraph on 8 vertices and 16 edge from start=0 to target=0 made of edges=[1, 3, 7, 14, -7, -4, -2]
+            Path of length 6 in LabelledDiGraph on 8 vertices and 16 edge from start=0 to target=0 made of edges=[1, 2, 5, 11, -4, -2]
+            Path of length 7 in LabelledDiGraph on 8 vertices and 16 edge from start=0 to target=0 made of edges=[1, 3, 6, 13, 11, -4, -2]
+            Path of length 6 in LabelledDiGraph on 8 vertices and 16 edge from start=0 to target=0 made of edges=[1, 3, -12, 10, -3, -2]
+            Path of length 4 in LabelledDiGraph on 8 vertices and 16 edge from start=0 to target=0 made of edges=[1, 2, 4, 8]
+            Path of length 5 in LabelledDiGraph on 8 vertices and 16 edge from start=0 to target=0 made of edges=[1, 3, 6, 12, 8]
         """
         tree, complementary_edges = self.spanning_tree(root)
         for i in complementary_edges:
@@ -192,14 +220,14 @@ class LabelledDiGraphPath:
     EXAMPLES::
 
         sage: from veerer.labelled_digraph import LabelledDiGraph, LabelledDiGraphPath
-        sage: G = LabelledDiGraph(digraphs.ButterflyGraph(5))
+        sage: G = LabelledDiGraph(digraphs.ButterflyGraph(5), sort=True)
         sage: path = LabelledDiGraphPath(G, 0)
         sage: path.append(0)
-        sage: path.append(-162)
-        sage: path.appendleft(-1)
-        sage: path.appendleft(161)
+        sage: path.append(-161)
+        sage: path.appendleft(-2)
+        sage: path.appendleft(-163)
         sage: path
-        Closed path of length 4 in LabelledDiGraph on 192 vertices and 320 edge at vertex=96 made of edges=[161, -1, 0, -162]
+        Path of length 4 in LabelledDiGraph on 192 vertices and 320 edge from start=98 to target=96 made of edges=[-163, -2, 0, -161]
     """
     def __init__(self, graph, start, edges=None):
         self._graph = graph
@@ -226,11 +254,7 @@ class LabelledDiGraphPath:
         return iter(self._edges)
 
     def __repr__(self):
-        if self.is_closed():
-            return "Closed path of length {} in {} at vertex={} made of edges={}".format(len(self), self._graph, self.start(), list(self._edges))
-
-        else:
-            return "Path of length {} in {} from start={} to target={} made of edges={}".format(len(self), self._graph, self.start(), self.end(), list(self._edges))
+        return "Path of length {} in {} from start={} to target={} made of edges={}".format(len(self), self._graph, self.start(), self.end(), list(self._edges))
 
     def start(self):
         return self._vertices[0]
@@ -279,11 +303,21 @@ class LabelledDiGraphPath:
         EXAMPLES::
 
             sage: from veerer.labelled_digraph import LabelledDiGraph, LabelledDiGraphPath
-            sage: G = LabelledDiGraph(digraphs.DeBruijn(2, 3))
+            sage: G = LabelledDiGraph(digraphs.DeBruijn(2, 3), sort=True)
             sage: path = LabelledDiGraphPath(G, 0)
             sage: path.random_append(10)
-            sage: path # random
-            ... of length 10 in LabelledDiGraph on 8 vertices and 16 edge from start=0 to ...
+            sage: path
+            Path of length 10 in LabelledDiGraph on 8 vertices and 16 edge from start=0 to target=... made of edges=[...]
+
+            sage: path = LabelledDiGraphPath(G, 0)
+            sage: path.random_append(100, reverse=True)
+            sage: path.is_oriented()
+            False
+
+            sage: path = LabelledDiGraphPath(G, 0)
+            sage: path.random_append(100, reverse=False)
+            sage: path.is_oriented()
+            True
         """
         for _ in range(repeat):
             edges = self._graph.outgoing_edges(self.end(), reverse=reverse and randrange(2))
@@ -322,12 +356,23 @@ class LabelledDiGraphPath:
         EXAMPLES::
 
             sage: from veerer.labelled_digraph import LabelledDiGraph, LabelledDiGraphPath
-            sage: G = LabelledDiGraph(digraphs.DeBruijn(2, 3))
-            sage: path = LabelledDiGraphPath(G, 0)
-            sage: path.random_appendleft(10)
-            sage: path # random
-        """
 
+            sage: G = LabelledDiGraph(digraphs.DeBruijn(2, 3), sort=True)
+            sage: path = G.path(0)
+            sage: path.random_appendleft(10)
+            sage: path
+            Path of length 10 in LabelledDiGraph on 8 vertices and 16 edge from start=... to target=0 made of edges=[...]
+
+            sage: path = LabelledDiGraphPath(G, 0)
+            sage: path.random_appendleft(100, reverse=True)
+            sage: path.is_oriented()
+            False
+
+            sage: path = LabelledDiGraphPath(G, 0)
+            sage: path.random_appendleft(100, reverse=False)
+            sage: path.is_oriented()
+            True
+        """
         for _ in range(repeat):
             edges = self._graph.incoming_edges(self.start(), reverse=reverse and randrange(2))
             if not edges:
@@ -345,13 +390,64 @@ class LabelledDiGraphPath:
         return (source, self.start(), edge)
 
     def is_oriented(self):
+        r"""
+        Return whether the path is oriented.
+
+        A path is *oriented* if it follows each edge orientation.
+
+        EXAMPLES::
+
+            sage: from veerer.labelled_digraph import LabelledDiGraph
+
+            sage: G = LabelledDiGraph(digraphs.DeBruijn(2, 3), sort=True)
+            sage: G.path(2).is_oriented()
+            True
+            sage: G.path(0, [1, 2, 5, 10, 4]).is_oriented()
+            True
+            sage: G.path(0, [0, 1, -10, 8]).is_oriented()
+            False
+        """
         return all(edge >= 0 for edge in self._edges)
 
     def is_closed(self):
+        r"""
+        Return whether the path is closed.
+
+        A path is *closed* if it starts and ends at the same vertex.
+
+        EXAMPLES::
+
+            sage: from veerer.labelled_digraph import LabelledDiGraph
+
+            sage: G = LabelledDiGraph(digraphs.DeBruijn(2, 3), sort=True)
+            sage: G.path(2).is_closed()
+            True
+            sage: G.path(0, [0]).is_closed()
+            True
+            sage: G.path(0, [-9, 9, 2, -11, 10, 5, 11, 7, 14, 12, 8]).is_closed()
+            True
+            sage: G.path(0, [1, 2, 5, 10, 4]).is_closed()
+            False
+        """
+
         return self.start() == self.end()
 
+    # TODO: should maybe be called is_reduced?
     def is_non_backtracking(self):
+        r"""
+        Return whether the path is non-backtracking.
+
+        A path is *non-backtracking* if it does not contain as a sub-path an
+        edge followed by its inverse.
+
+        EXAMPLES::
+
+            sage: from veerer.labelled_digraph import LabelledDiGraph
+
+            sage: G = LabelledDiGraph(digraphs.DeBruijn(2, 3), sort=True)
+            sage: G.path(2).is_non_backtracking()
+            True
+            sage: G.path(0, [1, 2, -3]).is_non_backtracking()
+            False
+        """
         return all(self._edges[i] != ~self._edges[i + 1] for i in range(len(self._edges) - 1))
-
-
-
