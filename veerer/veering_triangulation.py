@@ -227,7 +227,7 @@ class VeeringTriangulation(Triangulation):
             raise ValueError("invalid angle for separatrix")
         angle = int(angle)
         num_seps =  self.half_edge_num_separatrices(half_edge)
-        if self.boundary_vector()[half_edge] == 0:
+        if self._bdry[half_edge] == 0:
             raise ValueError("not a face separatrix")
         if angle < 0 or angle >= num_seps:
             raise ValueError(f"angle (={angle}) out of range for separatrix at half_edge={half_edge}; must be >= 0 and <= {num_seps}")
@@ -3662,7 +3662,21 @@ class VeeringTriangulation(Triangulation):
         return A
 
     def delaunay_strebel_graph(self):
-        return self.delaunay_strebel_automaton()._graph
+        r"""
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,2,1)(~0,3,~1)(~2:2,~3:2)", "RBRR")
+            sage: vt.delaunay_strebel_graph()
+            Delaunay-Strebel graph of VeeringTriangulation("(0:1,1:1,~0:1,~1:1)", "RB") made of
+              9 veering Delaunay states
+              1 Strebel states
+              8 flip transitions
+              5 rotation transitions
+              5 Strebel transitions
+        """
+        from .delaunay_strebel_graph import DelaunayStrebelGraph
+        return DelaunayStrebelGraph(self.delaunay_strebel_automaton()._graph)
 
     def _complexify_generators(self, Gx):
         r"""

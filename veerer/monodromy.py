@@ -9,7 +9,7 @@ from .labelled_digraph import LabelledDiGraph
 
 # TODO: make this a proper morphism from the fundamental group of the labelled digraph
 # to some permutation group of the separatrices
-class VertexSeparatrixMonodromy:
+class SeparatrixMonodromy:
     r"""
     Monodromy of separatrices at a zero (or simple pole of quadratic differential) in a prime
     component.
@@ -17,16 +17,18 @@ class VertexSeparatrixMonodromy:
     EXAMPLES::
 
         sage: from veerer import VeeringTriangulation
-        sage: from surface_dynamics import Stratum
-        sage: from veerer.delaunay_strebel_path import DelaunayStrebelPath
-        sage: DS = VeeringTriangulation.from_stratum(Stratum([1, 1])).delaunay_strebel_graph()
-        sage: start = next(iter(DS))
-        sage: path = DelaunayStrebelPath(DS, start)
+        sage: from veerer.monodromy import SeparatrixMonodromy
+        sage: vt = VeeringTriangulation("(0,8,~7)(~0,~6,7)(1,11,~10)(~1,~11,4)(2,10,~9)(~2,~4,5)(3,9,~8)(~3,~5,6)", "RRRRBBBBBBBB")
+        sage: ds_graph = vt.delaunay_strebel_graph()
+        sage: monodromy = SeparatrixMonodromy(ds_graph)
+        sage: path = ds_graph.path(0)
         sage: path.random_append(10, reverse=False)
-        sage: separatrices = [(h, 0) for h in path.start().right_wedges()]
-        sage: separatrices_image = [path.vertex_separatrix_transport(h, a) for (h, a) in separatrices]
-        sage: separatrices_target = [(h, 0) for h in path.end().right_wedges()]
-        sage: assert set(separatrices_image) == set(separatrices_target), (separatrices, separatrices_image, separatrices_target)
+        sage: start = ds_graph.vertex_label(path.start())
+        sage: end = ds_graph.vertex_label(path.end())
+        sage: separatrices = start.vertex_separatrices()
+        sage: separatrices_image = [monodromy.vertex_separatrix_transport(path, h, a) for (h, a) in separatrices]
+        sage: separatrices_target = end.vertex_separatrices()
+        sage: assert set(separatrices_image) == set(separatrices_target)
     """
     def __init__(self, graph):
         self._graph = graph
@@ -70,10 +72,9 @@ class VertexSeparatrixMonodromy:
         return (half_edge, angle)
 
     @staticmethod
-    def _rotate(state, half_edge, angle):
+    def _rotate_vertex(state, half_edge, angle):
         # blue half-edge: nothing on angle, always fine
         # red half-edge: do -1 on angle, need to explore previous if angle=0
-        next_half_edge = state.next_at_vertex(half_edge)
         if state._colouring[half_edge // 2] == RED:
             if angle == 0:
                 half_edge = state.previous_at_vertex(half_edge)
@@ -88,7 +89,7 @@ class VertexSeparatrixMonodromy:
         return (half_edge, angle)
 
     @staticmethod
-    def _rotate_back(state, half_edge, angle):
+    def _rotate_vertex_back(state, half_edge, angle):
         # blue half-edge: +1 on angle, if next half-edge is blue and angle=max need to explore next
         # red half-edge: nothing on angle, if next half-edge is blue and angle=max need to explore next
         if state._colouring[half_edge // 2] == BLUE:
@@ -102,6 +103,39 @@ class VertexSeparatrixMonodromy:
                 num_seps = state.half_edge_num_separatrices(half_edge, HORIZONTAL)
                 while num_seps == 0:
                     half_edge = state.next_at_vertex(half_edge)
+                    num_seps = state.half_edge_num_separatrices(half_edge, HORIZONTAL)
+                angle = 0
+
+        return (half_edge, angle)
+
+    @staticmethod
+    def _rotate_face(state, half_edge, angle):
+        if state._colouring[half_edge // 2] == RED:
+            if angle == 0:
+                half_edge = state.next_in_face(half_edge)
+                num_seps = state.half_edge_num_separatrices(half_edge, HORIZONTAL)
+                while num_seps == 1:
+                    half_edge = state.next_in_face(half_edge)
+                    num_seps = state.half_edge_num_separatrices(half_edge, HORIZONTAL)
+                angle = num_seps - 2
+            else:
+                angle -= 1
+
+        return (half_edge, angle)
+
+    @staticmethod
+    def _rotate_face_back(state, half_edge, angle):
+        if state._colouring[half_edge // 2] == BLUE:
+            angle += 1
+
+        next_half_edge = state.previous_in_face(half_edge)
+        if state._colouring[next_half_edge // 2] == BLUE:
+            num_seps = state.half_edge_num_separatrices(half_edge, HORIZONTAL)
+            if num_seps == angle:
+                half_edge = next_half_edge
+                num_seps = state.half_edge_num_separatrices(half_edge, HORIZONTAL)
+                while num_seps == 1:
+                    half_edge = state.previous_in_face(half_edge)
                     num_seps = state.half_edge_num_separatrices(half_edge, HORIZONTAL)
                 angle = 0
 
@@ -125,14 +159,12 @@ class VertexSeparatrixMonodromy:
 
         return (half_edge, angle)
 
-    def __call__(self, path, x):
+    def vertex_separatrix_transport(self, path, half_edge, angle):
         r"""
         Transport the vertex separatrix ``(half_edge, angle)`` along ``path``.
         """
         if path._graph is not self._graph:
             raise ValueError("invalid path for vertex monodromy")
-
-        half_edge, angle = x
 
         for i in path:
             source = self._graph.vertex_label(self._graph.edge_source(i))
@@ -162,10 +194,10 @@ class VertexSeparatrixMonodromy:
             elif kind == "rotate":
                 relabelling = transition[1]
                 if reverse:
-                    half_edge, angle = self._rotate_back(source, half_edge, angle)
+                    half_edge, angle = self._rotate_vertex_back(source, half_edge, angle)
                     half_edge, angle = self._relabelling_back(relabelling, half_edge, angle)
                 else:
-                    half_edge, angle = self._rotate(source, half_edge, angle)
+                    half_edge, angle = self._rotate_vertex(source, half_edge, angle)
                     half_edge, angle = self._relabelling(relabelling, half_edge, angle)
 
             elif kind == "strebel":
@@ -181,32 +213,12 @@ class VertexSeparatrixMonodromy:
 
         return (half_edge, angle)
 
-
-# TODO: there is nothing implemented yet
-class FaceSeparatrixMonodromy:
-    # Transport of face separatrices (separatrices of a higher order poles)
-
-    @staticmethod
-    def _rotate(state, half_edge, angle):
-        raise NotImplementedError
-
-    @staticmethod
-    def _rotate_back(state, half_edge, angle):
-        raise NotImplementedError
-
-    @staticmethod
-    def _strebel(state, mapping, half_edge, angle):
-        raise NotImplementedError
-
-    @staticmethod
-    def _strebel_back(state, mapping, half_edge, angle):
-        raise NotImplementedError
-
-    def __call__(self, path, x):
+    def face_separatrix_transport(self, path, half_edge, angle):
         r"""
         Transport the face separatrix ``(half_edge, angle)`` along this path.
         """
-        half_edge, angle = x
+        if path._graph is not self._graph:
+            raise ValueError("invalid path for vertex monodromy")
 
         for i in path:
             source = self._graph.vertex_label(self._graph.edge_source(i))
@@ -216,87 +228,86 @@ class FaceSeparatrixMonodromy:
             reverse = i < 0
 
             # too expensive!!
-            # source._check_face_separatrix(half_edge, angle)
+            source._check_face_separatrix(half_edge, angle)
 
             kind = transition[0]
             if kind == "flip":
-                continue
+                relabelling = transition[4]
+                if reverse:
+                    half_edge, angle = self._relabelling_back(relabelling, half_edge, angle)
+                else:
+                    half_edge, angle = self._relabelling(relabelling, half_edge, angle)
 
             elif kind == "rotate":
                 relabelling = transition[1]
                 if reverse:
-                    half_edge, angle = self._rotate_back(source, half_edge, angle)
+                    half_edge, angle = self._rotate_face_back(source, half_edge, angle)
                     half_edge, angle = self._relabelling_back(relabelling, half_edge, angle)
                 else:
-                    half_edge, angle = self._rotate(source, half_edge, angle)
+                    half_edge, angle = self._rotate_face(source, half_edge, angle)
                     half_edge, angle = self._relabelling(relabelling, half_edge, angle)
 
             elif kind == "strebel":
                 mapping = transition[1]
                 if reverse:
                     # NOTE: for Strebel operation the argument is always the veering triangulation
+                    half_edge, angle = source._normalization_face_separatrix(half_edge, angle)
                     half_edge, angle = self._strebel_back(target, mapping, half_edge, angle)
                 else:
                     half_edge, angle = self._strebel(source, mapping, half_edge, angle)
 
             # too expensive!!
-            # target._check_face_separatrix(half_edge, angle)
+            target._check_face_separatrix(half_edge, angle)
 
-        # TODO: canonicalize the output
-        return (half_edge, angle)
+        return self._graph.vertex_label(path.end())._normalization_face_separatrix(half_edge, angle)
 
 
-# TODO: this function has to move closer to Delaunay-Strebel graphs and linear subvarieties
-def vertex_separatrices_monodromy(ds_graph, root=None):
+def separatrices_monodromy(ds_graph):
     r"""
     EXAMPLES::
 
         sage: from veerer import VeeringTriangulation
-        sage: from veerer.monodromy import vertex_separatrices_monodromy
+        sage: from veerer.monodromy import separatrices_monodromy
 
     The case of H(1^2)::
 
         sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,9)(~8,10,11)(~9,~10,~11)", "BRBBRBBRBBRB")
         sage: ds_graph = vt.delaunay_strebel_graph()
-        sage: G = vertex_separatrices_monodromy(ds_graph)
+        sage: G = separatrices_monodromy(ds_graph)
         sage: G.cardinality()
         8
         sage: G.structure_description()
         'C4 x C2'
 
-    The case of H(1^2, -1^2)::
+    The case of H(3^2, -3^2)::
 
-        sage: vt = VeeringTriangulation("(~0,1,2)(~1,3,4)(~2,5,6)(~3,~5,7)(~6,8,9)(~7,~8,~9)(0:1)(~4:1)", "BRRRBBRRRB")
+        sage: vt = VeeringTriangulation("(~0,1,2)(~1,3,4)(~2,5,6)(~3,~5,7)(~6,8,9)(~7,~8,~9)(0:2)(~4:2)", "BRRRBBRRRB")
         sage: ds_graph = vt.delaunay_strebel_graph()
-        sage: G = vertex_separatrices_monodromy(ds_graph)
+        sage: G = separatrices_monodromy(ds_graph)
         sage: G.cardinality()
-        8
+        20
         sage: G.structure_description()
-        'C4 x C2'
+        'C10 x C2'
     """
-    if root is None:
-        root = next(state for state in ds_graph if isinstance(state, VeeringTriangulation))
+    root = ds_graph.root()
 
-    # TODO: the Delaunay-Strebel graph ought to be a LabelledDiGraph rather
-    # than a sage DiGraph
-    G = LabelledDiGraph(ds_graph)
-    monodromy = VertexSeparatrixMonodromy(G)
+    mon = SeparatrixMonodromy(ds_graph)
 
-    separatrix_vertex_angle = {}
-    separatrix_index = {}
-    separatrices = []
-    i = 0
-    for v, seps in enumerate(root.vertex_separatrices(flat=False)):
-        for a, s in enumerate(seps):
-            separatrix_vertex_angle[s] = (v, a)
-            separatrix_index[s] = i
-            separatrices.append(s)
-            i += 1
+    vertex_separatrices = root.vertex_separatrices(flat=True)
+    vertex_separatrix_index = {ha: i for i, ha in enumerate(vertex_separatrices)}
+    nv = len(vertex_separatrices)
+
+    face_separatrices = root.face_separatrices(flat=True)
+    face_separatrix_index = {ha: nv + i for i, ha in enumerate(face_separatrices)}
+    nf = len(face_separatrices)
+
+    n = nv + nf
 
     perms = set()
-    for path in G.fundamental_group_basis():
-        p = [separatrix_index[monodromy(path, (h, a))] for (h, a) in separatrices]
-        perms.add(tuple(p))
+    for path in ds_graph.fundamental_group_basis():
+        p_vert = [vertex_separatrix_index[mon.vertex_separatrix_transport(path, h, a)] for (h, a) in vertex_separatrices]
+        p_face = [face_separatrix_index[mon.face_separatrix_transport(path, h, a)] for (h, a) in face_separatrices]
+        perms.add(tuple(p_vert) + tuple(p_face))
 
-    S = SymmetricGroup(range(len(separatrices)))
+    S = SymmetricGroup(range(n))
     return S.subgroup([S(list(p)) for p in perms])

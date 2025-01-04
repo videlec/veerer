@@ -23,9 +23,13 @@ class LabelledDiGraph:
         sage: G.incoming_edges(3)
         [4, 44, -7, -8]
     """
-    def __init__(self, digraph):
+    def __init__(self, digraph, root=None):
         self._digraph = DiGraph(len(digraph), loops=digraph.allows_loops(), multiedges=digraph.allows_multiple_edges())
+
         self._vertices = list(digraph)
+        if root is not None:
+            i = self._vertices.index(root)
+            self._vertices[0], self._vertices[i] = self._vertices[i], self._vertices[0]
         self._vertex_index = {v: i for i, v in enumerate(self._vertices)}
 
         self._edge_sources = []
@@ -138,6 +142,9 @@ class LabelledDiGraph:
                     complementary_edges.append(i)
         return tree, complementary_edges
 
+    def path(self, start, edges=None):
+        return LabelledDiGraphPath(self, start, edges)
+
     def fundamental_group_basis(self, root=0):
         r"""
         Iterate through a basis of the fundamental group of the digraph ``G``.
@@ -194,10 +201,14 @@ class LabelledDiGraphPath:
         sage: path
         Closed path of length 4 in LabelledDiGraph on 192 vertices and 320 edge at vertex=96 made of edges=[161, -1, 0, -162]
     """
-    def __init__(self, graph, start):
+    def __init__(self, graph, start, edges=None):
         self._graph = graph
         self._vertices = collections.deque([start])  # vertices
         self._edges = collections.deque([])          # edge labels (>= 0 for forward and < 0 for backward)
+
+        if edges is not None:
+            for i in edges:
+                self.append(i)
 
     def copy(self):
         ans = type(self).__new__(type(self))
