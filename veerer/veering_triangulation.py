@@ -5485,7 +5485,7 @@ class VeeringTriangulation(Triangulation):
         - ``mutable`` (optional, default ``False``) -- whether the output Strebel graph is mutable
 
         - ``mapping`` -- whether to return the mapping of edges (the Strebel
-          graph is a subgraph of the triangulation)
+          graph is a subgraph of the triangulation) and the mapping of boundary faces (the output list of boundary faces of the Strebel graph corresponds positionally to the list of boundary faces of the input veering triangulation)
 
         EXAMPLES::
 
@@ -5527,7 +5527,8 @@ class VeeringTriangulation(Triangulation):
             sage: assert sg.stratum() == vt.stratum() == Stratum((5, 0, 0, 0, 0, -4, -5), 2) # optional - surface_dynamics
             sage: vt.strebel_graph(mapping=True)
             (StrebelGraph("(0:1,1,~1:1,~0,2)(~2,~3:2,4,~4:1,3)"),
-             array('i', [-1, -1, 0, 1, 2, 3, 4, 5, -1, -1, -1, -1, 6, 7, 8, 9, -1, -1]))
+             array('i', [-1, -1, 0, 1, 2, 3, 4, 5, -1, -1, -1, -1, 6, 7, 8, 9, -1, -1]),
+             [[0, 2, 3, 1, 4], [5, 7, 8, 9, 6]])
 
             sage: vt = VeeringTriangulation("(0,1,2)(3,4,5)(6,7,8)", "(~8:2,~7:1,~6:1,~5:2,~4:1,~3:1,~2:2,~1:1,~0:1)", "RBRRBBRRB")
             sage: sg = vt.strebel_graph()
@@ -5548,6 +5549,17 @@ class VeeringTriangulation(Triangulation):
             sage: for cols in G.colourings():
             ....:     for vt in G.veering_triangulations(cols):
             ....:         assert vt.is_strebel() and vt.strebel_graph() == G
+
+        Example where the output mapping of boundary faces differs in order from the list of boundary faces in the output Strebel graph::
+
+            sage: vt = VeeringTriangulation("(1,4,2)(~2,3,~0)(~1:1, ~4:1)(0:1,~3:1)","BRBRB")
+            sage: sg = vt.strebel_graph()
+            sage: sg.boundary_faces()
+            [[0, 1, 2], [3, 4, 5]]
+            sage: vt.strebel_graph(mapping=True)
+            (StrebelGraph("(0,~0:1,1)(~1,2,~2:1)"),
+            array('i', [-1, -1, 0, 1, 2, 3, 4, 5, -1, -1]),
+            [[3, 4, 5], [0, 1, 2]])
         """
         if not self.is_strebel(slope=slope):
             raise ValueError('triangulation is not Strebel')
@@ -5613,7 +5625,19 @@ class VeeringTriangulation(Triangulation):
         #STEP3: build the Strebel graph
         from .strebel_graph import StrebelGraph
         sg = StrebelGraph.from_permutations(vertex_permutation, None, (beta,), (), mutable=mutable, check=True)
-        return (sg, index_strebel) if mapping else sg
+
+        bdry = self.boundary_faces()
+        correspondece = [None] * len(bdry) 
+        for f in bdry:
+            h = f[0]
+            while index_strebel[h] == -1:
+                h = self.previous_at_vertex(h)
+            for ff in sg.boundary_faces():
+                if index_strebel[h] in ff:
+                    correspondece[bdry.index(f)] = ff
+            assert self.face_angle(f[0]) == sg.face_angle(index_strebel[h])
+
+        return (sg, index_strebel, correspondece) if mapping else sg
 
 
 class VeeringTriangulations:
