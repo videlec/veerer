@@ -31,7 +31,7 @@ from sage.rings.integer_ring import ZZ
 from sage.matrix.constructor import matrix
 from sage.matrix.special import identity_matrix
 
-from .permutation import perm_check, perm_cycles, perm_cycles_to_string, str_to_cycles_and_data
+from .permutation import perm_check, perm_cycles, perm_cycles_to_string, str_to_cycles_and_data, perm_orbit
 from .triangulation import face_boundary_init, Triangulation
 from .constellation import Constellation
 from .constants import *
@@ -322,14 +322,65 @@ class StrebelGraph(Constellation):
         EXAMPLES::
 
             sage: from veerer import StrebelGraph
-            sage: StrebelGraph("(0,1,2)(~0,~1:1,~2:2)").vertex_separatrices()
-            [(0, 0), (5, 0), (5, 1), (5, 2), (2, 0), (1, 0), (4, 0), (3, 0), (3, 1)]
+            sage: sg = StrebelGraph("(0,1,2,3)(~1,~0:1,~3:2,~2:1)")
+            sage: sg.vertex_separatrices()
+            [(0, 0),
+             (7, 0),
+             (7, 1),
+             (7, 2),
+             (1, 0),
+             (1, 1),
+             (2, 0),
+             (3, 0),
+             (4, 0),
+             (5, 0),
+             (5, 1),
+             (6, 0)]
+            sage: seps = sg.vertex_separatrices(flat=False)
+            sage: seps
+            [[(0, 0), (7, 0), (7, 1), (7, 2)],
+             [(1, 0), (1, 1), (2, 0)],
+             [(3, 0), (4, 0)],
+             [(5, 0), (5, 1), (6, 0)]]
+            sage: all(sg.vertex_angle(h) == len(sep) for sep in seps for h, a in sep)
+            True
         """
         separatrices = []
         for cycle in self.vertices():
             orbit = []
             for h in cycle:
                 for a in range(self._excess[h] + 1):
+                    orbit.append((h, a))
+            if flat:
+                separatrices.extend(orbit)
+            else:
+                separatrices.append(orbit)
+        return separatrices
+
+    # TODO: (for Kai) should we go clockwise or counter-clockwise around the face
+    # TODO: (for Kai) what should we do for angle=0 (ie infinite cylinder) faces
+    # which have no associated separatrices?
+    def face_separatrices(self, flat=True):
+        r"""
+        Return the pairs ``(h, a)`` encoding face separatrices on this Strebel graph.
+
+        EXAMPLES::
+
+            sage: from veerer import StrebelGraph
+            sage: sg = StrebelGraph("(0,1,2)(~0,~1:1,~2:2)")
+            sage: sg.face_separatrices()
+            [(3, 0), (5, 0), (5, 1)]
+            sage: seps = sg.face_separatrices(flat=False)
+            sage: seps
+            [[], [(3, 0), (5, 0), (5, 1)]]
+            sage: all(sg.face_angle(h) == -len(sep) for sep in seps for h, a in sep)
+            True
+        """
+        separatrices = []
+        for cycle in self.faces():
+            orbit = []
+            for h in cycle:
+                for a in range(self._excess[h]):
                     orbit.append((h, a))
             if flat:
                 separatrices.extend(orbit)
@@ -852,38 +903,71 @@ class StrebelGraph(Constellation):
         if run:
             A.run()
         return A
-    
+
     def half_edge_num_separatrices(self, half_edge):
         r"""
         Return the number of separatrices in the corner of the half-edge
+
+        EXAMPLES::
+
+            sage: from veerer import StrebelGraph
+            sage: G = StrebelGraph("(0:1, 1:0, ~1:1, ~0:0)")
+            sage: G.half_edge_num_separatrices(0)
+            2
+            sage: G.half_edge_num_separatrices(1)
+            1
+            sage: G.half_edge_num_separatrices(2)
+            1
         """
-        bdry = self.half_plane_excess()
-        return bdry[half_edge] + 1
-    
-    def face_angle(self, half_edge):
-        for f in self.boundary_faces():
-            if half_edge in f:
-                a = 0
-                beta = self.half_plane_excess()
-                for h in f:
-                    a = a - beta[h]
+        return self._excess[half_edge] + 1
+
+    def vertex_angle(self, half_edge):
+        r"""
+        Return the angle of the vertex adjacent to ``half_edge``.
+
+        EXAMPLES::
+
+            sage: from veerer import StrebelGraph
+            sage: sg = StrebelGraph("(0:1, 1:0)(~0:3, ~1:1)")
+            sage: sg.vertex_angle(0)
+            4
+            sage: sg.vertex_angle(1)
+            5
+        """
+        a = 0
+        for h in perm_orbit(self._vp, half_edge):
+            a = a + self._excess[h] + 1
         return a
-    
+
+    def face_angle(self, half_edge):
+        r"""
+        Return the angle of the face adjacent to ``half_edge``.
+
+        EXAMPLES::
+
+            sage: from veerer import StrebelGraph
+            sage: G = StrebelGraph("(0:1, 1:0)(~0:2, ~1:1)")
+            sage: G.face_angle(0)
+            -1
+            sage: G.face_angle(1)
+            -3
+        """
+        a = 0
+        for h in perm_orbit(self._fp, half_edge):
+            a = a - self._excess[h]
+        return a
+
     def _normalization_face_separatrix(self, half_edge, angle):
         r"""
         EXAMPLES::
-            
+
             sage: from veerer import *
             sage: G = StrebelGraph("(0:1, 1:0, ~1:1, ~0:0)")
             sage: G._normalization_face_separatrix(2, 0)
             (0, 0)
         """
         if self.face_angle(half_edge) == 0:
-            assert angle == 0
-            for f in self.boundary_faces():
-                if half_edge in f:
-                    half_edge = min(f)
-                    return (half_edge, angle)
+            return (min(perm_orbit(self._fp, half_edge)), angle)
 
         last_angle = self.half_edge_num_separatrices(half_edge) - 1 #the valide range is between 1 and the number of vertical separatrices 
         while angle == last_angle:
@@ -891,7 +975,7 @@ class StrebelGraph(Constellation):
             angle = 0
             last_angle = self.half_edge_num_separatrices(half_edge) - 1
         return (half_edge, angle)
-    
+
     def _check_face_separatrix(self, half_edge, angle):
         half_edge = self._check_half_edge(half_edge)
         if not isinstance(angle, numbers.Integral):

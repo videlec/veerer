@@ -196,11 +196,7 @@ class VeeringTriangulation(Triangulation):
 
     def _normalization_face_separatrix(self, half_edge, angle):
         if self.face_angle(half_edge) == 0:
-            assert angle == 0
-            for f in self.boundary_faces():
-                if half_edge in f:
-                    half_edge = min(f)
-                    return (half_edge, angle)
+            return (min(perm_orbit(self._fp, half_edge)), angle)
 
         last_angle = self.half_edge_num_separatrices(half_edge) - 1 #the valide range is between 1 and the number of separatrices
         while angle == last_angle:
@@ -975,6 +971,54 @@ class VeeringTriangulation(Triangulation):
             orbit = []
             for h in cycle:
                 for a in range(self.half_edge_num_separatrices(h, slope, check=False)):
+                    orbit.append((h, a))
+            if flat:
+                separatrices.extend(orbit)
+            else:
+                separatrices.append(orbit)
+        return separatrices
+
+    # TODO: (for Kai) should we go clockwise or counter-clockwise around the face
+    # TODO: (for Kai) what should we do for angle=0 (ie infinite cylinder) faces
+    # which have no associated separatrix?
+    def face_separatrices(self, flat=True, slope=VERTICAL):
+        r"""
+        Return the pairs ``(h, a)`` encoding face separatrices on this veering triangulation.
+
+        INPUT:
+
+        - ``flat`` (boolean, default ``False``) -- whether to return the result
+          as a plain list or as a list of cycles corresponding to each vertex
+
+        - ``slope`` -- either ``VERTICAL`` (default) or ``HORIZONTAL``
+
+        EXAMPLES::
+
+            sage: from veerer import Triangulation, VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,1,2)(~1,3,4)(~0:1,~4:2)(~3:2,~2:3)", "RBRRB")
+            sage: vt.face_separatrices()
+            [(1, 0), (9, 0), (5, 0), (5, 1), (7, 0)]
+            sage: seps = vt.face_separatrices(flat=False)
+            sage: seps
+            [[(1, 0), (9, 0)], [(5, 0), (5, 1), (7, 0)]]
+            sage: all(vt.face_angle(h) == -len(sep) for sep in seps for h, a in sep)
+            True
+        """
+        if slope == VERTICAL:
+            right = RED
+            left = BLUE
+        else:
+            right = BLUE
+            left = RED
+
+        if any(col == GREEN or col == PURPLE for col in self._colouring):
+            raise NotImplementedError
+
+        separatrices = []
+        for cycle in self.boundary_faces():
+            orbit = []
+            for h in cycle:
+                for a in range(self.half_edge_num_separatrices(h, slope, check=False) - 1):
                     orbit.append((h, a))
             if flat:
                 separatrices.extend(orbit)
