@@ -171,13 +171,27 @@ class VeeringTriangulation(Triangulation):
         self._colouring = self._edges_data[0]
 
     def _check_vertex_separatrix(self, half_edge, angle):
+        r"""
+        EXAMPLES::
+
+            sage: from veerer import *
+            sage: vt = VeeringTriangulation("(0,1,2)(~0:1, ~2:1 , ~1:2)", "BRR")
+            sage: vt._check_vertex_separatrix(1, 0)
+            (1, 0)
+            sage: vt._check_vertex_separatrix(2, 0)
+            (2, 0)
+            sage: vt._check_vertex_separatrix(1, 2)
+            Traceback (most recent call last):
+            ...
+            ValueError: angle (=2) out of range for separatrix at half_edge=1; must be >= 0 and <= 1
+        """
         half_edge = self._check_half_edge(half_edge)
         if not isinstance(angle, numbers.Integral):
             raise ValueError("invalid angle for separatrix")
         angle = int(angle)
         num_seps =  self.half_edge_num_separatrices(half_edge)
         if angle < 0 or angle >= num_seps:
-            raise ValueError("angle (={}) out of range for separatrix at half_edge={}; must be >= 0 and <= {}".format(angle, half_edge, num_seps))
+            raise ValueError(f"angle (={angle}) out of range for separatrix at half_edge={half_edge}; must be >= 0 and <= {num_seps}")
         return (half_edge, angle)
 
     def _normalization_face_separatrix(self, half_edge, angle):
@@ -194,15 +208,23 @@ class VeeringTriangulation(Triangulation):
             angle = 0
             last_angle = self.half_edge_num_separatrices(half_edge) - 1
         return (half_edge, angle)
-    
+
     def _check_face_separatrix(self, half_edge, angle):
         r"""
         EXAMPLES::
 
             sage: from veerer import *
             sage: vt = VeeringTriangulation("(0,1,2)(~0:1, ~2:1 , ~1:2)", "BRR")
-            sage: vt._check_face_separatrix(1,0)
+            sage: vt._check_face_separatrix(1, 0)
             (3, 0)
+            sage: vt._check_face_separatrix(2, 0)
+            Traceback (most recent call last):
+            ...
+            ValueError: not a face separatrix
+            sage: vt._check_face_separatrix(1, 2)
+            Traceback (most recent call last):
+            ...
+            ValueError: angle (=2) out of range for separatrix at half_edge=1; must be >= 0 and <= 1
         """
         half_edge = self._check_half_edge(half_edge)
         if not isinstance(angle, numbers.Integral):
@@ -210,9 +232,9 @@ class VeeringTriangulation(Triangulation):
         angle = int(angle)
         num_seps =  self.half_edge_num_separatrices(half_edge)
         if self.boundary_vector()[half_edge] == 0:
-            raise ValueError(f"The separatrix at the half-edge {half_edge} is not in a boundary face")
+            raise ValueError("not a face separatrix")
         if angle < 0 or angle >= num_seps:
-            raise ValueError("angle (={}) out of range for separatrix at half_edge={}; must be >= 0 and <= {}".format(angle, half_edge, num_seps))
+            raise ValueError(f"angle (={angle}) out of range for separatrix at half_edge={half_edge}; must be >= 0 and <= {num_seps}")
         return self._normalization_face_separatrix(half_edge, angle)
 
     def _check(self, error=RuntimeError):
