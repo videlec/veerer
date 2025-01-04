@@ -49,9 +49,7 @@ class LabelledDiGraph:
     def __init__(self, digraph, root=None, sort=False):
         self._digraph = DiGraph(len(digraph), loops=digraph.allows_loops(), multiedges=digraph.allows_multiple_edges())
 
-        self._vertices = list(digraph)
-        if sort:
-            self._vertices.sort()
+        self._vertices = list(digraph.vertices(sort=sort))
         if root is not None:
             i = self._vertices.index(root)
             self._vertices[0], self._vertices[i] = self._vertices[i], self._vertices[0]
@@ -61,9 +59,7 @@ class LabelledDiGraph:
         self._edge_targets = []
         self._edge_labels = []
 
-        edges = list(digraph.edges())
-        if sort:
-            edges.sort()
+        edges = list(digraph.edges(sort=sort))
         for k, (u, v, label) in enumerate(edges):
             i = self._vertex_index[u]
             j = self._vertex_index[v]
