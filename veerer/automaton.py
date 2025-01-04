@@ -1497,7 +1497,7 @@ class DelaunayStrebelAutomaton(Automaton):
             if len(s) != 1:
                 raise ValueError('got different strata: {}'.format(sorted(s)))
 
-        for source, target, label in self._graph.edges():
+        for source, target, label in self._graph.edges(sort=False):
             kind = label[0]
             if kind == "flip":
                 assert len(label) == 5
