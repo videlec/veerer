@@ -5533,7 +5533,7 @@ class VeeringTriangulation(Triangulation):
             sage: vt.strebel_graph(mapping=True)
             (StrebelGraph("(0:1,1,~1:1,~0,2)(~2,~3:2,4,~4:1,3)"),
              array('i', [-1, -1, 0, 1, 2, 3, 4, 5, -1, -1, -1, -1, 6, 7, 8, 9, -1, -1]),
-             array('i', [3, 0, -1, -1, -1, -1, -1, -1, 0, 1, 7, 6, -1, -1, -1, -1, 9, 7]))
+             array('i', [1, 9, 1, 5, 9, 11, 11, 17, 17, 15]))
 
             sage: vt = VeeringTriangulation("(0,1,2)(3,4,5)(6,7,8)", "(~8:2,~7:1,~6:1,~5:2,~4:1,~3:1,~2:2,~1:1,~0:1)", "RBRRBBRRB")
             sage: sg = vt.strebel_graph()
@@ -5564,7 +5564,7 @@ class VeeringTriangulation(Triangulation):
             sage: vt.strebel_graph(mapping=True)
             (StrebelGraph("(0,~0:1,1)(~1,2,~2:1)"),
             array('i', [-1, -1, 0, 1, 2, 3, 4, 5, -1, -1]),
-            array('i', [3, 5, -1, -1, -1, -1, -1, -1, 1, 2]))
+            array('i', [9, 3, 9, 0, 0, 7]))
         """
         if not self.is_strebel(slope=slope):
             raise ValueError('triangulation is not Strebel')
@@ -5631,16 +5631,26 @@ class VeeringTriangulation(Triangulation):
         sg = StrebelGraph.from_permutations(vertex_permutation, None, (beta,), (), mutable=mutable, check=True)
 
         if mapping:
-            index_non_strebel = array('i', [-1] * n)
-            for h, k in enumerate(index_strebel):
-                if k == -1:
-                    continue
-                h = self._vp[h]
-                while index_strebel[h] == -1:
-                    index_non_strebel[h] = k
-                    h = self._vp[h]
+            # Each edge in the Strebel graph is mapped to a sub-edge of
+            # the veering triangulation at the boundary. We compute
+            # this map below.
+            strebel_to_veering_boundary = array('i', [-1] * m)
+            for h in range(2 * self._ne):
+                if self._bdry[h]:
+                    k = h
+                    while index_strebel[k] == -1:
+                        k = self.previous_at_vertex(k)
+                    strebel_to_veering_boundary[index_strebel[k]] = h
 
-            return (sg, index_strebel, index_non_strebel)
+            for k, h in enumerate(strebel_to_veering_boundary):
+                if h == -1:
+                    continue
+                k = sg._fp[k]
+                while strebel_to_veering_boundary[k] == -1:
+                    strebel_to_veering_boundary[k] = h
+                    k = sg._fp[k]
+
+            return (sg, index_strebel, strebel_to_veering_boundary)
 
         return sg
 

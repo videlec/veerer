@@ -1,8 +1,32 @@
+r"""
+Monodromy in linear subvarieties
+"""
+# ****************************************************************************
+#  This file is part of veerer
+#
+#       Copyright (C) 2024 Vincent Delecroix
+#                     2024 Kai Fu
+#
+#  This program is free software; you can redistribute it and/or
+#  modify it under the terms of the GNU General Public License
+#  as published by the Free Software Foundation; either version 2
+#  of the License, or (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+# ****************************************************************************
+
 from sage.graphs.digraph import DiGraph
 from sage.groups.perm_gps.permgroup_named import SymmetricGroup
 
 from .constants import RED, BLUE, HORIZONTAL, VERTICAL
-from .permutation import perm_preimage
+from .permutation import perm_preimage, perm_orbit
 from .veering_triangulation import VeeringTriangulation
 from .labelled_digraph import LabelledDiGraph
 
@@ -159,6 +183,15 @@ class SeparatrixMonodromy:
 
         return (half_edge, angle)
 
+    @staticmethod
+    def _infinite_cylinder_strebel(mapping_back, half_edge):
+        half_edge = next(k for k, h in enumerate(mapping_back) if h == half_edge)
+        return half_edge
+
+    @staticmethod
+    def _infinite_cylinder_strebel_back(state, mapping, mapping_back, half_edge):
+        return mapping_back[half_edge]
+
     def vertex_separatrix_transport(self, path, half_edge, angle):
         r"""
         Transport the vertex separatrix ``(half_edge, angle)`` along ``path``.
@@ -185,20 +218,20 @@ class SeparatrixMonodromy:
                 if reverse:
                     for e in edges:
                         half_edge, angle = self._flip_back(source, relabelling[2 * e] // 2, old_col, half_edge, angle)
-                    half_edge, angle = self._relabelling_back(relabelling, half_edge, angle)
+                    half_edge = perm_preimage(relabelling, half_edge)
                 else:
                     for e in edges:
                         half_edge, angle = self._flip(source, e, new_col, half_edge, angle)
-                    half_edge, angle = self._relabelling(relabelling, half_edge, angle)
+                    half_edge = relabelling[half_edge]
 
             elif kind == "rotate":
                 relabelling = transition[1]
                 if reverse:
                     half_edge, angle = self._rotate_vertex_back(source, half_edge, angle)
-                    half_edge, angle = self._relabelling_back(relabelling, half_edge, angle)
+                    half_edge = perm_preimage(relabelling, half_edge)
                 else:
                     half_edge, angle = self._rotate_vertex(source, half_edge, angle)
-                    half_edge, angle = self._relabelling(relabelling, half_edge, angle)
+                    half_edge = relabelling[half_edge]
 
             elif kind == "strebel":
                 mapping = transition[1]
@@ -218,7 +251,7 @@ class SeparatrixMonodromy:
         Transport the face separatrix ``(half_edge, angle)`` along this path.
         """
         if path._graph is not self._graph:
-            raise ValueError("invalid path for vertex monodromy")
+            raise ValueError("invalid path for face monodromy")
 
         for i in path:
             source = self._graph.vertex_label(self._graph.edge_source(i))
@@ -234,18 +267,18 @@ class SeparatrixMonodromy:
             if kind == "flip":
                 relabelling = transition[4]
                 if reverse:
-                    half_edge, angle = self._relabelling_back(relabelling, half_edge, angle)
+                    half_edge = perm_preimage(relabelling, half_edge)
                 else:
-                    half_edge, angle = self._relabelling(relabelling, half_edge, angle)
+                    half_edge = relabelling[half_edge]
 
             elif kind == "rotate":
                 relabelling = transition[1]
                 if reverse:
                     half_edge, angle = self._rotate_face_back(source, half_edge, angle)
-                    half_edge, angle = self._relabelling_back(relabelling, half_edge, angle)
+                    half_edge = perm_preimage(relabelling, half_edge)
                 else:
                     half_edge, angle = self._rotate_face(source, half_edge, angle)
-                    half_edge, angle = self._relabelling(relabelling, half_edge, angle)
+                    half_edge = relabelling[half_edge]
 
             elif kind == "strebel":
                 mapping = transition[1]
@@ -261,19 +294,64 @@ class SeparatrixMonodromy:
 
         return self._graph.vertex_label(path.end())._normalization_face_separatrix(half_edge, angle)
 
+    def infinite_cylinder_transport(self, path, half_edge):
+        if path._graph is not self._graph:
+            raise ValueError("invalid path for infinite cylinder monodromy")
 
-def separatrices_monodromy(ds_graph):
+            source = self._graph.vertex_label(self._graph.edge_source(i))
+            target = self._graph.vertex_label(self._graph.edge_target(i))
+            transition = self._graph.edge_label(i)
+
+            reverse = i < 0
+
+            # too expensive!!
+            assert source.face_angle(half_edge) == 0
+
+            kind = transition[0]
+            if kind == "flip" or kind == "rotate":
+                relabelling = transition[4]
+                if reverse:
+                    half_edge = perm_preimage(relabelling, half_edge)
+                else:
+                    half_edge = relabelling[half_edge]
+
+            elif kind == "strebel":
+                mapping = transition[1]
+                mapping_back = transition[2]
+                if reverse:
+                    half_edge = self._infinite_cylinder_strebel_back(state, mapping, half_edge, angle)
+                else:
+                    half_edge = self._infinite_cylinder_strebel(mapping_back, half_edge)
+
+
+            # too expensive!!
+            assert target.face_angle(half_edge) == 0
+
+        return min(perm_orbit(self._graph.vertex_label(path.end())._fp, half_edge))
+
+
+def monodromy(ds_graph):
     r"""
     EXAMPLES::
 
         sage: from veerer import VeeringTriangulation
-        sage: from veerer.monodromy import separatrices_monodromy
+        sage: from veerer.monodromy import monodromy
 
     The case of H(1^2)::
 
         sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,9)(~8,10,11)(~9,~10,~11)", "BRBBRBBRBBRB")
         sage: ds_graph = vt.delaunay_strebel_graph()
-        sage: G = separatrices_monodromy(ds_graph)
+        sage: G = monodromy(ds_graph)
+        sage: G.cardinality()
+        8
+        sage: G.structure_description()
+        'C4 x C2'
+
+    The case of H(1^2, -1^2)::
+
+        sage: vt = VeeringTriangulation("(~0,1,2)(~1,3,4)(~2,5,6)(~3,~5,7)(~6,8,9)(~7,~8,~9)(0:1)(~4:1)", "BRRRBBRRRB")
+        sage: ds_graph = vt.delaunay_strebel_graph()
+        sage: G = monodromy(ds_graph)
         sage: G.cardinality()
         8
         sage: G.structure_description()
@@ -283,7 +361,7 @@ def separatrices_monodromy(ds_graph):
 
         sage: vt = VeeringTriangulation("(~0,1,2)(~1,3,4)(~2,5,6)(~3,~5,7)(~6,8,9)(~7,~8,~9)(0:2)(~4:2)", "BRRRBBRRRB")
         sage: ds_graph = vt.delaunay_strebel_graph()
-        sage: G = separatrices_monodromy(ds_graph)
+        sage: G = monodromy(ds_graph)
         sage: G.cardinality()
         20
         sage: G.structure_description()
@@ -301,13 +379,18 @@ def separatrices_monodromy(ds_graph):
     face_separatrix_index = {ha: nv + i for i, ha in enumerate(face_separatrices)}
     nf = len(face_separatrices)
 
-    n = nv + nf
+    infinite_cylinders = [min(f) for f in root.boundary_faces() if root.face_angle(f[0]) == 0]
+    infinite_cylinder_index = {h: nv + nf + i for i, h in enumerate(infinite_cylinders)}
+    nc = len(infinite_cylinders)
+
+    n = nv + nf + nc
 
     perms = set()
     for path in ds_graph.fundamental_group_basis():
         p_vert = [vertex_separatrix_index[mon.vertex_separatrix_transport(path, h, a)] for (h, a) in vertex_separatrices]
         p_face = [face_separatrix_index[mon.face_separatrix_transport(path, h, a)] for (h, a) in face_separatrices]
-        perms.add(tuple(p_vert) + tuple(p_face))
+        p_cyl = [infinite_cylinder_index[mon.infinite_cylinder_transport(path, h)] for h in infinite_cylinders]
+        perms.add(tuple(p_vert) + tuple(p_face) + tuple(p_cyl))
 
     S = SymmetricGroup(range(n))
     return S.subgroup([S(list(p)) for p in perms])
