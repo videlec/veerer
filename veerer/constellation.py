@@ -535,9 +535,7 @@ class Constellation:
             sage: StrebelGraph("(0,1,2,~0,~1,~2)") == StrebelGraph("(0,1:1,2,~0,~1,~2)")
             False
         """
-        if type(self) != type(other):
-            raise TypeError
-        return self._ne == other._ne and self._fp == other._fp and self._half_edges_data == other._half_edges_data and self._edges_data == other._edges_data
+        return type(self) == type(other) and self._ne == other._ne and self._fp == other._fp and self._half_edges_data == other._half_edges_data and self._edges_data == other._edges_data
 
     def __ne__(self, other):
         r"""
@@ -557,9 +555,7 @@ class Constellation:
             sage: StrebelGraph("(0,1,2,~0,~1,~2)") != StrebelGraph("(0,1:1,2,~0,~1,~2)")
             True
         """
-        if type(self) != type(other):
-            raise TypeError
-        return self._ne != other._ne or self._fp != other._fp or self._half_edges_data != other._half_edges_data or self._edges_data != other._edges_data
+        return type(self) != type(other) or self._ne != other._ne or self._fp != other._fp or self._half_edges_data != other._half_edges_data or self._edges_data != other._edges_data
 
     def _cmp_(self, other):
         r"""
