@@ -181,7 +181,14 @@ class VeeringTriangulation(Triangulation):
         return (half_edge, angle)
 
     def _normalization_face_separatrix(self, half_edge, angle):
-        last_angle = self.half_edge_num_separatrices(half_edge) - 1 #the valide range is between 1 and the number of vertical separatrices 
+        if self.face_angle(half_edge) == 0:
+            assert angle == 0
+            for f in self.boundary_faces():
+                if half_edge in f:
+                    half_edge = min(f)
+                    return (half_edge, angle)
+
+        last_angle = self.half_edge_num_separatrices(half_edge) - 1 #the valide range is between 1 and the number of separatrices
         while angle == last_angle:
             half_edge = self.previous_in_face(half_edge)
             angle = 0
@@ -197,12 +204,13 @@ class VeeringTriangulation(Triangulation):
             sage: vt._check_face_separatrix(1,0)
             (3, 0)
         """
-
         half_edge = self._check_half_edge(half_edge)
         if not isinstance(angle, numbers.Integral):
             raise ValueError("invalid angle for separatrix")
         angle = int(angle)
         num_seps =  self.half_edge_num_separatrices(half_edge)
+        if self.boundary_vector()[half_edge] == 0:
+            raise ValueError(f"The separatrix at the half-edge {half_edge} is not in a boundary face")
         if angle < 0 or angle >= num_seps:
             raise ValueError("angle (={}) out of range for separatrix at half_edge={}; must be >= 0 and <= {}".format(angle, half_edge, num_seps))
         return self._normalization_face_separatrix(half_edge, angle)
