@@ -549,7 +549,7 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
             sage: fl.flip_back(4)
             sage: fl.flip_back(2)
             sage: fl
-            FlatVeeringTriangulation("(0,3,4)(~0,1,2)(~1,5,6)", "BRRRRRB", (47, 27, 74, 22, 69, 61, 34), (51, 67, 16, 79, 28, 31, 36))
+            FlatVeeringTriangulation("(0,1,2)(~0,3,4)(~1,5,6)", "BRRRRRB", (47, 27, 74, 22, 69, 61, 34), (51, 67, 16, 79, 28, 31, 36))
         """
         if check:
             if not self._mutable:
