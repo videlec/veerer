@@ -369,10 +369,10 @@ class StrebelGraph(Constellation):
             sage: from veerer import StrebelGraph
             sage: sg = StrebelGraph("(0,1,2)(~0,~1:1,~2:2)")
             sage: sg.face_separatrices()
-            [(3, 0), (5, 0), (5, 1)]
+            [(3, 0), (5, 1), (5, 0)]
             sage: seps = sg.face_separatrices(flat=False)
             sage: seps
-            [[], [(3, 0), (5, 0), (5, 1)]]
+            [[], [(3, 0), (5, 1), (5, 0)]]
             sage: all(sg.face_angle(h) == -len(sep) for sep in seps for h, a in sep)
             True
         """
@@ -380,7 +380,7 @@ class StrebelGraph(Constellation):
         for cycle in self.faces():
             orbit = []
             for h in cycle:
-                for a in range(self._excess[h]):
+                for a in range(self._excess[h] -1, -1, -1):
                     orbit.append((h, a))
             if flat:
                 separatrices.extend(orbit)

@@ -997,10 +997,10 @@ class VeeringTriangulation(Triangulation):
             sage: from veerer import Triangulation, VeeringTriangulation
             sage: vt = VeeringTriangulation("(0,1,2)(~1,3,4)(~0:1,~4:2)(~3:2,~2:3)", "RBRRB")
             sage: vt.face_separatrices()
-            [(1, 0), (9, 0), (5, 0), (5, 1), (7, 0)]
+            [(1, 0), (9, 0), (5, 1), (5, 0), (7, 0)]
             sage: seps = vt.face_separatrices(flat=False)
             sage: seps
-            [[(1, 0), (9, 0)], [(5, 0), (5, 1), (7, 0)]]
+            [[(1, 0), (9, 0)], [(5, 1), (5, 0), (7, 0)]]
             sage: all(vt.face_angle(h) == -len(sep) for sep in seps for h, a in sep)
             True
         """
@@ -1018,7 +1018,7 @@ class VeeringTriangulation(Triangulation):
         for cycle in self.boundary_faces():
             orbit = []
             for h in cycle:
-                for a in range(self.half_edge_num_separatrices(h, slope, check=False) - 1):
+                for a in range(self.half_edge_num_separatrices(h, slope, check=False) - 2, -1, -1):
                     orbit.append((h, a))
             if flat:
                 separatrices.extend(orbit)
