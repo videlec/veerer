@@ -250,7 +250,11 @@ of the product of the two train-track polytopes.
     sage: print(T1.is_delaunay())
     True
     sage: print(T1.delaunay_cone())
-    Cone of dimension 8 in ambient dimension 18 made of 13 facets (backend=ppl)
+    8-dimensional Delaunay cone of VeeringTriangulation("(0,~3,4)(~0,7,~6)(1,2,~7)(~1,~2,3)(~4,5,~8)(~5,8,6)", "RBRRBRBRB") made of
+     2 forward-flip facets
+     2 backward-flip facets
+     5 x-degeneration facets
+     4 y-degeneration facets
 
 Core automaton
 --------------

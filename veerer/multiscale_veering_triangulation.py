@@ -822,12 +822,11 @@ class MultiscaleVeeringTriangulation:
 
             sage: from veerer import *
             sage: from veerer.multiscale_veering_triangulation import *
-            sage: import surface_dynamics
 
         Reach all vertical boundary component of H_1(2) from a single veering triangulaiton (TO BE COMPLETED)::
 
             sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "BRBBRBBRB")
-            sage: vt.stratum()
+            sage: vt.stratum()  # optional - surface_dynamics
             H_2(2)
             sage: mvt = MultiscaleVeeringTriangulation([vt],[[]],[])
             sage: vt.vertical_degeneration_low_edges_subsets()

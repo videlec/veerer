@@ -4,7 +4,7 @@ Flat structures on veering triangulations and Strebel graphs.
 # ****************************************************************************
 #  This file is part of veerer
 #
-#       Copyright (C) 2018-2023 Vincent Delecroix
+#       Copyright (C) 2018-2024 Vincent Delecroix
 #
 #  This program is free software; you can redistribute it and/or
 #  modify it under the terms of the GNU General Public License
@@ -338,6 +338,82 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
             vecs[c] = t[3] - t[2]
         return vecs
 
+    def is_delaunay(self):
+        for e in self.backward_flippable_edges(self):
+            a, _, _, d = self.square_about_half_edge(2 * e)
+            a //= 2
+            d //= 2
+            if self._x[a] + self._x[d] < self._y[e]:
+                return False
+        for e in self.forward_flippable_edges(self):
+            a, _, _, d = self.square_about_half_edge(2 * e)
+            a //= 2
+            d //= 2
+            if self._y[a] + self._y[d] < self._x[e]:
+                return False
+        return True
+
+    def delaunay_flip_sequence(self):
+        r"""
+        Return the list of backward and forward flips to be performed in order
+        to turn this flat structure into its Delaunay triangulation.
+
+        EXAMPLES::
+
+            sage: from veerer import FlatVeeringTriangulation
+            sage: fl = FlatVeeringTriangulation("(0,3,4)(~0,1,2)(~1,5,6)", "BRRRRRB", (47, 27, 74, 22, 69, 61, 34), (51, 67, 16, 79, 28, 31, 36))
+        """
+        backward_flips = []
+        state = self.copy(mutable=True)
+        todo_backward = set(state.backward_flippable_edges())
+        todo_forward = set(state.forward_flippable_edges())
+        while todo_backward:
+            e = todo_backward.pop()
+            a, b, c, d = state.square_about_half_edge(2 * e)
+            a //= 2
+            b //= 2
+            c //= 2
+            d //= 2
+            if state._x[a] + state._x[d] < state._y[e]:
+                state.flip_back(e)
+                col = state.edge_colour(e)
+                backward_flips.append((e, col))
+                # TODO: depending on the colour col we only have
+                # two possible backward flippable edges
+                if state.is_backward_flippable(a):
+                    todo_backward.add(a)
+                if state.is_backward_flippable(b):
+                    todo_backward.add(b)
+                if state.is_backward_flippable(c):
+                    todo_backward.add(c)
+                if state.is_backward_flippable(d):
+                    todo_backward.add(d)
+
+        forward_flips = []
+        while todo_forward:
+            e = todo_forward.pop()
+            a, b, c, d = state.square_about_half_edge(2 * e)
+            a //= 2
+            b //= 2
+            c //= 2
+            d //= 2
+            if state._y[a] + state._y[d] < state._x[e]:
+                state.flip(e)
+                col = state.edge_colour(e)
+                forward_flips.append((e, col))
+                # TODO: depending on the colour col we only have
+                # two possible forward flippable edges
+                if state.is_forward_flippable(a):
+                    todo_forward.add(a)
+                if state.is_forward_flippable(b):
+                    todo_forward.add(b)
+                if state.is_forward_flippable(c):
+                    todo_forward.add(c)
+                if state.is_forward_flippable(d):
+                    todo_forward.add(d)
+
+        return backward_flips, forward_flips
+
     def to_pyflatsurf(self):
         ans, oris = self.is_abelian(certificate=True)
         if not ans:
@@ -355,7 +431,7 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
             sage: from veerer import *
             sage: T = VeeringTriangulation("(0,1,2)(~0,~1,3)", "BRRR")
             sage: F = T.flat_structure_min()
-            sage: F.plot()
+            sage: F.plot()  # optional - sage_flatsurf
             Graphics object consisting of ... graphics primitives
         """
         from .flatsurf_conversion import flat_structure_to_sage_flatsurf
@@ -379,7 +455,7 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
         G.will_plot_non_adjacent_edge_labels = True
         return G.plot()
 
-    def flip(self, e, check=False):
+    def flip(self, e, col=None, check=True):
         r"""
         Flip the edge ``e``.
 
@@ -404,13 +480,13 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
             sage: fl
             FlatVeeringTriangulation("(0,2,1)", "RRB", (13, 5, 8), (8, 13, 5))
         """
-        if not self._mutable:
-            raise ValueError("immutable flat veering triangulation; use a mutable copy instead")
-
         if check:
+            if not self._mutable:
+                raise ValueError("immutable flat veering triangulation; use a mutable copy instead")
+
             e = self._check_edge(e)
             if not self.is_forward_flippable(e):
-                raise ValueError("invalid edge e={}".format(e))
+                raise ValueError("invalid edge e={} for forward flip".format(e))
 
         h = 2 * e
         H = self._ep(h)
@@ -439,19 +515,83 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
 
         if self._x[ea] > self._x[ed]:
             self._x[e] = self._x[ea] - self._x[ed]
+            if col is not None:
+                assert col == BLUE
             col = BLUE
         elif self._x[ea] < self._x[ed]:
             self._x[e] = self._x[ed] - self._x[ea]
+            if col is not None:
+                assert col == RED
             col = RED
         else:
             # equality
             self._x[e] = self._x[ea] - self._x[ed]
+            if col is not None:
+                assert col == GREEN
             col = GREEN
 
         self._y[e] = self._y[ea] + self._y[ed]
 
         self._constellation_class.flip(self, e, col, check=True)
-        self._check()
+
+        if check:
+            self._check()
+
+    def flip_back(self, e, col=None, check=True):
+        r"""
+        Flip back the edge ``e``.
+
+        EXAMPLES::
+
+            sage: from veerer import Triangulation, FlatVeeringTriangulation, RIGHT, LEFT
+            sage: fl = FlatVeeringTriangulation("(0,1,4)(~0,3,2)(~1,5,6)", (2, 27, 20, 22, 25, 61, 34), (197, 67, 118, 79, 130, 31, 36), mutable=True)
+            sage: fl.flip_back(0)
+            sage: fl.flip_back(4)
+            sage: fl.flip_back(2)
+            sage: fl
+            FlatVeeringTriangulation("(0,3,4)(~0,1,2)(~1,5,6)", "BRRRRRB", (47, 27, 74, 22, 69, 61, 34), (51, 67, 16, 79, 28, 31, 36))
+        """
+        if check:
+            if not self._mutable:
+                raise ValueError("immutable flat veering triangulation; use a mutable copy instead")
+
+            e = self._check_edge(e)
+            if not self.is_backward_flippable(e):
+                raise ValueError("invalid edge e={} for backward flip".format(e))
+
+        h = 2 * e
+        H = self._ep(h)
+        a, b, c, d = self.square_about_half_edge(h)
+        ea = a // 2
+        eb = b // 2
+        ec = c // 2
+        ed = d // 2
+
+        assert self._y[e] == self._y[ea] + self._y[eb] == self._y[ec] + self._y[ed]
+        assert self._x[e] == abs(self._x[ea] - self._x[eb]) == abs(self._x[ec] - self._x[ed])
+
+        if self._y[ea] > self._y[ed]:
+            self._y[e] = self._y[ea] - self._y[ed]
+            if col is not None:
+                assert col == RED
+            col = RED
+        elif self._y[ea] < self._y[ed]:
+            self._y[e] = self._y[ed] - self._y[ea]
+            if col is not None:
+                assert col == BLUE
+            col = BLUE
+        else:
+            # equality
+            self._y[e] = self._y[ea] - self._y[ed]
+            if col is not None:
+                assert col == PURPLE
+            col = PURPLE
+
+        self._x[e] = self._x[ea] + self._x[ed]
+
+        self._constellation_class.flip_back(self, e, col, check=False)
+        if check:
+            self._check
 
     def _extra_relabelling(self, p):
         perm_on_edge_list(p, self._x)

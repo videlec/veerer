@@ -407,9 +407,9 @@ class IrreducibleRealLinearSubvariety:
             sage: from veerer import VeeringTriangulation
             sage: vt = VeeringTriangulation("(0,1,2)(~1,3,4)(~3,5,6)(~6,~2,~5)(~4,7,8)(~8,~0,~7)", "RBBBRRBBR")
             sage: L = vt.linear_subvariety()
-            sage: L.ambient_stratum()
+            sage: L.ambient_stratum()  # optional - surface_dynamics
             [[H_2(2)]]
-            sage: for Ldeg in sorted(L.codimension_one_vertical_degenerations()):
+            sage: for Ldeg in sorted(L.codimension_one_vertical_degenerations()):  # optional - surface_dynamics
             ....:     print(Ldeg.ambient_stratum())
             [[H_1(0)], [H_1(2, -2)]]
             [[H_1(0^2)], [H_0(2, -2^2)]]
@@ -622,7 +622,7 @@ class MultiscaleCompactification:
 
         sage: vt = VeeringTriangulation("(0,~6,7)(1,8,4)(2,~4,5)(3,~5,6)", "RRRRBBBBB")
         sage: L = vt.linear_subvariety()
-        sage: L.multiscale_compactification()
+        sage: L.multiscale_compactification() # optional - surface_dynamics
         MultiscaleCompactification of Irreducible real linear subvariety of projective dimension 4 in [[Q_0(2, -1^6)]] made of
         5 components in codimension 1
         11 components in codimension 2
