@@ -967,7 +967,6 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
 
         An example with folded edges::
 
-
             sage: x = polygen(QQ)
             sage: K.<sqrt17> = NumberField(x^2 - 17, embedding=AA(17).sqrt())
             sage: vt = VeeringTriangulation("", boundary="(0:1)(1:1,~0:1)", colouring="RR")
@@ -981,10 +980,10 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
             if self.is_half_edge_strebel(2 * e, slope) and (fp[2 * e + 1] == -1 or self.is_half_edge_strebel(2 * e + 1)):
                 indices.append(e)
 
-        G, index_strebel = VeeringTriangulation.strebel_graph(self, slope, mapping=True, mutable=False)
+        G, index_strebel, index_non_strebel = VeeringTriangulation.strebel_graph(self, slope, mapping=True, mutable=False)
         subspace = self.generators_matrix(slope).matrix_from_columns(indices)
         sg = StrebelGraphLinearFamily(G, subspace, mutable=mutable)
-        return (sg, index_strebel) if mapping else sg
+        return (sg, index_strebel, index_non_strebel) if mapping else sg
 
 
 class StrebelGraphLinearFamily(LinearFamily, StrebelGraph):

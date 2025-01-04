@@ -1519,8 +1519,9 @@ class DelaunayStrebelAutomaton(Automaton):
                 state.relabel(r)
                 assert state == target, (source, state, target)
             elif kind == "strebel":
-                assert len(label) == 2
-                r = label[1]
+                assert len(label) == 3
+                r1 = label[1]  # strebel edges
+                r2 = label[2]  # non-strebel edges
                 sg = source.strebel_graph()
 
     def _setup(self, backend=None):
@@ -1560,10 +1561,10 @@ class DelaunayStrebelAutomaton(Automaton):
                     print('[_out_neighbors] strebelization')
                 if CHECK:
                     assert state.is_strebel(VERTICAL)
-                out_neighbor, r1 = state.strebel_graph(VERTICAL, mapping=True, mutable=True)
-                r2 = out_neighbor.set_canonical_labels(mapping=True)
+                out_neighbor, r1, r2 = state.strebel_graph(VERTICAL, mapping=True, mutable=True)
+                r3 = out_neighbor.set_canonical_labels(mapping=True)
                 out_neighbor.set_immutable()
-                yield (out_neighbor, ('strebel', perm_compose(r1, r2)))
+                yield (out_neighbor, ('strebel', perm_compose(r1, r3), perm_compose(r2, r3)))
 
                 # rotation
                 if self._verbosity >= 2:

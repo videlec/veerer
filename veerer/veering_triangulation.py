@@ -4908,6 +4908,11 @@ class VeeringTriangulation(Triangulation):
              VeeringTriangulationLinearFamily("(0,1,2)(~2:3)", "RBB", [(1, 0, -1), (0, 1, 1)]),
              array('i', [-1, -1, -1, -1, -1, -1, -1, 2, -1, -1, 4, -1, 6, 7, 8, -1, 0, -1]),
              array('i', [0, -1, 2, -1, 4, 5, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]))
+            sage: vt.degeneration(edges_up=[3, 4, 5, 6, 7, 8], edges_low=[0, 1, 2], collapsed_half_edge_relabelling=True)
+            (VeeringTriangulationLinearFamily("(0,~3,4)(1,2,3)", "RRRBB", [(1, 0, 0, 0, -1), (0, 1, 0, -1, -1), (0, 0, 1, 1, 1)]),
+             VeeringTriangulationLinearFamily("(0,1,2)(~2:3)", "RBB", [(1, 0, -1), (0, 1, 1)]),
+             array('i', [-1, -1, -1, -1, -1, -1, 2, 2, 3, -1, 4, -1, 6, 7, 8, -1, 0, -1]),
+             array('i', [0, -1, 2, -1, 4, 5, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]))
         """
         # We distinguish three kinds of triangles
         # - up triangles: when the three edges are in the up partition
@@ -5528,7 +5533,7 @@ class VeeringTriangulation(Triangulation):
             sage: vt.strebel_graph(mapping=True)
             (StrebelGraph("(0:1,1,~1:1,~0,2)(~2,~3:2,4,~4:1,3)"),
              array('i', [-1, -1, 0, 1, 2, 3, 4, 5, -1, -1, -1, -1, 6, 7, 8, 9, -1, -1]),
-             [[0, 2, 3, 1, 4], [5, 7, 8, 9, 6]])
+             array('i', [3, 0, -1, -1, -1, -1, -1, -1, 0, 1, 7, 6, -1, -1, -1, -1, 9, 7]))
 
             sage: vt = VeeringTriangulation("(0,1,2)(3,4,5)(6,7,8)", "(~8:2,~7:1,~6:1,~5:2,~4:1,~3:1,~2:2,~1:1,~0:1)", "RBRRBBRRB")
             sage: sg = vt.strebel_graph()
@@ -5559,7 +5564,7 @@ class VeeringTriangulation(Triangulation):
             sage: vt.strebel_graph(mapping=True)
             (StrebelGraph("(0,~0:1,1)(~1,2,~2:1)"),
             array('i', [-1, -1, 0, 1, 2, 3, 4, 5, -1, -1]),
-            [[3, 4, 5], [0, 1, 2]])
+            array('i', [3, 5, -1, -1, -1, -1, -1, -1, 1, 2]))
         """
         if not self.is_strebel(slope=slope):
             raise ValueError('triangulation is not Strebel')
@@ -5622,22 +5627,22 @@ class VeeringTriangulation(Triangulation):
                     else:
                         beta[i] = sum_alpha_e - 1
 
-        #STEP3: build the Strebel graph
         from .strebel_graph import StrebelGraph
         sg = StrebelGraph.from_permutations(vertex_permutation, None, (beta,), (), mutable=mutable, check=True)
 
-        bdry = self.boundary_faces()
-        correspondece = [None] * len(bdry) 
-        for f in bdry:
-            h = f[0]
-            while index_strebel[h] == -1:
-                h = self.previous_at_vertex(h)
-            for ff in sg.boundary_faces():
-                if index_strebel[h] in ff:
-                    correspondece[bdry.index(f)] = ff
-            assert self.face_angle(f[0]) == sg.face_angle(index_strebel[h])
+        if mapping:
+            index_non_strebel = array('i', [-1] * n)
+            for h, k in enumerate(index_strebel):
+                if k == -1:
+                    continue
+                h = self._vp[h]
+                while index_strebel[h] == -1:
+                    index_non_strebel[h] = k
+                    h = self._vp[h]
 
-        return (sg, index_strebel, correspondece) if mapping else sg
+            return (sg, index_strebel, index_non_strebel)
+
+        return sg
 
 
 class VeeringTriangulations:
