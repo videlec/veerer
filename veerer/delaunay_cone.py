@@ -74,27 +74,27 @@ class DelaunayCone:
     @cached_method
     def facets_kind_and_data(self):
         kinds = [None] * len(self.facets())
-        datas = [[] for _ in range(len(self.facets()))]
+        data = [[] for _ in range(len(self.facets()))]
 
         for face, edges in self.x_vanishing_facets():
             for i in face.ambient_H_indices():
                 kinds[i] = 'x'
-                datas[i] = edges
+                data[i] = edges
         for face, edges in self.y_vanishing_facets():
             for i in face.ambient_H_indices():
                 kinds[i] = 'y'
-                datas[i] = edges
+                data[i] = edges
         for face, edges in self.forward_delaunay_facets():
             for i in face.ambient_H_indices():
                 kinds[i] = 'f'
-                datas[i] = edges
+                data[i] = edges
         for face, edges in self.backward_delaunay_facets():
             for i in face.ambient_H_indices():
                 kinds[i] = 'b'
-                datas[i] = edges
+                data[i] = edges
 
         assert not any(v is None for v in kinds)
-        return tuple(kinds), tuple(datas)
+        return tuple(kinds), tuple(data)
 
     @cached_method
     def rays(self):

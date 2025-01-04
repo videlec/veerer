@@ -241,7 +241,7 @@ class MultiscaleVeeringTriangulation:
                 level2, h2, ang = prong2
                 vt = self._veering_triangulations[abs(level2)]
                 assert vt.face_angle(h2) != 0
-                last_ang = _num_vertical_separatrices_in_corner(vt, h2) - 1 #the valide range is between 1 and the number of vertical separatrices 
+                last_ang = _num_vertical_separatrices_in_corner(vt, h2) - 1 #the valid range is between 1 and the number of vertical separatrices 
                 while ang == last_ang:
                     h2 = vt.previous_in_face(h2)
                     ang = 0
@@ -745,11 +745,11 @@ class MultiscaleVeeringTriangulation:
             o1 = oris[-level1][h1]
             o2 = oris[-level2][h2]
             
-            #decide the orietation of the prong pm[0]
+            #decide the orientation of the prong pm[0]
             if (ang1)%2 == 1:
                 o1 = not o1
             
-            #decide the orietation of the prong pm[1]
+            #decide the orientation of the prong pm[1]
             if (ang2)%2 == 1:
                 o2 = not o2 
             
@@ -799,7 +799,7 @@ class MultiscaleVeeringTriangulation:
                         
                         for label in l2:
                             lv.append(label)
-            else: #coherent orietation
+            else: #coherent orientation
                 if (level1, c1) not in lv:
                     for label in l1:
                         lv.append(label)

@@ -198,7 +198,7 @@ class VeeringTriangulation(Triangulation):
         if self.face_angle(half_edge) == 0:
             return (min(perm_orbit(self._fp, half_edge)), angle)
 
-        last_angle = self.half_edge_num_separatrices(half_edge) - 1 #the valide range is between 1 and the number of separatrices
+        last_angle = self.half_edge_num_separatrices(half_edge) - 1 #the valid range is between 1 and the number of separatrices
         while angle == last_angle:
             half_edge = self.previous_in_face(half_edge)
             angle = 0
@@ -4802,7 +4802,7 @@ class VeeringTriangulation(Triangulation):
         The output is a 4-tuple ``(f_up, f_low, relabelling_up, relabelling_low)`` where
         - ``f_up`` and ``f_low`` are ``VeeringTriangulationLinearFamily``s
         - ``relabelling_up``, ``relabelling_low`` are partial maps from the half-edges of this
-          veering triangulation to the half-edges in repsectively ``f_up`` and ``f_low``
+          veering triangulation to the half-edges in respectively ``f_up`` and ``f_low``
 
         EXAMPLES::
 

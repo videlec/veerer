@@ -969,7 +969,7 @@ class StrebelGraph(Constellation):
         if self.face_angle(half_edge) == 0:
             return (min(perm_orbit(self._fp, half_edge)), angle)
 
-        last_angle = self.half_edge_num_separatrices(half_edge) - 1 #the valide range is between 1 and the number of vertical separatrices 
+        last_angle = self.half_edge_num_separatrices(half_edge) - 1 #the valid range is between 1 and the number of vertical separatrices 
         while angle == last_angle:
             half_edge = self.previous_in_face(half_edge)
             angle = 0
