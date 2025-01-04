@@ -855,17 +855,22 @@ class StrebelGraph(Constellation):
     
     def half_edge_num_separatrices(self, half_edge):
         r"""
-        Return the number of vertical separatrices in the corner of the half-edge
+        Return the number of separatrices in the corner of the half-edge
         """
         bdry = self.half_plane_excess()
         return bdry[half_edge] + 1
     
+    def face_angle(self, half_edge):
+        for f in self.boundary_faces():
+            if half_edge in f:
+                a = 0
+                beta = self.half_plane_excess()
+                for h in f:
+                    a = a - beta[h]
+        return a
+    
     def _normalization_face_separatrix(self, half_edge, angle):
         r"""
-        Return a normalized vertical separatrix.
-
-        The normailzed vertical separatrix is not at the last vertical separatrix in the corner of the half-edge.
-
         EXAMPLES::
             
             sage: from veerer import *
@@ -873,6 +878,13 @@ class StrebelGraph(Constellation):
             sage: G._normalization_face_separatrix(2, 0)
             (0, 0)
         """
+        if self.face_angle(half_edge) == 0:
+            assert angle == 0
+            for f in self.boundary_faces():
+                if half_edge in f:
+                    half_edge = min(f)
+                    return (half_edge, angle)
+
         last_angle = self.half_edge_num_separatrices(half_edge) - 1 #the valide range is between 1 and the number of vertical separatrices 
         while angle == last_angle:
             half_edge = self.previous_in_face(half_edge)
