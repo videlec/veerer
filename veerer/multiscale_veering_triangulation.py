@@ -82,8 +82,15 @@ def track_prong(vt, r_up, r_low, prong):
             ang = ang + a
             assert r_low[h] >= 0
             return (l - 1, r_low[h], ang)
+         
+def _vaninshing_red_blue_corner(vt, r_up, r_low, h):
+    hh = vt.next_at_vertex(h)
+    if r_up[h] >= 0 and r_low[hh] >= 0 and vt.boundary_vector()[h] == 0 and _num_vertical_separatrices_in_corner(vt, h) == 1:
+        return True
+    else:
+        return False
 
-def new_prong_matching(vt, f_low, r_low, r_up, level):
+def _new_prong_matching(vt, f_low, r_up, r_low, level):
     
     nh = 2 * vt.num_edges()
     newpm = []
@@ -93,11 +100,11 @@ def new_prong_matching(vt, f_low, r_low, r_up, level):
         if r_up[h] >= 0 and r_low[hh] >= 0:
             #find the boundary face in f_low containing hh
             for f in f_low.boundary_faces():
-                if r_low[hh] in f:
+                if f_low.next_in_edge(r_low[hh]) in f:
                     f_pole = f
             
             if f_pole not in lpoles:
-                while (_num_vertical_separatrices_in_corner(vt, h) == 0) and (r_up[h] >= 0):
+                while ((_num_vertical_separatrices_in_corner(vt, h) == 0) and (r_up[h] >= 0)) or (_vaninshing_red_blue_corner(vt, r_up, r_low, h)):
                     h = vt.previous_at_vertex(h)
                 if (_num_vertical_separatrices_in_corner(vt, h) > 0) and (r_up[h] >= 0):
                     vert_sep = (level, h, 0)
@@ -138,43 +145,33 @@ class MultiscaleVeeringTriangulation:
         sage: from veerer import VeeringTriangulation
         sage: from veerer.multiscale_veering_triangulation import *
     
-    A multi-scale veering triangulation of two levels and two vertical nodes::
-
-        sage: vt00 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)","RBRBB")
-        sage: vt01 = VeeringTriangulation("(~0,1,2)(~1,~2,3)(~4,~6,~7)(6,7,~5)(0:5)(~3:1)(4:4,5:4)","BBRBBBRR")
-        sage: mvt0 = MultiscaleVeeringTriangulation([vt00,vt01],[[],[]],[[(0,"0",0),(-1,"0",1)],[(0,"2",0),(-1,"5",1)]])
-        sage: mvt0
-        MultiscaleVeeringTriangulation(
-        veering_triangulations=[
-            VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)", "RBRBB"),
-            VeeringTriangulation("(~0,1,2)(~1,~2,3)(~4,~6,~7)(~5,6,7)(0:5)(~3:1)(4:4,5:4)", "BBRBBBRR")
-        ],
-        horizontal_nodes=[[], []]
-        prong_matching=[[(0, 0, 0), (-1, 0, 1)], [(0, 4, 0), (-1, 10, 1)]],
-        )
-        sage: mvt0.is_abelian()
+    An example with non-trivial glabal residue condition::
+    
+        sage: vt = VeeringTriangulation("(0,1,2)(4,~2,3)(~3,5,6)(~6,~0,~1)(11, 12,~10)(8,9,10)(~13, 7, ~9)(13,~11,~12)(~5,~7,14)(~14,~4,~8)", "RBBBRRBBBRRBRRB")
+        sage: vt.stratum()
+        H_3(4)
+        sage: vt.is_delaunay()
         True
-
-    A multi-scale veering triangulation of two levels, two vertical nodes and two horizontal nodes::
-
-        sage: vt10 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:3,3:1)","RBRBB")
-        sage: vt11 = VeeringTriangulation("(~0,1,4)(~1,~2,3)(~5,6,9)(~6,~7,8)(0:5)(~4:1)(~3:1)(2:1)(5:5)(~9:1)(~8:1)(7:1)","BBRBRBBRBR")
-        sage: mvt1 = MultiscaleVeeringTriangulation([vt10,vt11],["","(~4,7)(~3,~8)"],[[(0,"0",0),(-1,"0",1)],[(0,"2",0),(-1,"5",1)]])
+        sage: edges_low = [4,5,7,8,14]
+        sage: mvt = MultiscaleVeeringTriangulation([vt], [[]], [])
+        sage: mvt1 = mvt.degeneration(0,edges_low=edges_low)
         sage: mvt1
         MultiscaleVeeringTriangulation(
         veering_triangulations=[
-            VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:3,3:1)", "RBRBB"),
-            VeeringTriangulation("(~0,1,4)(~1,~2,3)(~5,6,9)(~6,~7,8)(0:5)(2:1)(~3:1)(~4:1)(5:5)(7:1)(~8:1)(~9:1)", "BBRBRBBRBR")
+            VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)(3,4,5)(~3,~4,~5)", "RBBRBR", [(1, 0, -1, 0, 0, 0), (0, 1, 1, 0, 0, 0), (0, 0, 0, 1, 0, 1), (0, 0, 0, 0, 1, -1)]),
+            VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])
         ],
-        horizontal_nodes=[[], [[7, 17], [9, 14]]]
-        prong_matching=[[(0, 0, 0), (-1, 0, 1)], [(0, 4, 0), (-1, 10, 1)]],
+        horizontal_nodes=[[], []]
+        prong_matching=[[(0, 0, 0), (-1, 0, 0)], [(0, 10, 0), (-1, 4, 0)]],
         )
-        sage: vt10.is_abelian()
-        True
-        sage: vt11.is_abelian()
-        True
-        sage: mvt1.is_abelian()
-        False
+        sage: vt0, vt1 = mvt1._veering_triangulations
+        sage: vt0.stratum()
+        (H_1(0), H_1(0))
+        sage: vt1.stratum()
+        H_1(4, -2^2)
+        sage: vt1.residue_constraints()
+        [1 0]
+        [0 1]
     """
 
     __slots__ = ('_veering_triangulations', '_horizontal_nodes', '_prong_matching')
@@ -935,7 +932,7 @@ class MultiscaleVeeringTriangulation:
                 l_pm.append(pm)
         #new vertical nodes
         if f_up is not None:
-            l_pm  = l_pm + new_prong_matching(vt, f_low, r_low, r_up, level)
-        
+            l_pm  = l_pm + _new_prong_matching(vt, f_low, r_up, r_low,level)
+
         #build the degeneration
         return MultiscaleVeeringTriangulation(vts,l_horiz,l_pm)
