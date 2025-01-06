@@ -36,7 +36,10 @@ from sage.misc.cachefunc import cached_method
 from sage.graphs.digraph import DiGraph
 
 
-# TODO: vertical/horizontal degenerations commute
+# TODO: optimization: vertical/horizontal degenerations commute
+# TODO: need to store one additional information: for each possible degeneration DS -> list of DS'
+# we need to record the set of VeeringTriangulation in the initial DS and the subset of (low_edges, up_edges)
+# to degenerate in order to get a "canonical" veering triangulation (ie which is the root in each component)
 class Degenerations:
     r"""
     Helper class for computing successive degenerations of (primitive) linear subvarieties.
