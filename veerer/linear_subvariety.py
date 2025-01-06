@@ -42,14 +42,17 @@ from sage.graphs.digraph import DiGraph
 # to degenerate in order to get a "canonical" veering triangulation (ie which is the root in each component)
 class Degenerations:
     r"""
-    Helper class for computing successive degenerations of (primitive) linear subvarieties.
+    Helper class for computing successive degenerations of (primitive) linear
+    subvarieties and their decomposition in prime components.
     """
     def __init__(self):
         self._to_components = {}  # mapping: veering triangulation -> position in self._components
         self._components = []     # list of Delaunay-Strebel graphs of prime veering triangulation
         self._mins = []           # the root of each Delaunay-Strebel graphs
-        self._horizontal_degenerations = [] # list of tuples representing a list of single level subvarieties
-        self._vertical_degenerations = []   # list of pairs of tuples representing a list of bi-level primitive
+        self._horizontal_degenerations = []          # list of lists of tuples of integers representing one-level subvarieties decomposed into prime components
+        self._minimal_horizontal_degenerations = []  # TODO: to be updated with triples (vt, edges_up, edges_low)
+        self._vertical_degenerations = []            # list of lists of pairs of tuples of integers representing a two-levels subvarieties decomposed into prime components
+        self._minimal_vertical_degenerations = []    # TODO: to be updated with triples (vt, edges_up, edges_low)
 
     def __repr__(self):
         return "Degenerations of {} veering triangulations or Strebel graphs into {} prime components".format(len(self._to_components), len(self._components))
