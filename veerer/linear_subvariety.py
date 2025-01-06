@@ -45,11 +45,11 @@ class Degenerations:
     Helper class for computing successive degenerations of (primitive) linear subvarieties.
     """
     def __init__(self):
-        self._to_components = {}  # veering triangulation/strebel graph -> component number
-        self._components = []     # list of connected subgraphs
-        self._mins = []           # the minimum of each component
-        self._horizontal_degenerations = [] # each element is a list of tuples representing a list of single level subvarieties
-        self._vertical_degenerations = [] # each element is a list of pairs of tuples representing a list of bi-level primitive
+        self._to_components = {}  # mapping: veering triangulation -> position in self._components
+        self._components = []     # list of Delaunay-Strebel graphs of prime veering triangulation
+        self._mins = []           # the root of each Delaunay-Strebel graphs
+        self._horizontal_degenerations = [] # list of tuples representing a list of single level subvarieties
+        self._vertical_degenerations = []   # list of pairs of tuples representing a list of bi-level primitive
 
     def __repr__(self):
         return "Degenerations of {} veering triangulations or Strebel graphs into {} prime components".format(len(self._to_components), len(self._components))
@@ -98,10 +98,11 @@ class Degenerations:
         """
         return [i for i, degenerations in enumerate(self._horizontal_degenerations) if degenerations is None]
 
+    # TODO: output an additional boolean that tells whether all known components are canonical
     def find_and_decompose(self, f):
         r"""
         Given a linear family ``f`` decompose it into prime components and
-        return a pair ``(known_prime_component_indices, unknown_prime_components)``
+        return a triple ``(known_prime_component_indices, unknown_prime_components, all_known_components_are_roots)``
         """
         if f.is_prime():
             f.set_canonical_labels()
