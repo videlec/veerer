@@ -37,6 +37,7 @@ from sage.graphs.digraph import DiGraph
 
 
 # TODO: optimization: vertical/horizontal degenerations commute
+# TODO: store DelaunayStrebelGraph instead of sage DiGraph
 # TODO: need to store one additional information: for each possible degeneration DS -> list of DS'
 # we need to record the set of VeeringTriangulation in the initial DS and the subset of (low_edges, up_edges)
 # to degenerate in order to get a "canonical" veering triangulation (ie which is the root in each component)
@@ -65,6 +66,7 @@ class Degenerations:
             raise ValueError("component_number (={}) must a positive integer smaller than {}".format(len(self._components)))
         return component_number
 
+    # TODO: input must be a DelaunayStrebelGraph
     def find(self, g):
         r"""
         Find the Delaunay-Strebel graph ``g`` in the already computed list or
@@ -78,6 +80,7 @@ class Degenerations:
         else:
             return self.add(g)
 
+    # TODO: input must be a DelaunayStrebelGraph
     def add(self, g):
         vt_min = next(state for state in g if isinstance(state, VeeringTriangulation))
         num = len(self._components)
