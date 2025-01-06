@@ -30,6 +30,7 @@ import sys
 from .automaton import DelaunayStrebelAutomaton
 from .veering_triangulation import VeeringTriangulation
 from .strebel_graph import StrebelGraph
+from .delaunay_strebel_graph import DelaunayStrebelGraph
 
 from sage.structure.richcmp import op_LT, op_LE, op_EQ, op_NE, op_GT, op_GE, rich_to_bool
 from sage.misc.cachefunc import cached_method
@@ -37,59 +38,113 @@ from sage.graphs.digraph import DiGraph
 
 
 # TODO: optimization: vertical/horizontal degenerations commute
-# TODO: store DelaunayStrebelGraph instead of sage DiGraph
-# TODO: need to store one additional information: for each possible degeneration DS -> list of DS'
-# we need to record the set of VeeringTriangulation in the initial DS and the subset of (low_edges, up_edges)
-# to degenerate in order to get a "canonical" veering triangulation (ie which is the root in each component)
-class Degenerations:
+class PrimeDegenerations:
     r"""
-    Helper class for computing successive degenerations of (primitive) linear
+    Helper class for computing successive degenerations of (prime) linear
     subvarieties and their decomposition in prime components.
+
+    This class maintains the following attributes:
+
+    - ``_components``: list of ``DelaunayStrebelGraph``
+
+    - ``_to_components``: dictionary whose keys are the union of veering
+      triangulations in the graphs in ``_components`` and the corresponding value
+      is the index in ``_components``.
+
+    - ``_horizontal_degenerations``: a list of lists of dictionaries, the list
+    at index ``i`` encodes the horizontal degenerations of ``_components[i]``.
+    Each key is a tuple of ordered indices ``(i1, ..., ik)`` which corresponds
+    to the decomposition into prime components of a codimension one horizontal
+    degeneration. The corresponding values are the triples ``(vt, edges_up,
+    edges_low)`` where ``vt`` is a veering triangulation in ``_components[i]``
+    and whose degeneration along the given ``edges_up`` and ``edges_low`` gives
+    a WYYISWYG differential in the product of ``_components[i1]``,
+    ``_components[i2]``, ..., ``_components[ik]`` (possibly after applying
+    canonical relabelling).
+
+    - ``vertical_degenerations``: similar to ``_horizontal_degenerations`` but for
+      vertical degenerations. In that case, the keys are pairs of ordered tuples
+      ``((i1, ..., ik), (j1, ..., jl)`` which corresponds to the prime decompositions
+      of the two level obtained after degeneration.
+
+    The data structure is updated after calls to the (low level) methods :meth:`add`,
+    :meth:`compute_vertical_degenerations` and
+    :meth:`compute_horizontal_degenerations`.
+
+    EXAMPLES::
+
+        sage: from veerer import VeeringTriangulation
+        sage: from veerer.linear_subvariety import PrimeDegenerations
+        sage: vt = VeeringTriangulation("(~0,1,2)(~1,3,4)(~2,5,6)(~3,~5,7)(~6,8,9)(~7,~8,~9)(0:2)(~4:2)", "BRRRBBRRRB")
+        sage: D = PrimeDegenerations()
+        sage: D
+        Degenerations of 0 prime components (0 veering triangulations)
+        sage: D.add(vt.delaunay_strebel_graph())
+        0
+        sage: D
+        Degenerations of 1 prime components (446 veering triangulations)
+        sage: D.compute_vertical_degenerations(0)
+        sage: D
+        Degenerations of 12 prime components (648 veering triangulations)
+        sage: D.compute_horizontal_degenerations(0)
+        sage: D
+        Degenerations of 13 prime components (848 veering triangulations)
+
+    We check below that some of the vertical degeneration information is correct::
+
+        sage: degeneration_indices, root_degenerations = choice(list(D._vertical_degenerations[0].items()))
+        sage: for vt, edges_up, edges_low in root_degenerations:
+        ....:     vt_up, vt_low, _, _ = vt.degeneration(edges_up=edges_up, edges_low=edges_low, mutable=True)
+        ....:     vt_up = [x[1] for x in vt_up.prime_decomposition(mutable=True)]
+        ....:     vt_low = [x[1] for x in vt_low.prime_decomposition(mutable=True)]
+        ....:     for comp in vt_up + vt_low:
+        ....:         comp.set_canonical_labels()
+        ....:         comp.set_immutable()
+        ....:     indices_up = tuple(sorted(D._to_components[comp] for comp in vt_up))
+        ....:     indices_low = tuple(sorted(D._to_components[comp] for comp in vt_low))
+        ....:     assert degeneration_indices == (indices_up, indices_low)
     """
     def __init__(self):
-        self._to_components = {}  # mapping: veering triangulation -> position in self._components
         self._components = []     # list of Delaunay-Strebel graphs of prime veering triangulation
-        self._mins = []           # the root of each Delaunay-Strebel graphs
-        self._horizontal_degenerations = []          # list of lists of tuples of integers representing one-level subvarieties decomposed into prime components
-        self._minimal_horizontal_degenerations = []  # TODO: to be updated with triples (vt, edges_up, edges_low)
-        self._vertical_degenerations = []            # list of lists of pairs of tuples of integers representing a two-levels subvarieties decomposed into prime components
-        self._minimal_vertical_degenerations = []    # TODO: to be updated with triples (vt, edges_up, edges_low)
+        self._to_components = {}  # mapping: veering triangulation -> position in self._components
+        self._horizontal_degenerations = []  # list of lists of dictionaries
+        self._vertical_degenerations = []    # list of lists of dictionaries
 
     def __repr__(self):
-        return "Degenerations of {} veering triangulations or Strebel graphs into {} prime components".format(len(self._to_components), len(self._components))
+        return "Degenerations of {} prime components ({} veering triangulations)".format(len(self._components), len(self._to_components))
 
     def _check_component_number(self, component_number):
         if not isinstance(component_number, numbers.Integral):
             raise TypeError("component_number must be an integer")
         component_number = int(component_number)
         if component_number < 0 or component_number >= len(self._components):
-            raise ValueError("component_number (={}) must a positive integer smaller than {}".format(len(self._components)))
+            raise ValueError("component_number (={}) must a positive integer smaller than {}".format(component_number, len(self._components)))
         return component_number
 
-    # TODO: input must be a DelaunayStrebelGraph
-    def find(self, g):
+    def find(self, ds_graph):
         r"""
-        Find the Delaunay-Strebel graph ``g`` in the already computed list or
-        add it to the list and return the associated index.
+        Find the Delaunay-Strebel graph ``ds_graph`` in the already computed
+        list or add it to the list and return the associated index.
         """
-        vt = next(state for state in g if isinstance(state, VeeringTriangulation))
+        vt = ds_graph.root()
         if not vt.is_prime():
-            raise ValueError("not-prime")
+            raise ValueError("not prime")
         if vt in self._to_components:
             return self._to_components[vt]
         else:
-            return self.add(g)
+            return self.add(ds_graph)
 
-    # TODO: input must be a DelaunayStrebelGraph
-    def add(self, g):
-        vt_min = next(state for state in g if isinstance(state, VeeringTriangulation))
+    def add(self, ds_graph):
+        r"""
+        Add the Delaunay-Strebel graph ``ds_graph`` in the list of prime components.
+        """
         num = len(self._components)
-        self._components.append(g)
-        self._mins.append(vt_min)
+        self._components.append(ds_graph)
         self._horizontal_degenerations.append(None)
         self._vertical_degenerations.append(None)
-        for state in g:
-            self._to_components[state] = num
+        for state in ds_graph._vertices:
+            if isinstance(state, VeeringTriangulation):
+                self._to_components[state] = num
         return num
 
     def pending_vertical_degenerations(self):
@@ -104,20 +159,22 @@ class Degenerations:
         """
         return [i for i, degenerations in enumerate(self._horizontal_degenerations) if degenerations is None]
 
-    # TODO: output an additional boolean that tells whether all known components are canonical
     def find_and_decompose(self, f):
         r"""
         Given a linear family ``f`` decompose it into prime components and
         return a triple ``(known_prime_component_indices, unknown_prime_components, all_known_components_are_roots)``
         """
+        all_roots = True
+
         if f.is_prime():
             f.set_canonical_labels()
             f.set_immutable()
             if f in self._to_components:
                 component_number = self._to_components[f]
-                return (component_number,), ()
+                all_roots = f == self._components[component_number].root()
+                return (component_number,), (), all_roots
             else:
-                return (), (f,)
+                return (), (f,), all_roots
         else:
             prime_components = [comp for atom, comp in f.prime_decomposition(mutable=True, check=True)]
             if f.is_abelian() and not all(ff.is_abelian() for ff in prime_components):
@@ -129,12 +186,13 @@ class Degenerations:
                 ff.set_immutable()
                 if ff in self._to_components:
                     component_number = self._to_components[ff]
+                    all_roots = all_roots and ff == self._components[component_number].root()
                     prime_components_known.append(component_number)
                 else:
                     prime_components_unknown.append(ff)
             prime_components_known.sort()
             prime_components_unknown.sort()
-            return prime_components_known, prime_components_unknown
+            return tuple(prime_components_known), tuple(prime_components_unknown), all_roots
 
     def compute_horizontal_degenerations(self, component_number):
         r"""
@@ -144,16 +202,19 @@ class Degenerations:
         if self._horizontal_degenerations[component_number] is not None:
             return
 
-        degenerations = set()
+        degenerations = []
         degenerations_prime_components = set()
         ds_graph = self._components[component_number]
-        for state in ds_graph:
+        for state in ds_graph._vertices:
             if isinstance(state, VeeringTriangulation):
-                for (f_up, f_low, _, _) in state.codimension_one_horizontal_degenerations(mutable=True, check=False):
+                for edges_up in state.horizontal_degeneration_up_edges_subsets():
+                    edges_low = tuple([e for e in range(state._ne) if e not in edges_up])
+                    f_up, f_low, _, _ = state.degeneration(edges_up=edges_up, edges_low=edges_low, mutable=True, check=False)
                     assert f_up is None
                     assert f_low.dimension() == state.dimension() - 1
-                    known, unknown = self.find_and_decompose(f_low)
-                    degenerations.add(tuple(known + unknown))
+                    known, unknown, all_roots = self.find_and_decompose(f_low)
+                    if all_roots:
+                        degenerations.append((state, edges_up, edges_low, known, unknown))
                     degenerations_prime_components.update(unknown)
 
         # NOTE: since we have the full list of Delaunay cells, we do not need to run
@@ -167,37 +228,46 @@ class Degenerations:
         assert set(state for state in ds_graph if isinstance(state, VeeringTriangulation)) == degenerations_prime_components
 
         for g in ds_graph._graph.connected_components_subgraphs():
-            self.add(g)
+            self.add(DelaunayStrebelGraph(g))
 
-        ans = self._horizontal_degenerations[component_number] = set()
-        for f in degenerations:
-            degeneration = tuple(sorted(x if isinstance(x, int) else self._to_components[x] for x in f))
-            ans.add(degeneration)
+        ans = self._horizontal_degenerations[component_number] = {}
+        for state, edges_up, edges_low, known, unknown in degenerations:
+            if all(x == self._components[self._to_components[x]].root() for x in unknown):
+                degeneration = tuple(sorted(known + tuple(self._to_components[x] for x in unknown)))
+                if degeneration not in ans:
+                    ans[degeneration] = []
+                ans[degeneration].append((state, edges_up, edges_low))
 
     def compute_vertical_degenerations(self, component_number):
+        r"""
+        Compute the vertical degenerations of ``component_number``.
+        """
         component_number = self._check_component_number(component_number)
         if self._vertical_degenerations[component_number] is not None:
             return
 
-        degenerations = set()
+        degenerations = []
         degenerations_prime_components = set()
         ds_graph = self._components[component_number]
-        for state in ds_graph:
+        for state in ds_graph._vertices:
             if isinstance(state, VeeringTriangulation):
-                for (f_up, f_low, _, _) in state.codimension_one_vertical_degenerations(mutable=True, check=False):
+                for edges_low in state.vertical_degeneration_low_edges_subsets():
+                    edges_up = tuple([e for e in range(state._ne) if e not in edges_low])
+                    f_up, f_low, _, _ = state.degeneration(edges_up=edges_up, edges_low=edges_low, mutable=True, check=False)
                     assert f_up is not None, (state,)
                     # NOTE: the projectivization makes us loose one dimension
                     assert f_low.dimension() + f_up.dimension() == state.dimension()
                     # too long assert f_low.is_delaunay()
                     # too long assert f_up.is_delaunay()
 
-                    known_up, unknown_up = self.find_and_decompose(f_up)
+                    known_up, unknown_up, all_roots_up = self.find_and_decompose(f_up)
                     f_up_decomposed = tuple(known_up + unknown_up)
                     degenerations_prime_components.update(unknown_up)
-                    known_low, unknown_low = self.find_and_decompose(f_low)
+                    known_low, unknown_low, all_roots_low = self.find_and_decompose(f_low)
                     f_low_decomposed = tuple(known_low + unknown_low)
                     degenerations_prime_components.update(unknown_low)
-                    degenerations.add((f_up_decomposed, f_low_decomposed))
+                    if all_roots_up and all_roots_low:
+                        degenerations.append((state, edges_up, edges_low, known_up, known_low, unknown_up, unknown_low))
 
         # NOTE: since we have the full list of Delaunay cells, we do not need to run
         # the expensive Strebel -> Delaunay
@@ -209,15 +279,22 @@ class Degenerations:
         assert set(state for state in ds_graph if isinstance(state, VeeringTriangulation)) == degenerations_prime_components
 
         for g in ds_graph._graph.connected_components_subgraphs():
-            self.add(g)
+            self.add(DelaunayStrebelGraph(g))
 
-        ans = self._vertical_degenerations[component_number] = set()
-        for f_up, f_low in degenerations:
-            degeneration_up = tuple(sorted(x if isinstance(x, int) else self._to_components[x] for x in f_up))
-            degeneration_low = tuple(sorted(x if isinstance(x, int) else self._to_components[x] for x in f_low))
-            ans.add((degeneration_up, degeneration_low))
+        ans = self._vertical_degenerations[component_number] = {}
+        for state, edges_up, edges_low, known_up, known_low, unknown_up, unknown_low in degenerations:
+            if all(x == self._components[self._to_components[x]].root() for x in unknown_up + unknown_low):
+                degeneration_up = tuple(sorted(known_up + tuple(self._to_components[x] for x in unknown_up)))
+                degeneration_low = tuple(sorted(known_low + tuple(self._to_components[x] for x in unknown_low)))
+                degeneration = (degeneration_up, degeneration_low)
+                if degeneration not in ans:
+                    ans[degeneration] = []
+                ans[degeneration].append((state, edges_up, edges_low))
 
     def compute_all(self):
+        r"""
+        Compute all degenerations up to dimension 0.
+        """
         vpending = self.pending_vertical_degenerations()
         hpending = self.pending_horizontal_degenerations()
         while vpending or hpending:
@@ -228,22 +305,58 @@ class Degenerations:
             vpending = self.pending_vertical_degenerations()
             hpending = self.pending_horizontal_degenerations()
 
-    def codimension_one_vertical_degenerations(self, g):
+    def codimension_one_vertical_degenerations(self, ds_graph):
         r"""
-        Return the codimension one vertical degenerations of the Delaunay-Strebel graph ``g``.
+        Return the codimension one vertical degenerations of the Delaunay-Strebel graph ``ds_graph``.
+
+        If the graph ``ds_graph`` is not already part of the stored prime
+        components it will be added to the list.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: from veerer.linear_subvariety import PrimeDegenerations
+            sage: vt = VeeringTriangulation("(~0,1,2)(~1,3,4)(~2,5,6)(~3,~5,7)(~6,8,9)(~7,~8,~9)(0:2)(~4:2)", "BRRRBBRRRB")
+            sage: D = PrimeDegenerations()
+            sage: ds_graph = vt.delaunay_strebel_graph()
+            sage: D.codimension_one_vertical_degenerations(ds_graph)
+            [((Delaunay-Strebel graph ...), (Delaunay-Strebel graph ...)),
+             ((Delaunay-Strebel graph ...), (Delaunay-Strebel graph ...)),
+             ((Delaunay-Strebel graph ...), (Delaunay-Strebel graph ...)),
+             ((Delaunay-Strebel graph ...), (Delaunay-Strebel graph ...)),
+             ((Delaunay-Strebel graph ...), (Delaunay-Strebel graph ...)),
+             ((Delaunay-Strebel graph ...), (Delaunay-Strebel graph ...))]
         """
-        component_number = self.find(g)
+        component_number = self.find(ds_graph)
         self.compute_vertical_degenerations(component_number)
         ans = []
         for up, low in self._vertical_degenerations[component_number]:
             ans.append((tuple(self._components[i] for i in up), tuple(self._components[i] for i in low)))
         return ans
 
-    def codimension_one_horizontal_degenerations(self, g):
+    def codimension_one_horizontal_degenerations(self, ds_graph):
         r"""
-        Return the codimension one horizontal degenerations of the Delaunay-Strebel graph ``g``.
+        Return the codimension one horizontal degenerations of the Delaunay-Strebel graph ``ds_graph``.
+
+        If the graph ``ds_graph`` is not already part of the stored prime
+        components it will be added to the list.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: from veerer.linear_subvariety import PrimeDegenerations
+            sage: vt = VeeringTriangulation("(~0,1,2)(~1,3,4)(~2,5,6)(~3,~5,7)(~6,8,9)(~7,~8,~9)(0:2)(~4:2)", "BRRRBBRRRB")
+            sage: D = PrimeDegenerations()
+            sage: ds_graph = vt.delaunay_strebel_graph()
+            sage: D.codimension_one_horizontal_degenerations(ds_graph)
+            [(Delaunay-Strebel graph of VeeringTriangulationLinearFamily("(0:1)(~0:1,1:2,2:1)(~1:2,~2:1,3:1)(~3:1)", "RRRR", [(1, 0, 0, 1), (0, 1, 0, 0), (0, 0, 1, 0)]) made of
+                200 veering Delaunay states
+                6 Strebel states
+                232 flip transitions
+                92 rotation transitions
+                92 Strebel transitions,)]
         """
-        component_number = self.find(g)
+        component_number = self.find(ds_graph)
         self.compute_horizontal_degenerations(component_number)
         ans = []
         for degeneration in self._horizontal_degenerations[component_number]:
@@ -276,12 +389,14 @@ class IrreducibleRealLinearSubvariety:
         MultiscaleCompactification Irreducible real linear subvariety of projective dimension 0 in [[H_0(1^2, -2^2)]]
     """
     def __init__(self, ds_graphs):
-        if isinstance(ds_graphs, DiGraph):
+        if isinstance(ds_graphs, DelaunayStrebelGraph):
             ds_graphs = [[ds_graphs]]
         elif isinstance(ds_graphs, (tuple, list)):
             ds_graphs_new = []
             for elt in ds_graphs:
                 if isinstance(elt, DiGraph):
+                    ds_graphs_new.append([DelaunayStrebelGraph(elt)])
+                elif isinstance(elt, DelaunayStrebelGraph):
                     ds_graphs_new.append([elt])
                 elif isinstance(elt, (tuple, list)):
                     ds_graphs_new.append(list(elt))
@@ -289,46 +404,34 @@ class IrreducibleRealLinearSubvariety:
                     raise ValueError("invalid input")
             ds_graphs = ds_graphs_new
 
-        # NOTE: in order to normalize we sort the components of each level according
-        # to the minima
+        # NOTE: in order to normalize we sort the components
         levels = list(map(list, ds_graphs))
         mins = []
         for j, level in enumerate(levels):
-            level_mins = [(min(state for state in comp if isinstance(state, VeeringTriangulation)), i) for i, comp in enumerate(level)]
-            level_mins.sort()
-            levels[j] = [level[k] for _, k in level_mins]
-            mins.extend(level_mins)
-
+            levels[j] = sorted(level)
         self._levels = tuple(map(tuple, levels))
-        self._mins = tuple(mins)
 
     def _check(self, error=RuntimeError):
         if not isinstance(self._levels, tuple) or not all(isinstance(level, tuple) for level in self._levels):
             raise error
-        if len(self._mins) != sum(map(len, self._levels)):
-            raise error
-        if not all(x.is_prime() for x in self._mins):
-            raise error("all component of a level must be prime; call prime_decomposition first")
 
     def __hash__(self):
-        return hash(self._mins)
+        return hash(tuple(comp.root() for level in self._levels for comp in level))
 
     def __eq__(self, other):
         if type(self) is not type(other):
             raise TypeError
-        return list(map(len, self._levels)) == list(map(len, other._levels)) and self._mins == other._mins
+        return self._levels == other._levels
 
     def __ne__(self, other):
         if type(self) is not type(other):
             raise TypeError
-        return list(map(len, self._levels)) != list(map(len, other._levels)) or self._mins != other._mins
+        return self._levels != other._levels
 
     def _cmp_(self, other):
         if type(self) is not type(other):
             raise TypeError("can not compare {} with {}".format(type(self).__name__, type(other).__name__))
 
-        if type(self) is not type(other):
-            raise TypeError
         data0 = len(self._levels)
         data1 = len(other._levels)
         c = (data0 > data1) - (data0 < data1)
@@ -341,8 +444,8 @@ class IrreducibleRealLinearSubvariety:
         if c:
             return c
 
-        data0 = self._mins
-        data1 = other._mins
+        data0 = self._levels
+        data1 = other._levels
         c = (data0 > data1) - (data0 < data1)
         return c
 
@@ -406,7 +509,7 @@ class IrreducibleRealLinearSubvariety:
         if level is None:
             return tuple(self.signature(level) for level in self.levels())
         level = self._check_level(level)
-        return tuple(sorted(sum((next(iter(comp)).stratum().signature() for comp in self._levels[level]), tuple())))
+        return tuple(sorted(sum((comp.root().stratum().signature() for comp in self._levels[level]), tuple())))
 
     def ambient_stratum(self, level=None):
         r"""
@@ -427,7 +530,7 @@ class IrreducibleRealLinearSubvariety:
         if level is None:
             return [self.ambient_stratum(level) for level in self.levels()]
         level = self._check_level(level)
-        return [next(iter(comp)).stratum() for comp in self._levels[level]]
+        return [comp.root().stratum() for comp in self._levels[level]]
 
     def dimension(self, level=None):
         r"""
@@ -448,7 +551,7 @@ class IrreducibleRealLinearSubvariety:
         if level is None:
             return sum(self.dimension(level) for level in self.levels())
         level = self._check_level(level)
-        return sum(next(iter(comp)).dimension() for comp in self._levels[level])
+        return sum(comp.root().dimension() for comp in self._levels[level])
 
     def projective_dimension(self, level=None):
         r"""
@@ -522,7 +625,7 @@ class IrreducibleRealLinearSubvariety:
         level = self._check_level(level)
 
         if degeneration_helper is None:
-            degeneration_helper = Degenerations()
+            degeneration_helper = PrimeDegenerations()
 
         ans = []
         ds_graphs = self.delaunay_strebel_graph(level)
@@ -567,7 +670,7 @@ class IrreducibleRealLinearSubvariety:
         level = self._check_level(level)
 
         if degeneration_helper is None:
-            degeneration_helper = Degenerations()
+            degeneration_helper = PrimeDegenerations()
 
         ds_graphs = self.delaunay_strebel_graph(level)
         ans = []
@@ -583,12 +686,15 @@ class IrreducibleRealLinearSubvariety:
         return ans
 
     def multiscale_compactification(self):
+        r"""
+        Return the multiscale compactification of this linear subvariety.
+        """
         return MultiscaleCompactification(self)
 
 
-# TODO: we should store more globally a list of DS graphs to avoid recomputations
-# TODO: if the goal is only to compute components, then in vertical degenerations
-# it is enough to degenerate only the level 0
+
+# TODO: this class could also easily handle LinearSubvariety by not performing
+# any degeneration but accepting a linear family as input
 class MultiscaleCompactification:
     r"""
     EXAMPLES:
@@ -641,7 +747,7 @@ class MultiscaleCompactification:
     """
     def __init__(self, L):
         self._L = L
-        self._degeneration_helper = Degenerations()
+        self._degeneration_helper = PrimeDegenerations()
 
         # at position (i, j) = i vertical and j horizontal degenerations
         self._components = collections.defaultdict(set)
