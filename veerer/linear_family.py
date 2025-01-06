@@ -28,6 +28,7 @@ import itertools
 import numbers
 from random import choice, shuffle
 
+from sage.structure.richcmp import op_LT, op_LE, op_EQ, op_NE, op_GT, op_GE, rich_to_bool
 from sage.structure.element import get_coercion_model, Matrix
 from sage.structure.richcmp import op_EQ, rich_to_bool
 from sage.rings.integer_ring import ZZ
@@ -376,13 +377,36 @@ class LinearFamily:
             sage: f3 = VeeringTriangulationLinearFamily(vt2, [s2, t2])
             sage: f1 == f3
             False
-            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", [RED, RED, BLUE])
-            sage: vt.as_linear_family() == f1
+            sage: vt3 = VeeringTriangulation("(0,1,2)(~0,~1,~2)", [RED, RED, BLUE])
+            sage: vt3 == vt3.as_linear_family()
+            True
+            sage: vt3.as_linear_family() == vt3
+            True
+            sage: vt3.as_linear_family() == f1
+            False
+            sage: f1 == vt3.as_linear_family()
             False
         """
-        if type(self) is not type(other):
-            raise TypeError
-        return self._constellation_class.__eq__(self, other) and self._subspace == other._subspace
+        if type(self) is type(other):
+            return self._constellation_class.__eq__(self, other) and self._subspace == other._subspace
+
+        if isinstance(self, LinearFamily):
+            if self._constellation_class.__ne__(self, other):
+                return False
+            elif isinstance(other, LinearFamily):
+                return False
+            else:
+                # self is a linear family while other is a constellation
+                return self._constellation_class.__eq__(self, other) and self.dimension() == other.dimension()
+
+        elif isinstance(other, LinearFamily):
+            if other._constellation_class.__ne__(self, other):
+                return False
+            elif type(self) is other._constellation_class:
+                # one of self or other is a VeeringTriangulation
+                return other._constellation_class.__eq__(other, self) and self.dimension() == other.dimension()
+            else:
+                return False
 
     def __ne__(self, other):
         r"""
@@ -401,15 +425,57 @@ class LinearFamily:
             sage: f3 = VeeringTriangulationLinearFamily(vt2, [s2, t2])
             sage: f1 != f3
             True
-            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", [RED, RED, BLUE])
-            sage: vt.as_linear_family() != f1
+
+            sage: vt1 = VeeringTriangulation("(0,1,2)(~0,~1,~2)", [RED, RED, BLUE])
+            sage: vt2 = VeeringTriangulation("(0,1,2)(~0,~1,~2)", [RED, BLUE, BLUE])
+            sage: vt1.as_linear_family() != f1
+            True
+            sage: vt1 != vt1.as_linear_family()
+            False
+            sage: vt1.as_linear_family() != vt1
+            False
+            sage: vt1 != vt2.as_linear_family()
+            True
+            sage: vt2.as_linear_family() != vt1
             True
         """
-        if type(self) is not type(other):
-            raise TypeError
-        return self._constellation_class.__ne__(self, other) or self._subspace != other._subspace
+        if type(self) is type(other):
+            return self._constellation_class.__ne__(self, other) or self._subspace != other._subspace
+
+        if isinstance(self, LinearFamily):
+            if self._constellation_class.__ne__(self, other):
+                return True
+            elif isinstance(other, LinearFamily):
+                return True
+            else:
+                # self is a linear family while other is a constellation
+                return self._constellation_class.__ne__(self, other) or self.dimension() != other.dimension()
+
+        elif isinstance(other, LinearFamily):
+            if other._constellation_class.__ne__(self, other):
+                return True
+            elif type(self) is other._constellation_class:
+                # one of self or other is a VeeringTriangulation
+                return other._constellation_class.__ne__(other, self) or self.dimension() != other.dimension()
+            else:
+                return True
 
     def _richcmp_(self, other, op):
+        r"""
+        TESTS::
+
+            sage: from veerer import VeeringTriangulation, VeeringTriangulationLinearFamily
+            sage: f = VeeringTriangulationLinearFamily("(0:1)(~0:1,1:1,2:2)(~1:1,~2:2,3:1)(~3:1)", "RRBR", [(1, 0, 0, 1), (0, 1, 0, 0), (0, 0, 1, 0)])
+            sage: f == min(x for x in f.delaunay_strebel_graph()._vertices if isinstance(x, VeeringTriangulation))
+            True
+
+            sage: f0 = VeeringTriangulationLinearFamily("(0:1)(~0:1,1:1,2:1)(~1:1,~2:1,3:1)(~3:1)", "RRBR", [(1, 0, 0, 1), (0, 1, 0, 0), (0, 0, 1, 0)])
+            sage: f1 = VeeringTriangulationLinearFamily("(0:1)(~0:1,1:1,2:1)(~1:1,~2:1,3:1)(~3:1)", "BRRB", [(1, 0, 0, 1), (0, 1, 0, 0), (0, 0, 1, 0)])
+            sage: (f0 < f1) + (f0 == f1) + (f0 > f1)
+            1
+            sage: (f1 < f0) + (f1 == f0) + (f1 > f0)
+            1
+        """
         c = self._constellation_class._cmp_(self, other)
         if c:
             return rich_to_bool(op, c)
