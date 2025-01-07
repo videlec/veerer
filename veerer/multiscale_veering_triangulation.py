@@ -16,6 +16,8 @@ from .triangulation import Triangulation
 from .veering_triangulation import *
 from .constants import *
 from .polyhedron import *
+from .labelled_digraph import *
+from .monodromy import *
 
 
 def str_to_label(h):
@@ -920,3 +922,78 @@ class MultiscaleVeeringTriangulation:
 
         #build the degeneration
         return MultiscaleVeeringTriangulation(vts,l_horiz,l_pm)
+    
+    def transport_along_path(self, level, component, path):
+        r"""
+        Return the multi-scale Veering triangulation obtained by deforming the prime veering triangulation at ``(level, component)`` along the path in the Delaunay-Strebel graph.
+
+        EXAMPLES::
+
+            sage: from veerer import *
+            sage: from veerer.multiscale_veering_triangulation import *
+
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,9)(~8,10,11)(~9,~10,~11)", "RRBBRRRRBBBR")
+            sage: edges_up = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+            sage: mvt0 = MultiscaleVeeringTriangulation([vt], [[]],[])
+            sage: mvt = mvt0.degeneration(0,0,edges_up=edges_up)
+            sage: mvt
+            MultiscaleVeeringTriangulation(
+            veering_triangulations=[
+                VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "RRBBRRRRB", [(1, 0, -1, -1, 0, -1, -1, 0, 1), (0, 1, 1, 1, 0, 1, 1, 0, -1), (0, 0, 0, 0, 1, 1, 1, 0, -1), (0, 0, 0, 0, 0, 0, 0, 1, 1)]),
+                VeeringTriangulationLinearFamily("(0:4,~0:4)", "R", [(1)])
+            ],
+            horizontal_nodes=[[], []]
+            prong_matching=[[((0, 0), 11, 0), ((-1, 0), 0, 0)]],
+            )
+            sage: vt0 = mvt._veering_triangulations[0][0]
+            sage: ds_graph = vt0.delaunay_strebel_graph()
+            sage: path = LabelledDiGraphPath(ds_graph, 0, [3, 13, 16])
+            sage: mvt.transport_along_path(0, 0, path)
+            MultiscaleVeeringTriangulation(
+            veering_triangulations=[
+                VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "BRBBRRRBR", [(1, 0, 1, 1, 0, 1, 1, 0, 1), (0, 1, 1, 1, 0, 1, 1, 0, 1), (0, 0, 0, 0, 1, 1, 1, 0, 1), (0, 0, 0, 0, 0, 0, 0, 1, -1)]),
+                VeeringTriangulationLinearFamily("(0:4,~0:4)", "R", [(1)])
+            ],
+            horizontal_nodes=[[], []]
+            prong_matching=[[((0, 0), 16, 0), ((-1, 0), 0, 0)]],
+            )
+        """
+        st_graph = path._graph
+        vt0 = st_graph.vertex_label(path.start())
+        vt1 = st_graph.vertex_label(path.end())
+        assert self._veering_triangulations[abs(level)][component] == vt0
+        
+        vts = self._veering_triangulations.copy()
+        vts[abs(level)][component] = vt1
+
+        mono = SeparatrixMonodromy(st_graph)
+        
+        #new horizontal nodes
+        l1 = []
+        l_horiz = self._horizontal_nodes.copy()
+        for node in l_horiz[abs(level)]:
+            p1, p2 = node
+            c1, h1 = p1
+            c2, h2 = p2
+            if c1 == component:
+                h1 = mono.infinite_cylinder_transport(path, h1)
+            if c2 == component:
+                h2 = mono.infinite_cylinder_transport(path, h2)
+            l1.append([(c1,h1),(c2,h2)])
+        l_horiz[level] = l1
+        
+        #new vertical nodes
+        l2 = []
+        l_vert = self._prong_matching.copy()
+        for pm in l_vert:
+            p1, p2 = pm
+            m1, h1, ang1 = p1
+            m2, h2, ang2 = p2
+            if m1 == (level, component):
+                h1, ang1 = mono.vertex_separatrix_transport(path, h1, ang1)
+            if m2 == (level, component):
+                h2, ang2 = mono.face_separatrix_transport(path, h2, ang2)
+            l2.append([(m1, h1, ang1),(m2, h2, ang2)])
+        l_vert = l2
+        
+        return MultiscaleVeeringTriangulation(vts,l_horiz,l_vert)   
