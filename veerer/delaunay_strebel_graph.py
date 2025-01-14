@@ -20,10 +20,82 @@ class DelaunayStrebelGraph(LabelledDiGraph):
     subset of vertices of the graph that are ``VeeringTriangulation``
     corresponds to cells. The edges encode some (but not all) adjacencies
     between cells.
+
+    EXAMPLES::
+
+        sage: from veerer import VeeringTriangulation
+
+    Let us build a Delaunay-Strebel graph in H(3^2, -3^2)::
+
+        sage: vt = VeeringTriangulation("(~0,1,2)(~1,3,4)(~2,5,6)(~3,~5,7)(~6,8,9)(~7,~8,~9)(0:2)(~4:2)", "BRRRBBRRRB")
+        sage: ds_graph = vt.delaunay_strebel_graph()
+        sage: ds_graph
+        Delaunay-Strebel graph of VeeringTriangulation("(0:1,1:1,2:1,3:1)(~0:1,~1:1,~2:1,~3:1)", "RRRB") made of
+          446 veering Delaunay states
+          1 Strebel states
+          1200 flip transitions
+          42 rotation transitions
+          42 Strebel transitions
+
+    The vertices and edges are indexed by integers (for efficiency purposes). In order to get
+    access to the underlying geometric data, one needs to call the methods ``vertex_label``
+    and ``edge_label``::
+
+        sage: ds_graph.vertex_label(122)
+        VeeringTriangulation("(~0,1,2)(~1,3,4)(~2,5,6)(~3,7,~6)(~5,8,9)(~7,~8,~9)(0:2)(~4:2)", "RBBBRBRBRB")
+        sage: ds_graph.edge_label(37)
+        ('flip',
+         [5],
+         1,
+         2,
+         array('i', [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 13, 11, 10, 14, 15, 16, 17, 18, 19]))
     """
     def __init__(self, ds_graph):
         root = min(vt for vt in ds_graph if isinstance(vt, VeeringTriangulation))
         LabelledDiGraph.__init__(self, ds_graph, root)
+
+        # store both the spanning tree "towards" the root and "against"
+        self._spanning_tree_towards, self._complementary_edges = self.spanning_tree()
+        self._spanning_tree_against = [[] for _ in range(len(self))]
+        for i in self._spanning_tree_towards:
+            if i is not None:
+                self._spanning_tree_against[self.edge_target(i)].append(~i)
+
+    def __eq__(self, other):
+        if type(self) is not type(other):
+            raise TypeError
+
+        return self._vertices[0] == other._vertices[0]
+
+    def __ne__(self, other):
+        if type(self) is not type(other):
+            raise TypeError
+
+        return self._vertices[0] != other._vertices[0]
+
+    def __lt__(self, other):
+        if type(self) is not type(other):
+            raise TypeError
+
+        return self._vertices[0] < other._vertices[0]
+
+    def __le__(self, other):
+        if type(self) is not type(other):
+            raise TypeError
+
+        return self._vertices[0] <= other._vertices[0]
+
+    def __gt__(self, other):
+        if type(self) is not type(other):
+            raise TypeError
+
+        return self._vertices[0] > other._vertices[0]
+
+    def __ge__(self, other):
+        if type(self) is not type(other):
+            raise TypeError
+
+        return self._vertices[0] >= other._vertices[0]
 
     def num_veering_states(self):
         return sum(isinstance(state, VeeringTriangulation) for state in self._vertices)

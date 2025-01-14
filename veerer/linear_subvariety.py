@@ -349,7 +349,7 @@ class PrimeDegenerations:
             sage: D = PrimeDegenerations()
             sage: ds_graph = vt.delaunay_strebel_graph()
             sage: D.codimension_one_horizontal_degenerations(ds_graph)
-            [(Delaunay-Strebel graph of VeeringTriangulationLinearFamily("(0:1)(~0:1,1:2,2:1)(~1:2,~2:1,3:1)(~3:1)", "RRRR", [(1, 0, 0, 1), (0, 1, 0, 0), (0, 0, 1, 0)]) made of
+            [(Delaunay-Strebel graph of VeeringTriangulationLinearFamily("(0:1)(~0:1,1:1,2:1)(~1:1,~2:1,3:1)(~3:1)", "RRBR", [(1, 0, 0, 1), (0, 1, 0, 0), (0, 0, 1, 0)]) made of
                 200 veering Delaunay states
                 6 Strebel states
                 232 flip transitions

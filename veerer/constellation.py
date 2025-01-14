@@ -535,7 +535,7 @@ class Constellation:
             sage: StrebelGraph("(0,1,2,~0,~1,~2)") == StrebelGraph("(0,1:1,2,~0,~1,~2)")
             False
         """
-        return type(self) == type(other) and self._ne == other._ne and self._fp == other._fp and self._half_edges_data == other._half_edges_data and self._edges_data == other._edges_data
+        return self._ne == other._ne and self._fp == other._fp and self._half_edges_data == other._half_edges_data and self._edges_data == other._edges_data
 
     def __ne__(self, other):
         r"""
@@ -555,7 +555,7 @@ class Constellation:
             sage: StrebelGraph("(0,1,2,~0,~1,~2)") != StrebelGraph("(0,1:1,2,~0,~1,~2)")
             True
         """
-        return type(self) != type(other) or self._ne != other._ne or self._fp != other._fp or self._half_edges_data != other._half_edges_data or self._edges_data != other._edges_data
+        return self._ne != other._ne or self._fp != other._fp or self._half_edges_data != other._half_edges_data or self._edges_data != other._edges_data
 
     def _cmp_(self, other):
         r"""
@@ -595,7 +595,8 @@ class Constellation:
         EXAMPLES::
 
             sage: import itertools
-            sage: from veerer import Triangulation
+            sage: from veerer import Triangulation, VeeringTriangulation
+
             sage: ts = [Triangulation("(0,1,2)"), Triangulation("(0:1,1:1,2:1)"), Triangulation("(0:1,1:1,2:2)"), Triangulation("(0,1,2)(~0,~1,~2)"), Triangulation("(0,1,2)(~0,~1,~2)"), Triangulation("(0,~0,1)(~1,2,~2)")]
             sage: for t1, t2 in itertools.product(ts, repeat=2):
             ....:     if t1 == t2:
@@ -608,6 +609,13 @@ class Constellation:
             ....:         assert (t1 > t2) + (t2 > t1) == 1
             ....:         assert (t1 < t2) == (t1 <= t2)
             ....:         assert (t1 > t2) == (t1 >= t2)
+
+            sage: vt0 = VeeringTriangulation("(0:1)(~0:1,1:1,2:1)(~1:1,~2:1,3:1)(~3:1)", "RRBR")
+            sage: vt1 = VeeringTriangulation("(0:1)(~0:1,1:1,2:1)(~1:1,~2:1,3:1)(~3:1)", "BRRB")
+            sage: (vt0 < vt1) + (vt0 == vt1) + (vt0 > vt1)
+            1
+            sage: (vt1 < vt0) + (vt1 == vt0) + (vt1 > vt0)
+            1
         """
         if type(self) is not type(other):
             raise TypeError("can not compare {} with {}".format(type(self).__name__, type(other).__name__))
