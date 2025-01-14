@@ -49,7 +49,7 @@ from .misc import det2
 from .triangulation import face_boundary_init, Triangulation
 from .polyhedron import LinearExpressions, ConstraintSystem
 from .polyhedron.linear_expression import LinearConstraint
-from .polyhedron.linear_algebra import linear_form_project, vector_normalize, prime_decomposition
+from .polyhedron.linear_algebra import linear_form_project, vector_normalize, prime_decomposition, is_rank_one
 
 cm = get_coercion_model()
 
@@ -2198,14 +2198,18 @@ class VeeringTriangulation(Triangulation):
         r"""
         Return the list of cylinders of colour ``col``.
 
-        Each cylinder is given as a quadruple ``(edges, rbdry, lbdry, half)`` where
+        Each cylinder is given as a quadruple ``(middle, rbdry, lbdry, pocket)`` where
 
-        - ``edges`` are the edges crossed by the core curve of the annulus
+        - ``middle`` are the half-edges crossed by the core curve of the annulus
 
-        - ``rbdry`` and ``lbdry`` are respectively the list of edges on the right
-          and left boundaries
+        - ``rbdry`` and ``lbdry`` are either two lists of half-edge boundaries or,
+          in the case of "pocket cylinder" the list of half-edge boundaries cut by
+          the folded edges.
 
-        - ``half`` is a boolean that is ``True`` when it is cut by two folded edges
+        - ``pocket`` (boolean) whether this is a pocket cylinder
+
+        In the case of "pocket cylinder", the first and last elements of
+        ``middle`` are the folded edges.
 
         EXAMPLES::
 
@@ -2373,7 +2377,7 @@ class VeeringTriangulation(Triangulation):
             LEFT = 1
             typ = RIGHT
 
-            cc = []    # cycle of half-edges inside the cylinder
+            cc = []    # cycle of edges inside the cylinder
             rbdry = [] # right boundary
             lbdry = [] # left boundary
             half_turn = False # whether the cylinder is a folded cylinder
@@ -2435,6 +2439,127 @@ class VeeringTriangulation(Triangulation):
                 cylinders.append((cc, rbdry, lbdry, half_turn))
 
         return cylinders
+
+    def cylinder_is_minimal(self, cyl):
+        r"""
+        Return whether ``cyl`` is minimal, that is whether all saddle connection
+        appearing in its boundary are colinear.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation, RED
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "RRBBRRRRB")
+            sage: cyl0, cyl1 = vt.cylinders(RED)
+            sage: cyl0
+            ([0, 3], [4], [6], False)
+            sage: cyl1
+            ([8, 12, 15, 11], [5, 16], [7, 17], False)
+            sage: vt.cylinder_is_minimal(cyl0)
+            True
+            sage: vt.cylinder_is_minimal(cyl1)
+            False
+        """
+        gens = self.generators_matrix()
+        mid_half_edges, rbdry, lbdry, pocket = cyl
+
+        rbdry = gens.matrix_from_columns([i // 2 for i in rbdry])
+        lbdry = gens.matrix_from_columns([i // 2 for i in lbdry])
+        return is_rank_one(rbdry) and is_rank_one(lbdry)
+
+    def cylinder_circumference(self, cyl, x, check=True):
+        r"""
+        Return the circumference of the cylinder ``x`` in coordinates ``x``.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation, RED
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "RRBBRRRRB")
+            sage: cyl0, cyl1 = vt.cylinders(RED)
+            sage: gens = vt.generators_matrix()
+            sage: x = (5, 9, 4, 4, 1, 5, 5, 6, 1)
+            sage: vt.cylinder_circumference(cyl0, x)
+            4
+            sage: vt.cylinder_circumference(cyl1, x)
+            5
+
+            sage: x = (12, 9, 4, 4, 1, 5, 5, 6, 1)
+            sage: print(vt.cylinder_circumference(cyl0, x))
+            Traceback (most recent call last):
+            ...
+            AssertionError: does not satisfy train-track constraints
+        """
+        if check:
+            if len(x) != self._ne:
+                raise ValueError("x must be a list or a vector of length the number of edges")
+            self._set_switch_conditions(self._constraint_check, x, VERTICAL)
+
+        middle, rbdry, lbdry, pocket = cyl
+        if pocket:
+            raise "NotImplementedError"
+        circ = 0
+        for h in middle:
+            e = h // 2
+            if self.is_forward_flippable(e):
+                circ += x[e]
+            elif self.is_backward_flippable(e):
+                circ -= x[e]
+        return circ
+
+    def cylinder_area(self, cyl, x, y, check=True):
+        r"""
+        Return the area of the cylinder ``cyl`` for the coordinates ``x`` and ``y``.
+
+        Warning: this does not return the area of the flat cylinder but rather
+        the sum of areas of the triangles in the combinatorial cylinder. The
+        former might be smaller. They coincide when the cylinder is minimal
+        (see :meth:`cylinder_is_minimal`).
+
+        The area is a quadratic form and ``x`` and ``y`` are not required to be
+        non-negative. Simply to satisfy the triangle inequalities (and possibly
+        additional linear constraints).
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation, RED
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "RRBBRRRRB")
+            sage: cyl0, cyl1 = vt.cylinders(RED)
+            sage: gens = vt.generators_matrix()
+            sage: x = (5, 9, 4, 4, 1, 5, 5, 6, 1)
+            sage: y = (5, 1, 4, 4, 9, 5, 5, 4, 1)
+            sage: vt.cylinder_area(cyl0, x, y)
+            40
+            sage: vt.cylinder_area(cyl1, x, y)
+            50
+
+            sage: x = (12, 9, 4, 4, 1, 5, 5, 6, 1)
+            sage: y = (5, 1, 4, 4, 9, 5, 5, 4, 1)
+            sage: print(vt.cylinder_area(cyl0, x, y))
+            Traceback (most recent call last):
+            ...
+            AssertionError: does not satisfy train-track constraints
+        """
+        if check:
+            if len(x) != self._ne or len(y) != self._ne:
+                raise ValueError("x and y must be lists or vectors of length the number of edges")
+            self._set_switch_conditions(self._constraint_check, x, VERTICAL)
+            self._set_switch_conditions(self._constraint_check, y, HORIZONTAL)
+
+        middle, rbdry, lbdry, pocket = cyl
+        area = 0
+        for a in middle:
+            b = self._fp[a]
+            c = self._fp[b]
+            if self.half_edge_colour(a) == BLUE and self.half_edge_colour(b) == RED:
+                a, b, c = c, a, b
+            elif self.half_edge_colour(c) == BLUE and self.half_edge_colour(a) == RED:
+                a, b, c = b, c, a
+            assert self.half_edge_colour(b) == BLUE and self.half_edge_colour(c) == RED
+            xl = x[b // 2]
+            yl = y[b // 2]
+            xr = x[c // 2]
+            yr = y[c // 2]
+            area += xr * yl + xl * yr
+        return area /2
 
     def dehn_twists(self, col):
         r"""
@@ -4739,31 +4864,26 @@ class VeeringTriangulation(Triangulation):
         r"""
         Return the L-parallel cylinders.
 
+        The output is a list of lists ``[l0, l1, ...]`` where each ``li``
+        represents a L-parallel family of cylinders, together with circumference.
+
         EXAMPLES::
 
             sage: from veerer.linear_family import VeeringTriangulationLinearFamilies
             sage: X9 = VeeringTriangulationLinearFamilies.prototype_H1_1(0, 2, 1, -1)
             sage: X9.parallel_cylinders()
-            [([(0, 0, 0, 1, 1, 0, 0, 1, 1), (0, 0, 0, 0, 0, 1, 1, 0, 0)], [1, 1])]
+            [([([14, 9, 7, 16], [4], [2, 0], True), ([10, 12], [], [1], True)], [1, 1])]
         """
         cylinders = list(self.cylinders(col))
         if not cylinders:
             []
 
-        B = []  # boundary edges
         C = []  # middle edges
         for cyl in cylinders:
-            b = [0] * self.num_edges()  # indicatrix of bottom edges
-            t = [0] * self.num_edges()  # indicatrix of top edges
             c = [0] * self.num_edges()  # indicatrix of the middle edges
             for e in cyl[0]:
                 c[e // 2] = 1
-            for e in cyl[1]:
-                b[e // 2] = 1
-            for e in cyl[2]:
-                t[e // 2] = 1
             C.append(c)
-            B.append((b, t))
 
         # take intersection of the cylinder twists in the tangent space
         F = FreeModule(self.base_ring(), self.num_edges())
@@ -4787,7 +4907,7 @@ class VeeringTriangulation(Triangulation):
             pos = u.nonzero_positions()
             assert not any(i in seen for i in pos)
             seen.update(pos)
-            parallel_cylinders = [C[i] for i in pos]
+            parallel_cylinders = [cylinders[i] for i in pos]
             parallel_families.append((parallel_cylinders, [u[i] for i in pos]))
 
         return parallel_families
@@ -5206,12 +5326,10 @@ class VeeringTriangulation(Triangulation):
 
     def horizontal_degeneration_up_edges_subsets(self):
         for col in [RED, BLUE]:
-            for cyl_family in self.parallel_cylinders(col):
+            for cyl_family, circumference_ratio in self.parallel_cylinders(col):
                 edges = set()
-                for cyl in cyl_family[0]:
-                    for i, j in enumerate(cyl):
-                        if j:
-                            edges.add(i)
+                for c, rbdry, lbdry, half in cyl_family:
+                    edges.update(i // 2 for i in c)
                 yield tuple(sorted(edges))
 
     def codimension_one_horizontal_degenerations(self, mutable=False, mapping=False, check=True):

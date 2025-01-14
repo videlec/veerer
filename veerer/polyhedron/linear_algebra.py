@@ -157,3 +157,44 @@ def prime_decomposition(mat, partition=None):
         gens.append(mat.matrix_from_rows_and_columns(rows, atom))
 
     return list(zip(partition, gens))
+
+
+def is_rank_one(m, ratios=False):
+    r"""
+    Return whether the given matrix ``m`` has rank one.
+
+    If ``ratios`` is set to ``True`` then return a pair ``(ans,
+    row_or_col_ratios)``
+
+    EXAMPLES::
+
+        sage: from veerer.polyhedron.linear_algebra import is_rank_one
+        sage: assert is_rank_one(matrix(2, 2, [1, 1, 1, 1]))
+        sage: assert is_rank_one(matrix(2, 3, [1, 1, 0, 2, 2, 0]))
+        sage: assert not is_rank_one(matrix(2, 2, [1, 2, 1, 1]))
+        sage: assert not is_rank_one(matrix(2, 2, [1, 1, 1, 2]))
+
+        sage: is_rank_one(matrix(2, 2, [1, 1, 1, 1]), ratios=True)
+        (True, [1, 1])
+        sage: is_rank_one(matrix(2, 3, [1, 1, 0, 2, 2, 0]), ratios=True)
+        (True, [1, 2])
+    """
+    if not m:
+        raise ValueError("zero matrix")
+    coeffs = []
+    i0 = 0
+    while not m[i0]:
+        i0 += 1
+        coeffs.append(0)
+    j0 = 0
+    while not m[i0, j0]:
+        j0 += 1
+    i = i0 + 1
+    coeffs.append(1)
+    for i in range(i0 + 1, m.nrows()):
+        coeff = m[i, j0] / m[i0, j0]
+        for j in range(m.ncols()):
+            if m[i, j] != coeff * m[i0, j]:
+                return (False, None) if ratios else False
+        coeffs.append(coeff)
+    return (True, coeffs) if ratios else True
