@@ -951,6 +951,62 @@ class MultiscaleVeeringTriangulation:
         #build the degeneration
         return MultiscaleVeeringTriangulation(vts,l_horiz,l_pm)
 
+    def codimension_one_horizontal_degenerations(self, level=None, component=None):
+        r"""
+        Iterator through the list of codimension one horizontal degenerations.
+
+        INPUT:
+
+        - ``level`` -- optional integer
+
+        - ``component`` -- optional integer
+        """
+        if level is None:
+            for level in range(self.num_levels()):
+                for component in range(len(self._veering_triangulations[level])):
+                    yield from self.codimension_one_horizontal_degenerations(level, component)
+            return
+        if component is None:
+            for component in range(len(self._veering_triangulations[level])):
+                yield from self.codimension_one_horizontal_degenerations(level, component)
+            return
+
+        for edges in self._veering_triangulations[level][component].horizontal_degeneration_up_edges_subsets():
+            yield self.degeneration(level, component, edges_up=edges)
+
+    def codimension_one_vertical_degenerations(self, level=None, component=None):
+        r"""
+        Iterator through the list of codimension one vertical degenerations.
+
+        INPUT:
+
+        - ``level`` -- optional integer
+
+        - ``component`` -- optional integer
+
+        EXAMPLES::
+
+            sage: from veerer import *
+            sage: from veerer.multiscale_veering_triangulation import *
+
+            sage: vt = VeeringTriangulation("(~0,2,3)(~1,4,5)(~2,6,7)(~3,~5,8)(~4,9,10)(~6,11,12)(~7,13,14)(~8,~12,15)(~9,16,~15)(~11,17,18)(~14,~18,19)(~16,~17,20)(0:1)(1:1)(~10:1)(~13:1)(~19:1)(~20:1)", "BBRRRBBBRBBRRBRBRRBBB")
+            sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[vt], horizontal_nodes=[[[(0, 0), (0, 2)], [(0, 21), (0, 27)], [(0, 39), (0, 41)]]], prong_matching=[])
+            sage: for mvt2 in mvt.codimension_one_vertical_degenerations():
+            ....:     print(mvt2)
+        """
+        if level is None:
+            for level in range(self.num_levels()):
+                for component in range(len(self._veering_triangulations[level])):
+                    yield from self.codimension_one_vertical_degenerations(level, component)
+            return
+        if component is None:
+            for component in range(len(self._veering_triangulations[level])):
+                yield from self.codimension_one_vertical_degenerations(level, component)
+            return
+
+        for edges in self._veering_triangulations[level][component].vertical_degeneration_low_edges_subsets():
+            yield self.degeneration(level, component, edges_low=edges)
+
     def transport_along_path(self, level, component, path):
         r"""
         Return the multi-scale Veering triangulation obtained by deforming the prime veering triangulation at ``(level, component)`` along the path in the Delaunay-Strebel graph.
