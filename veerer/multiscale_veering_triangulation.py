@@ -305,6 +305,7 @@ class MultiscaleVeeringTriangulation:
 
         if check:
             self._check_prong_matching()
+            self._check_horizontal_residue_conditions()
 
     def _check_level(self, level):
         r"""
@@ -341,6 +342,47 @@ class MultiscaleVeeringTriangulation:
             for hhh in f1:
                 if vt1._colouring[hh // 2] != vt2._colouring[hhh // 2]:
                     raise ValueError(f"The boundary edges in two faces of {h1} and {h2} have different colors")
+    
+    def _check_horizontal_residue_conditions(self):
+        N = self.num_levels()
+        horiz_nodes = self._horizontal_nodes
+        for level in range(N):
+            nodes = horiz_nodes[level]
+
+            for node in nodes:
+                p1, p2 = node
+                c = p1[0]
+                assert c == p2[0]
+
+                vt = self._veering_triangulations[level][c]
+                base_ring = vt.base_ring()
+                orig_constraints_matrix = vt.constraints_matrix()
+                n1 = orig_constraints_matrix.nrows()
+                constraints_matrix = matrix(base_ring, n1 + 1, vt.num_edges())
+                constraints_matrix[:n1, :] = orig_constraints_matrix
+
+                #build the ``residue`` matrix for simple poles
+                bdry = vt.boundary_faces()
+                nf = len(bdry)
+                ne = vt._ne
+                r = matrix(ZZ, nf, ne)
+                for i, f in enumerate(bdry):
+                    if vt.face_angle(f[0]) == 0:
+                        for h in f:
+                            r[i, h // 2] = 1 #if f has face angle zero, the colors on the boundary must be the same
+
+                #build reisdue conditions:
+                f1, f2 = self.horizontal_faces(level, node)
+                rr = matrix(ZZ, 1, nf)
+                rr[0, bdry.index(f1)] = 1
+                rr[0, bdry.index(f2)] = -1
+                constraints_matrix[n1:, :] = rr * r
+                gens = constraints_matrix.right_kernel_matrix()
+                from .linear_family import VeeringTriangulationLinearFamily
+                vt_test = VeeringTriangulationLinearFamily(vt, gens)
+
+                if not (vt_test == vt.as_linear_family()):
+                    raise ValueError(f"The horizontal node {node} at level {-level} do not satisfy the residue condition")
 
     def _check_local_prong_matching(self, pm):
         r"""
@@ -511,16 +553,6 @@ class MultiscaleVeeringTriangulation:
         Each node is represented by a triple (level,label0,face0,label1,face1).
 
         EXAMPLES::
-
-            sage: from veerer import VeeringTriangulation
-            sage: from veerer.multiscale_veering_triangulation import *
-            sage: vt10 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:3,3:1)","RBRBB")
-            sage: vt11 = VeeringTriangulation("(~0,1,4)(~1,~2,3)(~5,6,9)(~6,~7,8)(0:5)(~4:1)(~3:1)(2:1)(5:5)(~9:1)(~8:1)(7:1)","BBRBRBBRBR")
-            sage: mvt1 = MultiscaleVeeringTriangulation([vt10,vt11],[[],[[(0,"~4"),(0,"7")],[(0,"~3"),(0,"~8")]]],[[((0,0),"0",0),((-1,0),"0",1)],[((0,0),"2",0),((-1,0),"5",1)]])
-            sage: mvt1.horizontal_nodes_at_level(-1)
-            [(-1, 0, [7], 0, [17]), (-1, 0, [9], 0, [14])]
-            sage: mvt1.horizontal_nodes_at_level(0)
-            []
         """
         i = self._check_level(i)
 
@@ -668,19 +700,19 @@ class MultiscaleVeeringTriangulation:
 
         EXAMPLES::
 
-            sage: from veerer import VeeringTriangulation
+            sage: from veerer import *
             sage: from veerer.multiscale_veering_triangulation import *
 
         A horizontal node between the same components::
 
-            sage: vt = VeeringTriangulation("(0,1,4)(~4,2,3)(~0:1)(~1:1)(~2:1)(~3:1)","RBBRR")
+            sage: vt = VeeringTriangulationLinearFamily("(0,1,4)(2,3,~4)(~0:1)(~1:1)(~2:1)(~3:1)", "RBBRR", [(1, 0, 0, 1, 1), (0, 1, 1, -2, -1)])
             sage: mvt = MultiscaleVeeringTriangulation([vt],[[[(0,"~1"),(0,"~2")]]],[])
             sage: mvt.is_abelian()
             False
 
         Mix of horizontal and vertical nodes::
             sage: vt0 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:3,3:1)","RBRBB")
-            sage: vt1 = VeeringTriangulation("(~0,1,4)(~1,~2,3)(~5,6,9)(~6,~7,8)(0:5)(~4:1)(~3:1)(2:1)(5:5)(~9:1)(~8:1)(7:1)","BBRBRBBRBR")
+            sage: vt1 = VeeringTriangulationLinearFamily("(~0,1,4)(~1,~2,3)(~5,6,9)(~6,~7,8)(0:5)(2:1)(~3:1)(~4:1)(5:5)(7:1)(~8:1)(~9:1)", "BBRBRBBRBR", [(1, 0, 0, 0, 1, 0, 0, 1, 1, 0), (0, 1, 0, 1, -1, 0, 0, -1, -1, 0), (0, 0, 1, 1, 0, 0, 0, 0, 0, 0), (0, 0, 0, 0, 0, 1, 0, 0, 0, 1), (0, 0, 0, 0, 0, 0, 1, 0, 1, -1)])
             sage: vt0.is_abelian()
             True
             sage: vt1.is_abelian()
@@ -688,7 +720,8 @@ class MultiscaleVeeringTriangulation:
             sage: mvt0 = MultiscaleVeeringTriangulation([vt0,vt1],[[],[[(0,"~4"),(0,"7")]]],[[((0,0),"0",0),((-1,0),"0",1)],[((0,0),"2",0),((-1,0),"5",1)]])
             sage: mvt0.is_abelian()
             False
-            sage: mvt1 = MultiscaleVeeringTriangulation([vt0,vt1],[[],[[(0,"~3"),(0,"~8")]]],[[((0,0),"0",0),((-1,0),"0",1)],[((0,0),"2",0),((-1,0),"5",1)]])
+            sage: vt2 = VeeringTriangulationLinearFamily("(~0,1,4)(~1,~2,3)(~5,6,9)(~6,~7,8)(0:5)(2:1)(~3:1)(~4:1)(5:5)(7:1)(~8:1)(~9:1)", "BBRBRBBRBR", [(1, 0, 0, 0, 1, 0, 0, 0, 0, 0), (0, 1, 0, 1, -1, 0, 0, 1, 1, 0), (0, 0, 1, 1, 0, 0, 0, 1, 1, 0), (0, 0, 0, 0, 0, 1, 0, 0, 0, 1), (0, 0, 0, 0, 0, 0, 1, -1, 0, -1)])
+            sage: mvt1 = MultiscaleVeeringTriangulation([vt0,vt2],[[],[[(0,"~3"),(0,"~8")]]],[[((0,0),"0",0),((-1,0),"0",1)],[((0,0),"2",0),((-1,0),"5",1)]])
             sage: print(mvt1.is_abelian(certificate=True))
             (True, [[[True, False, True, False, False, True, False, True, False, True]], [[False, True, False, True, False, True, False, True, False, True, True, False, True, False, True, False, True, False, True, False]]])
         """
@@ -916,6 +949,7 @@ class MultiscaleVeeringTriangulation:
             else:
                 h1 = r_low[h1]
                 h2 = r_low[h2]
+                assert h1 >= 0
                 assert h2 >= 0
                 if f_up is None:
                     l1.append([(c1, h1),(c2, h2)])
@@ -948,6 +982,8 @@ class MultiscaleVeeringTriangulation:
             l_horiz[abs(level)] = l1
         else:
             l_horiz.insert(abs(level) + 1, [])
+            l_horiz[abs(level)] = l1
+            l_horiz[abs(level) + 1] = l2
 
         #build the vertical nodes
         l_pm = []
@@ -955,21 +991,21 @@ class MultiscaleVeeringTriangulation:
         original_pm = copy.deepcopy(self._prong_matching)
         for pm in original_pm:
             prong1, prong2 = pm
-            if prong1[0] == (level, component):
+            if prong1[0] == (-abs(level), component):
                 prong1 = track_prong(vt, r_up, r_low, prong1)
                 if f_up is None:
                     l_pm.append([prong1,prong2])
                 else:
                     prong2 = ((prong2[0][0] - 1,prong2[0][1]), prong2[1], prong2[2])
                     l_pm.append([prong1,prong2])
-            elif prong2[0] == (level, component):
+            elif prong2[0] == (-abs(level), component):
                 prong2 = track_prong(vt, r_up, r_low, prong2)
                 l_pm.append([prong1,prong2])
             else:
                 l_pm.append(pm)
         #new vertical nodes
         if f_up is not None:
-            l_pm  = l_pm + _new_prong_matching(vt, f_low, r_up, r_low,level,component)
+            l_pm  = l_pm + _new_prong_matching(vt, f_low, r_up, r_low, -abs(level), component)
 
         #build the degeneration
         return MultiscaleVeeringTriangulation(vts,l_horiz,l_pm)
