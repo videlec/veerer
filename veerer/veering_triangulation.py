@@ -1062,7 +1062,7 @@ class VeeringTriangulation(Triangulation):
         assert a % 2 == 0, a
         return a // 2
 
-    def face_angle(self, h):
+    def face_angle(self, h, check=True):
         r"""
         Return the angle associated to the pole in the middle of the face the half-edge ``h`` is adjacent to.
 
@@ -1074,11 +1074,12 @@ class VeeringTriangulation(Triangulation):
             sage: vt.face_angle(3)
             -2
         """
-        h = self._check_half_edge(h)
-        fp = self.face_permutation(copy=False)
+        if check:
+            h = self._check_half_edge(h)
+            if not self._bdry[h]:
+                raise ValueError('h={} not on a boundary face'.format(self._half_edge_string(h)))
 
-        if not self._bdry[h]:
-            raise ValueError('h={} not on a boundary face'.format(self._half_edge_string(h)))
+        fp = self.face_permutation(copy=False)
 
         cum_angle = 0
         alternations = 0
@@ -5687,18 +5688,24 @@ class VeeringTriangulation(Triangulation):
             sage: sg = vt.strebel_graph()
             sage: sg.boundary_faces()
             [[0, 1, 2], [3, 4, 5]]
-            sage: vt.strebel_graph(mapping=True)
-            (StrebelGraph("(0,~0:1,1)(~1,2,~2:1)"),
-            array('i', [-1, -1, 0, 1, 2, 3, 4, 5, -1, -1]),
-            array('i', [9, 3, 9, 0, 0, 7]))
+            sage: sg, r1, r2 = vt.strebel_graph(mapping=True)
+            sage: sg
+            StrebelGraph("(0,~0:1,1)(~1,2,~2:1)")
+            sage: r1
+            array('i', [-1, -1, 0, 1, 2, 3, 4, 5, -1, -1])
+            sage: r2
+            array('i', [9, 3, 9, 0, 0, 7])
+            sage: assert all(vt.face_angle(r2[h]) == sg.face_angle(h) for h in sg.half_edges())
 
         TESTS:
 
         An example with folded edges that used not to work::
 
             sage: vt = VeeringTriangulation("(0:1)(1:1,2:1,3:1,4:1)(~2:1,~4:1,5:1)(~3:1,~5:1)", "BBBBBB")
-            sage: vt.strebel_graph()
+            sage: sg, r1, r2 = vt.strebel_graph(mapping=True)
+            sage: sg
             StrebelGraph("(0)(1,2,3,4)(~2,~4,5)(~3,~5)")
+            sage: assert all(vt.face_angle(r2[h]) == sg.face_angle(h) for h in sg.half_edges())
         """
         if not self.is_strebel(slope=slope):
             raise ValueError('triangulation is not Strebel')

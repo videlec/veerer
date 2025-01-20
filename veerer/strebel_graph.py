@@ -231,6 +231,9 @@ class StrebelGraph(Constellation):
         if angle < 0 or angle > self._excess[half_edge]:
             raise ValueError("angle (={}) out of range for separatrix; must be >= 0 and <= {}".format(angle, self._excess[half_edge]))
 
+    def boundary_half_edges(self):
+        return self.half_edges()
+
     def _set_data_pointers(self):
         self._excess = self._half_edges_data[0]
 
@@ -939,7 +942,7 @@ class StrebelGraph(Constellation):
             a = a + self._excess[h] + 1
         return a
 
-    def face_angle(self, half_edge):
+    def face_angle(self, half_edge, check=True):
         r"""
         Return the angle of the face adjacent to ``half_edge``.
 
@@ -952,6 +955,9 @@ class StrebelGraph(Constellation):
             sage: G.face_angle(1)
             -3
         """
+        if check:
+            h = self._check_half_edge(half_edge)
+
         a = 0
         for h in perm_orbit(self._fp, half_edge):
             a = a - self._excess[h]

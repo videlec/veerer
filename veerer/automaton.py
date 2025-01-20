@@ -1485,6 +1485,19 @@ class DelaunayStrebelAutomaton(Automaton):
         0
         sage: A
         Delaunay-Strebel automaton with 45 states
+
+    TESTS::
+
+
+        sage: from veerer.automaton import DelaunayStrebelAutomaton
+        sage: from veerer import *
+        sage: vt = VeeringTriangulationLinearFamily("(~0,1,2)(~1,3,4)(~2,5,6)(~3,~4,~6)(0:1)(~5:1)", "RBRBRRB", [(1, 0, 1, 0, 0, 1, 0), (0, 1, -1, 0, 1, 0, 1), (0, 0, 0, 1, -1, 0, 0)])
+        sage: DS = DelaunayStrebelAutomaton(backward=True)
+        sage: DS.add_seed(vt)
+        1
+        sage: DS.run()
+        0
+        sage: DS._check()
     """
     _name = 'Delaunay-Strebel'
 
@@ -1520,9 +1533,12 @@ class DelaunayStrebelAutomaton(Automaton):
                 assert state == target, (source, state, target)
             elif kind == "strebel":
                 assert len(label) == 3
-                r1 = label[1]  # strebel edges
-                r2 = label[2]  # non-strebel edges
-                sg = source.strebel_graph()
+                r1 = label[1]  # strebel edges (-1 at positions which are not strebel)
+                r2 = label[2]  # strebel to veering boundary
+                for h in target.half_edges():
+                    a1 = target.face_angle(h)
+                    a2 = source.face_angle(r2[h])
+                    assert a1 == a2, (source, target, h, r2[h], a1, a2)
 
     def _setup(self, backend=None):
         self._backend = backend
@@ -1561,10 +1577,13 @@ class DelaunayStrebelAutomaton(Automaton):
                     print('[_out_neighbors] strebelization')
                 if CHECK:
                     assert state.is_strebel(VERTICAL)
+                # r1: index_strebel
+                # r2: strebel_to_veering_boundary
                 out_neighbor, r1, r2 = state.strebel_graph(VERTICAL, mapping=True, mutable=True)
+                # r3: relabelling of the Strebel graph
                 r3 = out_neighbor.set_canonical_labels(mapping=True)
                 out_neighbor.set_immutable()
-                yield (out_neighbor, ('strebel', perm_compose(r1, r3), perm_compose(r2, r3)))
+                yield (out_neighbor, ('strebel', perm_compose(r1, r3), perm_compose(perm_invert(r3), r2)))
 
                 # rotation
                 if self._verbosity >= 2:

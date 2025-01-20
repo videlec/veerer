@@ -189,7 +189,7 @@ class SeparatrixMonodromy:
         return half_edge
 
     @staticmethod
-    def _infinite_cylinder_strebel_back(state, mapping, mapping_back, half_edge):
+    def _infinite_cylinder_strebel_back(mapping_back, half_edge):
         return mapping_back[half_edge]
 
     def vertex_separatrix_transport(self, path, half_edge, angle):
@@ -295,21 +295,40 @@ class SeparatrixMonodromy:
         return self._graph.vertex_label(path.end())._normalization_face_separatrix(half_edge, angle)
 
     def infinite_cylinder_transport(self, path, half_edge):
+        r"""
+        TESTS::
+
+            sage: from veerer import VeeringTriangulationLinearFamily
+            sage: from veerer.monodromy import SeparatrixMonodromy
+            sage: vt = VeeringTriangulationLinearFamily("(0:1,1:1,2:1)(~0:1,~1:1,~2:1)", "RRR", [(1, 0, 0), (0, 1, 0), (0, 0, 1)])
+            sage: ds_graph = vt.delaunay_strebel_graph()
+            sage: mono = SeparatrixMonodromy(ds_graph)
+            sage: for i in range(ds_graph.num_edges()):
+            ....:     p1 = ds_graph.path(ds_graph.edge_source(i), [i])
+            ....:     p2 = ds_graph.path(ds_graph.edge_target(i), [-i-1])
+            ....:     for path in [p1, p2]:
+            ....:         source = ds_graph.vertex_label(path.start())
+            ....:         target = ds_graph.vertex_label(path.end())
+            ....:         for h1 in source.boundary_half_edges():
+            ....:             h2 = mono.infinite_cylinder_transport(path, h1)
+            ....:             assert target.face_angle(h2) == 0
+        """
         if path._graph is not self._graph:
             raise ValueError("invalid path for infinite cylinder monodromy")
 
+        for i in path:
             source = self._graph.vertex_label(self._graph.edge_source(i))
             target = self._graph.vertex_label(self._graph.edge_target(i))
             transition = self._graph.edge_label(i)
 
             reverse = i < 0
 
-            # too expensive!!
+            # TODO: remove as too expensive!!
             assert source.face_angle(half_edge) == 0
 
             kind = transition[0]
             if kind == "flip" or kind == "rotate":
-                relabelling = transition[4]
+                relabelling = transition[4 if kind == "flip" else 1]
                 if reverse:
                     half_edge = perm_preimage(relabelling, half_edge)
                 else:
@@ -319,12 +338,11 @@ class SeparatrixMonodromy:
                 mapping = transition[1]
                 mapping_back = transition[2]
                 if reverse:
-                    half_edge = self._infinite_cylinder_strebel_back(state, mapping, half_edge, angle)
+                    half_edge = self._infinite_cylinder_strebel_back(mapping_back, half_edge)
                 else:
                     half_edge = self._infinite_cylinder_strebel(mapping_back, half_edge)
 
-
-            # too expensive!!
+            # TODO: remove as too expensive!!
             assert target.face_angle(half_edge) == 0
 
         return min(perm_orbit(self._graph.vertex_label(path.end())._fp, half_edge))
@@ -353,9 +371,9 @@ def monodromy(ds_graph):
         sage: ds_graph = vt.delaunay_strebel_graph()
         sage: G = monodromy(ds_graph)
         sage: G.cardinality()
-        8
+        16
         sage: G.structure_description()
-        'C4 x C2'
+        'C4 x C2 x C2'
 
     The case of H(3^2, -3^2)::
 
