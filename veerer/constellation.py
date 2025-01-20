@@ -1359,6 +1359,12 @@ class Constellation:
             sage: sg = StrebelGraph("(0,~0,~1)(1,2,~2)")
             sage: sg.automorphism_quotient()
             StrebelGraph("(0,~0,1)")
+
+        TESTS::
+
+            sage: vt = VeeringTriangulation("(~0,1,2)(~1,3,4)(~2,5,6)(~3,7,8)(~4,~7,9)(~6,10,11)(~8,12,13)(~9,14,15)(~10,16,17)(~11,18,~17)(~12,19,~18)(~14,20,~16)(0:1)(~5:1)(~13:1)(~15:1)(~19:1)(~20:1)", "RBBBRRBRBBRRBRBRBBBRR")
+            sage: vt.automorphism_quotient()
+            VeeringTriangulation("(~0,1,2)(~1,3,4)(~2,5,6)(~3,7,8)(~4,~7,~6)(~8,9,10)(0:1)(~5:1)(~10:1)", "RBBBRRBRBBR")
         """
         return self.quotient(perms_orbits(self.automorphisms()), mapping, mutable, check)
 
@@ -1374,6 +1380,7 @@ class Constellation:
                 for l in self._half_edges_data:
                     if len(set(l[h] for h in block)) != 1:
                         raise ValueError("block must be constant on half-edges data")
+                for l in self._edges_data:
                     if len(set(l[h // 2] for h in block)) != 1:
                         raise ValueError("block must be constant on edges data")
 
