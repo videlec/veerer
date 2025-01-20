@@ -126,10 +126,11 @@ def tree_with_target(self, root=0, target_vertices=[]):
     seen[root] = True
     todo = [root]
 
+    path_dic = {}
     paths = [None] * len(target_vertices)
     while todo:
         v = todo.pop()
-        if v in target_vertices and paths[target_vertices.index(v)] is None:
+        if v in target_vertices and v not in path_dic:
             path = []
             current = v
             while current != root:
@@ -138,7 +139,7 @@ def tree_with_target(self, root=0, target_vertices=[]):
                 current = self.edge_target(edge)
             path = [-(e + 1) for e in path]
             path.reverse()
-            paths[target_vertices.index(v)] = LabelledDiGraphPath(self, 0, path)
+            path_dic[v] = LabelledDiGraphPath(self, 0, path)
 
         for i in self.incoming_edges(v):
             u = self.edge_source(i)
@@ -146,6 +147,9 @@ def tree_with_target(self, root=0, target_vertices=[]):
                 tree[u] = i
                 seen[u] = True
                 todo.append(u)
+        
+        for i, target in enumerate(target_vertices):
+            paths[i] = path_dic.get(target)
     return paths
 
 class MultiscaleVeeringTriangulation:
@@ -1523,7 +1527,7 @@ class MultiscaleVeeringTriangulation:
                         new_connected_comp = new_connected_comp + mvt1.transport_by_permutation_in_levels()
                     l_deg_connected_comps.append(new_connected_comp)
                     all_mvt = all_mvt + new_connected_comp
-                    lindex.append([list_comp_up, list_comp_low])
+                    lindex.append([list(list_comp_up), list(list_comp_low)])
 
             llmvt = llmvt + l_deg_connected_comps
 
@@ -1620,7 +1624,7 @@ class MultiscaleVeeringTriangulation:
                         new_connected_comp = new_connected_comp + mvt1.transport_by_permutation_in_levels()
                     l_deg_connected_comps.append(new_connected_comp)
                     all_mvt = all_mvt + new_connected_comp
-                    lindex.append([list_comp])
+                    lindex.append([list(list_comp)])
 
             llmvt = llmvt + l_deg_connected_comps
 
