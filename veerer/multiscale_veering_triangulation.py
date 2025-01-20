@@ -1535,23 +1535,21 @@ class MultiscaleVeeringTriangulation:
     
     def codimension_one_horizontal_prime_degenerations(self, level, component, ind_ds_graph, D, index=False):
         r"""
-        Return a list of lists of lists of multi-scale veering triangulations obtained 
+        Return a list of lists of multi-scale veering triangulations obtained 
         by codimension-one horizontal degenerations of the component.
 
-        The returned list is organized as `l = [[l00, l01, ...], [l10, l11, ...], ...]`, where:
-        - Each sublist `[li0, li1, ...]` contains multi-scale veering triangulations with the same enhanced level graph.
-        The corresponding components of these triangulations belong to the same cell of veering triangulations.
-        These sublists align with the `i`-th object in `D.codimension_one_horizontal_degenerations(ds_graph)`.
-
-        - Each `lij` within the sublists consists of multi-scale veering triangulations that are in the same 
-        connected component of the linear subvariety.
+        The returned list is organized as `l = [l0, l1, ...]`, where each Each sublist li satisfies that:
+        - li contains multi-scale veering triangulations with the same enhanced level graph.
+        - The corresponding components of the triangulations in li belong to the same cell of veering triangulations.
+        - The triangulations in li are in the same connected component of the linear subvariety.
 
         Input:
-        - `ds_graph`: The Delaunay-Strebel graph of the prime component (which is the `component`-th component at the `level`).
+        - `ds_graph`: The index of the Delaunay-Strebel graph of the prime component (which is the `component`-th component at the `level`).
         - `D`: An instance of the `PrimeDegeneration` class, responsible for computing the codimension-one horizontal degenerations 
         of the `component` in `ds_graph`.
 
         EXAMPLES::
+
             sage: from veerer import *
             sage: from veerer.linear_subvariety import *
             sage: from veerer.labelled_digraph import *
@@ -1629,9 +1627,50 @@ class MultiscaleVeeringTriangulation:
 
         return llmvt if not index else (llmvt, lindex)
     
-    
+
 def multiscale_compactification_representatives(L, D, index=False):
+    r"""
+    Return all connected components of the boundary in the multiscale compoactification of L as a dictionary.
     
+    The value of the key `(i,j)` is a list [l0, l1, ....], where:
+    - li is a list of multi-scale veering triangulations in the same connected components.
+    - A triangulation in a list has `i` levels and `j` horizontal nodes.
+
+    INPUT:
+    - L: a prime linear family
+    - D: An instance of the `PrimeDegeneration` class, responsible for computing all the degenerations of L 
+    
+    EXAMPLES::
+
+        sage: from veerer import *
+        sage: from veerer.linear_subvariety import *
+        sage: from veerer.labelled_digraph import *
+        sage: from veerer.monodromy import *
+        sage: from veerer.multiscale_veering_triangulation import *
+
+        sage: vt = VeeringTriangulation("(0,6,~5)(~0,~4,5)(1,8,~7)(~1,~8,3)(2,7,~6)(~2,~3,4)", "RRRBBBBBB")
+    
+    We compare two computations in the followings. We first compute by using the class MultiscaleCompactification::
+        sage: L = vt.linear_subvariety()
+        sage: M = L.multiscale_compactification()
+        sage: M
+        MultiscaleCompactification of Irreducible real linear subvariety of projective dimension 3 in [[H_2(2)]] made of
+        3 components in codimension 1
+        5 components in codimension 2
+        3 components in codimension 3
+
+    Then we compute by the method multiscale_compactification_representatives::
+        sage: ds_graph = vt.delaunay_strebel_graph()
+        sage: D = PrimeDegenerations()
+        sage: D.add(ds_graph)
+        0
+        sage: D.compute_all()
+        sage: dic= multiscale_compactification_representatives(vt, D)
+        sage: print(f"{len(dic[1,0]) + len(dic[0,1])} components in codimension 1\n{len(dic[2,0]) + len(dic[1,1]) + len(dic[0,2])} components in codimension 2\n{len(dic[1,2]) + len(dic[2,1])} components in codimension 3")
+        3 components in codimension 1
+        13 components in codimension 2
+        14 components in codimension 3
+    """
     assert L.is_prime()
     #mvt = mvt.prime_decomposition(0,0)
     
@@ -1681,9 +1720,6 @@ def multiscale_compactification_representatives(L, D, index=False):
                         for comp in range(len(mvt._veering_triangulations[level])):
                             ind = ind_comp[abs(level)][comp] #the index of the comp
                             if len(D._horizontal_degenerations[ind]) >0:
-                                
-                                print(mvt, level, comp, ind)
-                                
                                 l_mvts, inds = mvt.codimension_one_horizontal_prime_degenerations(-abs(level), comp, ind, D, index=True)
                                 for j, mvts in enumerate(l_mvts): 
                                     if mvts[0] not in all_mvt: 
