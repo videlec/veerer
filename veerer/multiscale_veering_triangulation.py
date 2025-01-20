@@ -1351,107 +1351,6 @@ class MultiscaleVeeringTriangulation:
             lmvts.add(mvtnew)
         return list(lmvts)
 
-    def codimension_one_vertical_degenerations_prime(self, level, component, ds_graph, D):
-        r"""
-        Return a list of lists of multi-scale veering triangulations.
-
-        The i-th list corresponds to the i-th pair in the list ``D.codimension_one_vertical_degeneration(ds_graph)``.
-
-        Input:
-        - ``ds_graph`` is the Delaunay-strebel graph of the prime component which is the ``component``-th component at level ``level``.
-        - ``D`` is the codimension one vertical decomposition of the Delaunay-Strebel graph of the prime component.
-
-        EXAMPLES::
-
-
-            sage: from veerer import *
-            sage: from veerer.linear_subvariety import *
-            sage: from veerer.labelled_digraph import *
-            sage: from veerer.monodromy import *
-            sage: from veerer.multiscale_veering_triangulation import *
-
-            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,9)(~8,10,11)(~9,~10,~11)", "RRBBRRRRBBRR")
-            sage: mvt = MultiscaleVeeringTriangulation([vt], [[]], [])
-            sage: D = PrimeDegenerations()
-            sage: ds_graph = vt.delaunay_strebel_graph()
-            sage: l1 = D.codimension_one_vertical_degenerations(ds_graph)
-            sage: lmvt1 = mvt.codimension_one_vertical_degenerations_prime(0, 0, ds_graph, D)
-            sage: mvt1 = lmvt1[0][0][0]
-            sage: vt0 = mvt1._veering_triangulations[0][0]
-            sage: ds_graph0 = vt0.delaunay_strebel_graph()
-            sage: l2 = D.codimension_one_vertical_degenerations(ds_graph0)
-            sage: lmvt2 = mvt1.codimension_one_vertical_degenerations_prime(0, 0, ds_graph0, D)
-            sage: mvt2 = lmvt2[0][0][0]
-            sage: mvt2._veering_triangulations
-            [[VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)])],
-            [VeeringTriangulationLinearFamily("(0:1,1:1,~0:1,~1:1)", "RB", [(1, 0), (0, 1)])],
-            [VeeringTriangulationLinearFamily("(0:4,~0:4)", "R", [(1)])]]
-            sage: l2[0]
-            ((Delaunay-Strebel graph of VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)]) made of
-                2 veering Delaunay states
-                0 Strebel states
-                4 flip transitions
-                0 rotation transitions
-                0 Strebel transitions,),
-            (Delaunay-Strebel graph of VeeringTriangulationLinearFamily("(0:1,1:1,~0:1,~1:1)", "RB", [(1, 0), (0, 1)]) made of
-                9 veering Delaunay states
-                1 Strebel states
-                8 flip transitions
-                5 rotation transitions
-                5 Strebel transitions,))
-        """
-
-        vt = self._veering_triangulations[abs(level)][component]
-        assert vt.is_prime()
-        assert vt == ds_graph.root() #it is required to be the root of the Delaunay Strebel graph
-
-        ind = D.find(ds_graph)
-        l = D._vertical_degenerations[ind]
-
-        list_comps_after_degen = list(l.keys())
-
-        llmvt = []
-        for list_comp_up, list_comp_low in list_comps_after_degen:
-            l_vt_edge = l[(list_comp_up, list_comp_low)]#the list of (vt, edges_up, edges_low) such that vt degenerates to prime components in list_com_yp and list_comp_low respectively.
-            l_ds_g_up = [D._components[index] for index in list_comp_up]
-            l_ds_g_low = [D._components[index] for index in list_comp_low]
-            lc0 = [(-abs(level), component + index) for index in range(len(list_comp_up))]
-            lc1 = [(-abs(level) - 1, index) for index in range(len(list_comp_low))]
-            lc = lc0 + lc1
-            ld = l_ds_g_up + l_ds_g_low
-            #mono_up = [monodromy(g) for g in l_ds_g_up]
-            #mono_down = [monodromy(g) for g in l_ds_g_down]
-
-            #construct paths
-            target_vertices = [ds_graph.vertex_index(a[0]) for a in l_vt_edge]
-            paths = tree_with_target(ds_graph, root=0, target_vertices=target_vertices)
-            assert len(paths) == len(l_vt_edge)
-
-            #transport mvt
-            lmvt = [self.transport_along_path(-abs(level), component, path) for path in paths]
-            assert len(lmvt) == len(l_vt_edge)
-
-            #make vertical degeneration and compute all transitions under monodromy groups
-            l_deg_connected_comps = []
-            all_mvt = []
-            for i, mvt in enumerate(lmvt):
-                _, edges_up, edges_low = l_vt_edge[i]
-                lmvt[i] = mvt.degeneration(-abs(level), component, edges_low=edges_low, edges_up=edges_up)
-                lmvt[i] = lmvt[i].prime_decomposition(-abs(level), component)
-                lmvt[i] = lmvt[i].prime_decomposition(-abs(level) - 1, 0)
-
-                new_connected_comp = []
-                if lmvt[i] not in all_mvt:
-                    l_mono = lmvt[i].transport_by_monodromy(lc, ld)
-                    for mvt in l_mono:
-                        new_connected_comp = new_connected_comp + mvt.transport_by_permutation_in_levels()
-                    l_deg_connected_comps.append(new_connected_comp)
-                    all_mvt = all_mvt + new_connected_comp
-
-            llmvt.append(l_deg_connected_comps)
-
-        return llmvt
-
     def transport_by_permutation_in_levels(self):
         r"""
         Return the list of multi-scale veering triangulations by permutes the same components in each level.
@@ -1519,3 +1418,200 @@ class MultiscaleVeeringTriangulation:
             mvts.append(MultiscaleVeeringTriangulation(new_vts, new_horiz_nodes, new_pms))
 
         return mvts
+    
+    def codimension_one_vertical_prime_degenerations(self, level, component, ds_graph, D):
+        r"""
+        Return a list of lists of lists of multi-scale veering triangulations obtained 
+        by codimension-one vertical degenerations of the component.
+
+        The returned list is organized as `l = [[l00, l01, ...], [l10, l11, ...], ...]`, where:
+        - Each sublist `[li0, li1, ...]` contains multi-scale veering triangulations with the same enhanced level graph.
+        The corresponding components of these triangulations belong to the same cell of veering triangulations.
+        These sublists align with the `i`-th object in `D.codimension_one_vertical_degenerations(ds_graph)`.
+
+        - Each `lij` within the sublists consists of multi-scale veering triangulations that are in the same 
+        connected component of the linear subvariety.
+
+        Input:
+        - `ds_graph`: The Delaunay-Strebel graph of the prime component (which is the `component`-th component at the `level`).
+        - `D`: An instance of the `PrimeDegeneration` class, responsible for computing the codimension-one vertical degenerations 
+        of the `component` in `ds_graph`.
+
+        EXAMPLES::
+
+
+            sage: from veerer import *
+            sage: from veerer.linear_subvariety import *
+            sage: from veerer.labelled_digraph import *
+            sage: from veerer.monodromy import *
+            sage: from veerer.multiscale_veering_triangulation import *
+
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,9)(~8,10,11)(~9,~10,~11)", "RRBBRRRRBBRR")
+            sage: mvt = MultiscaleVeeringTriangulation([vt], [[]], [])
+            sage: D = PrimeDegenerations()
+            sage: ds_graph = vt.delaunay_strebel_graph()
+            sage: l1 = D.codimension_one_vertical_degenerations(ds_graph)
+            sage: lmvt1 = mvt.codimension_one_vertical_prime_degenerations(0, 0, ds_graph, D)
+            sage: mvt1 = lmvt1[0][0][0]
+            sage: vt0 = mvt1._veering_triangulations[0][0]
+            sage: ds_graph0 = vt0.delaunay_strebel_graph()
+            sage: l2 = D.codimension_one_vertical_degenerations(ds_graph0)
+            sage: lmvt2 = mvt1.codimension_one_vertical_prime_degenerations(0, 0, ds_graph0, D)
+            sage: mvt2 = lmvt2[0][0][0]
+            sage: mvt2._veering_triangulations
+            [[VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)])],
+            [VeeringTriangulationLinearFamily("(0:1,1:1,~0:1,~1:1)", "RB", [(1, 0), (0, 1)])],
+            [VeeringTriangulationLinearFamily("(0:4,~0:4)", "R", [(1)])]]
+            sage: l2[0]
+            ((Delaunay-Strebel graph of VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)]) made of
+                2 veering Delaunay states
+                0 Strebel states
+                4 flip transitions
+                0 rotation transitions
+                0 Strebel transitions,),
+            (Delaunay-Strebel graph of VeeringTriangulationLinearFamily("(0:1,1:1,~0:1,~1:1)", "RB", [(1, 0), (0, 1)]) made of
+                9 veering Delaunay states
+                1 Strebel states
+                8 flip transitions
+                5 rotation transitions
+                5 Strebel transitions,))
+        """
+
+        vt = self._veering_triangulations[abs(level)][component]
+        assert vt.is_prime()
+        assert vt == ds_graph.root() #it is required to be the root of the Delaunay Strebel graph
+
+        ind = D.find(ds_graph)
+        l = D._vertical_degenerations[ind]
+
+        list_comps_after_degen = list(l.keys())
+
+        llmvt = []
+        for list_comp_up, list_comp_low in list_comps_after_degen:
+            l_vt_edge = l[(list_comp_up, list_comp_low)]#the list of (vt, edges_up, edges_low) such that vt degenerates to prime components in list_com_yp and list_comp_low respectively.
+            l_ds_g_up = [D._components[index] for index in list_comp_up]
+            l_ds_g_low = [D._components[index] for index in list_comp_low]
+            lc0 = [(-abs(level), component + index) for index in range(len(list_comp_up))]
+            lc1 = [(-abs(level) - 1, index) for index in range(len(list_comp_low))]
+            lc = lc0 + lc1
+            ld = l_ds_g_up + l_ds_g_low
+
+
+            #construct paths
+            target_vertices = [ds_graph.vertex_index(a[0]) for a in l_vt_edge]
+            paths = tree_with_target(ds_graph, root=0, target_vertices=target_vertices)
+            assert len(paths) == len(l_vt_edge)
+
+            #transport mvt
+            lmvt = [self.transport_along_path(-abs(level), component, path) for path in paths]
+            assert len(lmvt) == len(l_vt_edge)
+
+            #make vertical degeneration and compute all transitions under monodromy groups and level-wise permutations
+            l_deg_connected_comps = []
+            all_mvt = []
+            for i, mvt in enumerate(lmvt):
+                _, edges_up, edges_low = l_vt_edge[i]
+                mvt = mvt.degeneration(-abs(level), component, edges_low=edges_low, edges_up=edges_up)
+                mvt = mvt.prime_decomposition(-abs(level), component)
+                mvt = mvt.prime_decomposition(-abs(level) - 1, 0)
+
+                if mvt not in all_mvt:
+                    l_mono = mvt.transport_by_monodromy(lc, ld)
+                    new_connected_comp = []
+                    for mvt1 in l_mono:
+                        new_connected_comp = new_connected_comp + mvt1.transport_by_permutation_in_levels()
+                    l_deg_connected_comps.append(new_connected_comp)
+                    all_mvt = all_mvt + new_connected_comp
+
+            llmvt.append(l_deg_connected_comps)
+
+        return llmvt
+    
+    def codimension_one_horizontal_prime_degenerations(self, level, component, ds_graph, D):
+        r"""
+        Return a list of lists of lists of multi-scale veering triangulations obtained 
+        by codimension-one horizontal degenerations of the component.
+
+        The returned list is organized as `l = [[l00, l01, ...], [l10, l11, ...], ...]`, where:
+        - Each sublist `[li0, li1, ...]` contains multi-scale veering triangulations with the same enhanced level graph.
+        The corresponding components of these triangulations belong to the same cell of veering triangulations.
+        These sublists align with the `i`-th object in `D.codimension_one_horizontal_degenerations(ds_graph)`.
+
+        - Each `lij` within the sublists consists of multi-scale veering triangulations that are in the same 
+        connected component of the linear subvariety.
+
+        Input:
+        - `ds_graph`: The Delaunay-Strebel graph of the prime component (which is the `component`-th component at the `level`).
+        - `D`: An instance of the `PrimeDegeneration` class, responsible for computing the codimension-one horizontal degenerations 
+        of the `component` in `ds_graph`.
+
+        EXAMPLES::
+            sage: from veerer import *
+            sage: from veerer.linear_subvariety import *
+            sage: from veerer.labelled_digraph import *
+            sage: from veerer.monodromy import *
+            sage: from veerer.multiscale_veering_triangulation import *
+
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,9)(~8,10,11)(~9,~10,~11)", "RRBBRRRRBBRR")
+            sage: mvt = MultiscaleVeeringTriangulation([vt], [[]], [])
+            sage: D = PrimeDegenerations()
+            sage: ds_graph = vt.delaunay_strebel_graph()
+            sage: l1 = D.codimension_one_vertical_degenerations(ds_graph)
+            sage: mvt1 = mvt.codimension_one_vertical_prime_degenerations(0, 0, ds_graph, D)[0][0][0]
+            sage: vt0 = mvt1._veering_triangulations[0][0]
+            sage: ds_graph0 = vt0.delaunay_strebel_graph()
+            sage: l2 = D.codimension_one_vertical_degenerations(ds_graph0)
+            sage: mvt2 = mvt1.codimension_one_vertical_prime_degenerations(0, 0, ds_graph0, D)[0][0][0]
+            sage: vt1 = mvt2._veering_triangulations[1][0]
+            sage: ds_graph1 = vt1.delaunay_strebel_graph()
+            sage: l3 = D.codimension_one_horizontal_degenerations(ds_graph1)
+            sage: lmvts = mvt2.codimension_one_horizontal_prime_degenerations(-1, 0, ds_graph1, D)[0][0][2]
+        """
+
+        vt = self._veering_triangulations[abs(level)][component]
+        assert vt.is_prime()
+        assert vt == ds_graph.root() #it is required to be the root of the Delaunay Strebel graph
+
+        ind = D.find(ds_graph)
+        l = D._horizontal_degenerations[ind]
+        
+        list_comps_after_degen = list(l.keys())
+        
+        llmvt = []
+        for list_comp in list_comps_after_degen:
+            l_vt_edge = l[list_comp]
+            l_ds_g = [D._components[index] for index in list_comp]
+            
+            lc = [(-abs(level), component + index) for index in range(len(list_comp))]
+            ld = l_ds_g
+
+            #construct paths
+            target_vertices = [ds_graph.vertex_index(a[0]) for a in l_vt_edge]
+            paths = tree_with_target(ds_graph, root=0, target_vertices=target_vertices)
+            assert len(paths) == len(l_vt_edge)
+            #return paths
+
+            #transport mvt
+            lmvt = [self.transport_along_path(-abs(level), component, path) for path in paths]
+            assert len(lmvt) == len(l_vt_edge)
+
+            #make vertical degeneration and compute all transitions under monodromy groups and level-wise permutations
+            l_deg_connected_comps = []
+            all_mvt = []
+            
+            for i, mvt in enumerate(lmvt):
+                _, edges_up, edges_low = l_vt_edge[i]
+                mvt = mvt.degeneration(-abs(level), component, edges_low=edges_low, edges_up=edges_up)
+                mvt = mvt.prime_decomposition(-abs(level), component)
+                
+                if mvt not in all_mvt:
+                    l_mono = mvt.transport_by_monodromy(lc, ld)
+                    new_connected_comp = []
+                    for mvt1 in l_mono:
+                        new_connected_comp = new_connected_comp + mvt1.transport_by_permutation_in_levels()
+                    l_deg_connected_comps.append(new_connected_comp)
+                    all_mvt = all_mvt + new_connected_comp
+
+            llmvt.append(l_deg_connected_comps)
+
+        return llmvt
