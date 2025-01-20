@@ -1105,15 +1105,15 @@ class MultiscaleVeeringTriangulation:
             prong_matching=[[((0, 0), 16, 0), ((-1, 0), 0, 0)]]
             )
         """
-        st_graph = path._graph
-        vt0 = st_graph.vertex_label(path.start())
-        vt1 = st_graph.vertex_label(path.end())
+        ds_graph = path._graph
+        vt0 = ds_graph.vertex_label(path.start())
+        vt1 = ds_graph.vertex_label(path.end())
         assert self._veering_triangulations[abs(level)][component] == vt0
 
         vts = copy.deepcopy(self._veering_triangulations)
         vts[abs(level)][component] = vt1
 
-        mono = SeparatrixMonodromy(st_graph)
+        mono = SeparatrixMonodromy(ds_graph)
 
         #new horizontal nodes
         l1 = []
@@ -1602,7 +1602,6 @@ class MultiscaleVeeringTriangulation:
             target_vertices = [ds_graph.vertex_index(a[0]) for a in l_vt_edge]
             paths = tree_with_target(ds_graph, root=0, target_vertices=target_vertices)
             assert len(paths) == len(l_vt_edge)
-            #return paths
 
             #transport mvt
             lmvt = [self.transport_along_path(-abs(level), component, path) for path in paths]
@@ -1629,3 +1628,72 @@ class MultiscaleVeeringTriangulation:
             llmvt = llmvt + l_deg_connected_comps
 
         return llmvt if not index else (llmvt, lindex)
+    
+    
+def multiscale_compactification_representatives(L, D, index=False):
+    
+    assert L.is_prime()
+    #mvt = mvt.prime_decomposition(0,0)
+    
+    ds_graph = L.delaunay_strebel_graph()
+    L = ds_graph.root() #move to root
+    mvt = MultiscaleVeeringTriangulation([L], [[]], [])
+    
+    l = collections.defaultdict(list)
+    l[0, 0].append([mvt])
+    lindex = collections.defaultdict(list)
+    ind = D.find(ds_graph) #find the initial index
+    lindex[0, 0].append([[ind,]])
+    
+    all_mvt = []
+    d = L.dimension()
+    # vertical degenerations
+    for codim in range(d - 1):
+        for i, connected_comp in enumerate(l[codim, 0]):
+            ind_comp = lindex[codim, 0][i] #the index of the components of the triangulations in connected_comp
+            for mvt in connected_comp:
+                #only degenerate the top level
+                for comp in range(len(mvt._veering_triangulations[0])):
+                    ind = ind_comp[0][comp] #the index of the comp
+                    if len(D._vertical_degenerations[ind]) > 0:
+                        l_mvts, inds = mvt.codimension_one_vertical_prime_degenerations(0, comp, ind, D, index=True)
+                        for j, mvts in enumerate(l_mvts): 
+                            if mvts[0] not in all_mvt: 
+                                assert all(mvt not in all_mvt for mvt in mvts)
+                                l[codim + 1, 0].append(mvts)
+                                new = copy.deepcopy(ind_comp)
+                                new[1:1] = [inds[j][1]]
+                                new[0][comp:comp + 1] = inds[j][0]
+                                lindex[codim + 1, 0].append(new)
+                                all_mvt = all_mvt + mvts
+    
+    #horizontal degenerations
+    for codim in range(d):
+        h = 0
+        has_horiz = True
+        while has_horiz:
+            has_horiz = False
+            for i, connected_comp in enumerate(l[codim, h]):
+                ind_comp = lindex[codim, h][i] #the index of the components of the triangulations in connected_comp
+                for mvt in connected_comp:
+                    N = mvt.num_levels()
+                    for level in range(N):
+                        for comp in range(len(mvt._veering_triangulations[level])):
+                            ind = ind_comp[abs(level)][comp] #the index of the comp
+                            if len(D._horizontal_degenerations[ind]) >0:
+                                
+                                print(mvt, level, comp, ind)
+                                
+                                l_mvts, inds = mvt.codimension_one_horizontal_prime_degenerations(-abs(level), comp, ind, D, index=True)
+                                for j, mvts in enumerate(l_mvts): 
+                                    if mvts[0] not in all_mvt: 
+                                        assert all(mvt not in all_mvt for mvt in mvts)
+                                        l[codim, h + 1].append(mvts)
+                                        new = copy.deepcopy(ind_comp)
+                                        new[abs(level)][comp:comp + 1] = inds[j][0]
+                                        lindex[codim, h + 1].append(new)
+                                        all_mvt = all_mvt + mvts
+                                        has_horiz = True
+            h = h + 1
+
+    return l if not index else (l, lindex)
