@@ -474,6 +474,9 @@ class Triangulation(Constellation):
         """
         return [c for c in perm_cycles(self._fp, True, 2 * self._ne) if self._bdry[c[0]]]
 
+    def num_internal_faces(self):
+        return sum(not self._bdry[c[0]] for c in perm_cycles(self._fp))
+
     def num_boundary_faces(self):
         r"""
         Return the number of boundary faces.
@@ -495,46 +498,6 @@ class Triangulation(Constellation):
             1
         """
         return sum(bool(self._bdry[c[0]]) for c in perm_cycles(self._fp))
-
-    def euler_characteristic(self):
-        r"""
-        Return the Euler characteristic of this triangulation.
-
-        EXAMPLES::
-
-            sage: from veerer import Triangulation
-
-        A sphere::
-
-            sage: T = Triangulation("(0,1,2)")
-            sage: T.euler_characteristic()
-            2
-
-        A torus::
-
-            sage: T = Triangulation("(0,1,2)(~0,~1,~2)")
-            sage: T.euler_characteristic()
-            0
-
-        A genus 2 surface::
-
-            sage: T = Triangulation("(0,1,2)(~2,3,4)(~4,5,6)(~6,~0,7)(~7,~1,8)(~8,~3,~5)")
-            sage: T.euler_characteristic()
-            -2
-
-        A cylinder::
-
-            sage: T = Triangulation("(0,1,2)(~0,3,4)(~1,~2)(~3,~4)", {"~1": 1, "~2": 1, "~3": 1, "~4": 1})
-            sage: T.euler_characteristic()
-            0
-
-        A pair of pants::
-
-            sage: T = Triangulation("(0,1,2)(~0)(~1)(~2)", {"~0": 1, "~1": 1, "~2": 1})
-            sage: T.euler_characteristic()
-            -1
-        """
-        return self.num_triangles() - self.num_edges() + (self.num_vertices() + self.num_folded_edges())
 
     def genus(self):
         r"""
@@ -561,6 +524,15 @@ class Triangulation(Constellation):
         A pair of pants::
 
             sage: T = Triangulation("(0,1,2)(~0)(~1)(~2)", {"~0": 1, "~1": 1, "~2": 1})
+            sage: T.genus()
+            0
+
+        Disks::
+
+            sage: T = Triangulation("(0:1,~0:1)")
+            sage: T.genus()
+            0
+            sage: T = Triangulation("(0:1)")
             sage: T.genus()
             0
         """

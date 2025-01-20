@@ -1525,6 +1525,14 @@ class VeeringTriangulation(Triangulation):
             sage: assert vt.dimension() == vt.as_linear_family().dimension() == 2
             sage: assert vt.stratum().dimension() == 2  # optional - surface_dynamics # not tested (not yet in surface_dynamics)
 
+        An example in Q(-1^2, -2)::
+
+            sage: vt = VeeringTriangulation("(0:1)", "B")
+            sage: vt.dimension()
+            1
+            sage: vt.stratum().dimension()  # optional - surface_dynamics # not tested (not yet in surface_dynamics)
+            1
+
         An example with a disconnected linear family::
 
             sage: from veerer import VeeringTriangulation, VeeringTriangulationLinearFamily, DelaunayStrebelAutomaton
@@ -5683,6 +5691,14 @@ class VeeringTriangulation(Triangulation):
             (StrebelGraph("(0,~0:1,1)(~1,2,~2:1)"),
             array('i', [-1, -1, 0, 1, 2, 3, 4, 5, -1, -1]),
             array('i', [9, 3, 9, 0, 0, 7]))
+
+        TESTS:
+
+        An example with folded edges that used not to work::
+
+            sage: vt = VeeringTriangulation("(0:1)(1:1,2:1,3:1,4:1)(~2:1,~4:1,5:1)(~3:1,~5:1)", "BBBBBB")
+            sage: vt.strebel_graph()
+            StrebelGraph("(0)(1,2,3,4)(~2,~4,5)(~3,~5)")
         """
         if not self.is_strebel(slope=slope):
             raise ValueError('triangulation is not Strebel')
@@ -5711,6 +5727,8 @@ class VeeringTriangulation(Triangulation):
                     index_strebel[e] = j
                     index_strebel[E] = j + 1
                     j += 2
+
+        assert j == m, (j, m)
 
         # build vertex permutation, edge permutation, angle excess and nodes
         vertex_permutation = array('i', [-1] * m)
