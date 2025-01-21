@@ -5178,7 +5178,7 @@ class VeeringTriangulation(Triangulation):
         for (a, b, c) in self.triangles():
             x = (a in half_edges_up) + (b in half_edges_up) + (c in half_edges_up)
             if x == 1:
-                raise ValueError('invalid set of edges: {} is a up-down-down triangle'.format(t))
+                raise ValueError('invalid set of edges: {} is a up-down-down triangle'.format((a, b, c)))
             elif x == 2:
                 nt_mix += 1
                 if a not in half_edges_up:
@@ -5193,7 +5193,7 @@ class VeeringTriangulation(Triangulation):
                 if colouring[mix1 // 2] != colouring[mix2 // 2]:
                     raise ValueError('invalid mixed triangle ({}, {}, {}) with colouring ({}, {}, {})'.format(
                         down, mix1, mix2,
-                        colour_to_string(down),
+                        colour_to_string(colouring[down // 2]),
                         colour_to_string(colouring[mix1 // 2]),
                         colour_to_string(colouring[mix2 // 2])))
                 mix_p[mix1] = mix2
