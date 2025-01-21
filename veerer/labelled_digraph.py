@@ -22,6 +22,7 @@ Labelled directed graphs and fundamental group
 # ****************************************************************************
 
 import collections
+import numbers
 
 from sage.graphs.digraph import DiGraph
 from sage.misc.prandom import choice, randrange
@@ -234,6 +235,16 @@ class LabelledDiGraphPath:
             for i in edges:
                 self.append(i)
 
+    def __eq__(self, other):
+        if self._graph is not other._graph:
+            raise TypeError
+        return self._vertices == other._vertices and self._edges == other._edges
+
+    def __ne__(self, other):
+        if self._graph is not other._graph:
+            raise TypeError
+        return self._vertices != other._vertices or self._edges != other._edges
+
     def copy(self):
         ans = type(self).__new__(type(self))
         ans._vertices = self._vertices[:]
@@ -257,6 +268,61 @@ class LabelledDiGraphPath:
 
     def end(self):
         return self._vertices[-1]
+
+    def __getitem__(self, k):
+        r"""
+        TESTS::
+
+            sage: from veerer.labelled_digraph import LabelledDiGraph, LabelledDiGraphPath
+            sage: G = LabelledDiGraph(digraphs.ButterflyGraph(5), sort=True)
+            sage: path = LabelledDiGraphPath(G, 98, [-163, -2, 0, -161])
+            sage: path[0]
+            -163
+            sage: path[1]
+            -2
+            sage: path[2]
+            0
+            sage: path[3]
+            -161
+            sage: path[4]
+            Traceback (most recent call last):
+            ...
+            IndexError: deque index out of range
+            sage: path[-1]
+            -161
+            sage: path[-2]
+            0
+            sage: path[-3]
+            -2
+            sage: path[-4]
+            -163
+            sage: path[-5]
+            Traceback (most recent call last):
+            ...
+            IndexError: deque index out of range
+
+            sage: path[0:2] == G.path(98, [-163, -2])
+            True
+            sage: path[1:3] == G.path(97, [-2, 0])
+            True
+        """
+        if isinstance(k, numbers.Integral):
+            return self._edges[k]
+        elif isinstance(k, slice):
+            start, stop, stride = k.indices(len(self))
+            if stride == 1:
+                ans = type(self).__new__(type(self))
+                ans._graph = self._graph
+                ans._vertices = collections.deque(list(self._vertices)[start : stop + 1])
+                ans._edges = collections.deque(list(self._edges)[start : stop])
+            elif stride == -1:
+                raise NotImplementedError
+            else:
+                raise ValueError("stride must be 1 or -1")
+
+            return ans
+        else:
+            raise TypeError("path index must be integer or slice")
 
     def __invert__(self):
         ans = self.copy()
