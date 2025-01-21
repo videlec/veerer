@@ -865,6 +865,55 @@ def perm_cycle_type(array.array p, int n=-1):
     return c
 
 
+def perm_order(array.array p, int n=-1):
+    r"""
+    Return the multiplicative order of the permutation ``p``.
+
+    EXAMPLES::
+
+        sage: from veerer.permutation import perm_init, perm_order
+        sage: p = perm_init('(1,3)(2,4,6)(5)')
+        sage: perm_order(p)
+        6
+    """
+    from sage.arith.functions import lcm
+    return lcm(perm_cycle_type(p))
+
+
+def perm_is_involution(array.array p, int n=-1):
+    r"""
+    Return whether ``p`` is a non-trivial involution.
+
+    EXAMPLES::
+
+        sage: from veerer.permutation import perm_init, perm_is_involution
+        sage: perm_is_involution(perm_init('(0)(1)(2)'))
+        False
+        sage: perm_is_involution(perm_init('(0)(1,2)'))
+        True
+        sage: perm_is_involution(perm_init('(0,2)(1)'))
+        True
+        sage: perm_is_involution(perm_init('(0,2,1)'))
+        False
+
+        sage: perm_is_involution(perm_init('(0,2)', partial=True))
+        True
+        sage: perm_is_involution(perm_init('(0,2,4)', partial=True))
+        False
+    """
+    if n == -1:
+        n = len(p)
+    cdef int i, j, is_identity = 1
+    for i in range(n):
+        if p.data.as_ints[i] == -1:
+            continue
+        j = p.data.as_ints[i]
+        is_identity &= (i == j)
+        if p.data.as_ints[j] != i:
+            return False
+    return not is_identity
+
+
 def perm_cycles_to_string(list cycles, edge_like=False, data=None):
     r"""
     Return a string representing a list of cycles.
@@ -922,6 +971,8 @@ def perm_orbit(array.array p, int i):
         sage: perm_orbit(array('i', [0,3,1,2]), 2)
         [2, 1, 3]
     """
+    if i < 0 or i >= len(p):
+        raise ValueError("permutation index out of range")
     cdef int j
     cdef list res = [i]
     j = p.data.as_ints[i]
