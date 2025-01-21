@@ -457,6 +457,9 @@ class Triangulation(Constellation):
         """
         return [c for c in perm_cycles(self._fp, True, 2 * self._ne) if self._bdry[c[0]] == 0]
 
+    def boundary_half_edges(self):
+        return (h for h in self.half_edges() if self._bdry[h])
+
     def boundary_faces(self):
         r"""
         Return the list of boundaries as lists of half-edges.

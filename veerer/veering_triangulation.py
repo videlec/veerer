@@ -40,7 +40,9 @@ from sage.structure.element import get_coercion_model, Matrix
 from sage.structure.richcmp import op_LT, op_LE, op_EQ, op_NE, op_GT, op_GE, rich_to_bool
 from sage.modules.free_module import FreeModule
 from sage.matrix.constructor import matrix
+from sage.modules.free_module_element import vector
 from sage.rings.integer_ring import ZZ
+from sage.rings.rational import Rational
 
 from .constants import *
 from .constellation import Constellation
@@ -407,7 +409,7 @@ class VeeringTriangulation(Triangulation):
             VeeringTriangulationLinearFamily("(0:2,~0:4)", "R", [(1)])
         """
         from .linear_family import VeeringTriangulationLinearFamily
-        return VeeringTriangulationLinearFamily(self, self.train_track_linear_space().lines(), mutable=mutable)
+        return VeeringTriangulationLinearFamily(self, self.generators_matrix(), mutable=mutable)
 
     def triangle(self, a, check=True):
         r"""
@@ -1607,7 +1609,7 @@ class VeeringTriangulation(Triangulation):
             sage: sorted(V.vertex_cycles(HORIZONTAL))
             [[1, 0, 1], [1, 1, 0]]
         """
-        return self.train_track_polytope(slope, backend=backend).rays()
+        return self.cone(slope, backend=backend).rays()
 
     def branches(self, slope=VERTICAL):
         r"""
@@ -2120,8 +2122,8 @@ class VeeringTriangulation(Triangulation):
             sage: T.flip(3, 2, Gx=Gx)
             sage: T.flip(4, 2, Gx=Gx)
             sage: T.flip(5, 2, Gx=Gx)
-            sage: T._set_switch_conditions(T._constraint_check, Gx.row(0), VERTICAL)
-            sage: T._set_switch_conditions(T._constraint_check, Gx.row(1), VERTICAL)
+            sage: T._set_subspace_constraints(T._constraint_check, Gx.row(0), VERTICAL)
+            sage: T._set_subspace_constraints(T._constraint_check, Gx.row(1), VERTICAL)
 
             sage: T, s, t = VeeringTriangulations.L_shaped_surface(2, 3, 4, 5, 1, 2)
             sage: T = T.copy(mutable=True)
@@ -2129,8 +2131,8 @@ class VeeringTriangulation(Triangulation):
             sage: flip_sequence = [(3, 2), (4, 1), (5, 2), (6 , 2), (5, 1), (1, 1), (5, 1)]
             sage: for e, col in flip_sequence:
             ....:     T.flip(e, col, Gx=Gx)
-            ....:     T._set_switch_conditions(T._constraint_check, Gx.row(0), VERTICAL)
-            ....:     T._set_switch_conditions(T._constraint_check, Gx.row(1), VERTICAL)
+            ....:     T._set_subspace_constraints(T._constraint_check, Gx.row(0), VERTICAL)
+            ....:     T._set_subspace_constraints(T._constraint_check, Gx.row(1), VERTICAL)
         """
         if not self._mutable:
             raise ValueError('immutable veering triangulation; use a mutable copy instead')
@@ -2500,7 +2502,7 @@ class VeeringTriangulation(Triangulation):
         if check:
             if len(x) != self._ne:
                 raise ValueError("x must be a list or a vector of length the number of edges")
-            self._set_switch_conditions(self._constraint_check, x, VERTICAL)
+            self._set_subspace_constraints(self._constraint_check, x, VERTICAL)
 
         middle, rbdry, lbdry, pocket = cyl
         if pocket:
@@ -2550,8 +2552,8 @@ class VeeringTriangulation(Triangulation):
         if check:
             if len(x) != self._ne or len(y) != self._ne:
                 raise ValueError("x and y must be lists or vectors of length the number of edges")
-            self._set_switch_conditions(self._constraint_check, x, VERTICAL)
-            self._set_switch_conditions(self._constraint_check, y, HORIZONTAL)
+            self._set_subspace_constraints(self._constraint_check, x, VERTICAL)
+            self._set_subspace_constraints(self._constraint_check, y, HORIZONTAL)
 
         middle, rbdry, lbdry, pocket = cyl
         area = 0
@@ -3018,8 +3020,8 @@ class VeeringTriangulation(Triangulation):
             sage: T.flip(3, 2, Gx=Gx)
             sage: T.flip(4, 2, Gx=Gx)
             sage: T.flip(5, 2, Gx=Gx)
-            sage: T._set_switch_conditions(T._constraint_check, Gx.row(0), VERTICAL)
-            sage: T._set_switch_conditions(T._constraint_check, Gx.row(1), VERTICAL)
+            sage: T._set_subspace_constraints(T._constraint_check, Gx.row(0), VERTICAL)
+            sage: T._set_subspace_constraints(T._constraint_check, Gx.row(1), VERTICAL)
             sage: Gx.echelon_form()
             [ 1  0  0  1  1  1  1]
             [ 0  1  1 -1 -1 -1  0]
@@ -3212,9 +3214,9 @@ class VeeringTriangulation(Triangulation):
         for e in range(ne):
             cs.insert(L.element_class(L, {shift + e: one}, zero) >= zero, check=False)
 
-    def _set_switch_conditions(self, insert, x, slope=VERTICAL):
+    def _set_subspace_constraints(self, insert, x, slope=VERTICAL):
         r"""
-        These are the linear parts of the train-track equations
+        Set the linear parts of the train-track equations
 
         INPUT:
 
@@ -3233,7 +3235,7 @@ class VeeringTriangulation(Triangulation):
             sage: vt = VeeringTriangulation("(0,1,2)(3,4,5)(6,7,8)(~8,~0,~7)(~6,~1,~5)(~4,~2,~3)", "RRBRRBRRB")
             sage: cs = ppl.Constraint_System()
             sage: x = [ppl.Variable(e) for e in range(vt.num_edges())]
-            sage: vt._set_switch_conditions(cs.insert, x)
+            sage: vt._set_subspace_constraints(cs.insert, x)
             sage: for g in cs:
             ....:     print(vector(ZZ, g.coefficients()))
             (1, -1, 1, 0, 0, 0, 0, 0, 0)
@@ -3251,6 +3253,19 @@ class VeeringTriangulation(Triangulation):
         for (i, j, k) in self.non_degenerate_triangles(slope):
             # i is large
             insert(x[i // 2] == x[j // 2] + x[k // 2])
+
+    def _set_subspace_constraints_fast(self, cs, L, slope, shift):
+        zero = L.base_ring().zero()
+        one = L.base_ring().one()
+        m_one = -one
+        for (i, j, k) in self.degenerate_triangles(slope):
+            # is is degenerate
+            cs.insert(LinearConstraint(op_EQ, L.element_class(L, {shift + i // 2: one}, zero)), check=False)
+            cs.insert(LinearConstraint(op_EQ, L.element_class(L, {shift + j // 2: one, k // 2: m_one}, zero)), check=False)
+
+        for (i, j, k) in self.non_degenerate_triangles(slope):
+            # is is large
+            cs.insert(LinearConstraint(op_EQ, L.element_class(L, {shift + i // 2: one, shift + j // 2: m_one, shift + k // 2: m_one}, zero)), check=False)
 
     @staticmethod
     def _constraint_check(x, error=AssertionError):
@@ -3277,7 +3292,7 @@ class VeeringTriangulation(Triangulation):
         L = LinearExpressions(ZZ)
         cs = ConstraintSystem(ne)
         variables = [L.variable(e) for e in range(ne)]
-        self._set_switch_conditions(cs.insert, variables, slope)
+        self._set_subspace_constraints(cs.insert, variables, slope)
         return cs
 
     def _set_train_track_constraints(self, insert, x, slope, low_bound, allow_degenerations):
@@ -3359,7 +3374,7 @@ class VeeringTriangulation(Triangulation):
         ep = self._ep
 
         # switch
-        self._set_switch_conditions(insert, x, slope)
+        self._set_subspace_constraints(insert, x, slope)
 
         # non-negativity
         for e in range(ne):
@@ -3373,11 +3388,6 @@ class VeeringTriangulation(Triangulation):
                 insert(x[e] >= 0)
             else:
                 insert(x[e] >= low_bound)
-
-    # For veering triangulation, the only constraints on coordinates come from the
-    # train-track switch equation (or triangle equalities)
-    _set_subspace_constraints = _set_train_track_constraints
-    _set_subspace_constraints_fast = _set_train_track_constraints_fast
 
     def _set_delaunay_constraints_fast(self, cs, L):
         zero = L.base_ring().zero()
@@ -3469,99 +3479,53 @@ class VeeringTriangulation(Triangulation):
 
     def train_track_linear_space(self, slope=VERTICAL, backend=None):
         r"""
-        Return the polytope determined by the switch equations (a linear subspace)
-
-        INPUT:
-
-        - ``slope`` - the slope for the train track (``HORIZONTAL`` or ``VERTICAL``)
+        Deprecated method
 
         EXAMPLES::
 
             sage: from veerer import *
             sage: T = VeeringTriangulation("(0,1,2)(~2,~0,~1)", "RRB")
-            sage: T.train_track_linear_space()
-            Cone of dimension 2 in ambient dimension 3 made of 0 facets (backend=ppl)
-            sage: T.train_track_linear_space(backend='sage')
-            Cone of dimension 2 in ambient dimension 3 made of 0 facets (backend=sage)
+            sage: T.train_track_linear_space().lines()
+            doctest:warning
+            ...
+            UserWarning: train_track_linear_space is deprecated; use generators_matrix() instead
+            [[1, 1, 0], [1, 0, -1]]
+            sage: T.generators_matrix().rows()
+            [(1, 1, 0), (-1, 0, 1)]
 
-            sage: VeeringTriangulation("(0:2,~0:4)", "R").train_track_linear_space()
-            Cone of dimension 1 in ambient dimension 1 made of 0 facets (backend=ppl)
+            sage: T.train_track_linear_space(HORIZONTAL).lines()
+            [[1, 1, 0], [1, 0, 1]]
+            sage: T.generators_matrix(HORIZONTAL).rows()
+            [(-1, -1, 0), (-1, 0, -1)]
         """
-        from sage.rings.integer_ring import ZZ
+        from warnings import warn
+        warn('train_track_linear_space is deprecated; use generators_matrix() instead')
+
         ne = self.num_edges()
         L = LinearExpressions(ZZ)
         cs = ConstraintSystem(ne)
         x = [L.variable(e) for e in range(ne)]
-        self._set_switch_conditions(cs.insert, x, slope)
+        self._set_subspace_constraints(cs.insert, x, slope)
         return cs.cone(backend)
 
     def train_track_polytope(self, slope=VERTICAL, low_bound=0, backend=None):
         r"""
-        Return the polytope determined by the constraints.
-
-        INPUT:
-
-        - ``slope`` - the slope for the train track
-
-        - ``low_bound`` - integer - optional lower bound for the lengths
-          (default to 0)
-
-        EXAMPLES::
-
-            sage: from veerer import *
-
-            sage: T = VeeringTriangulation([(0,1,2),(-1,-2,-3)], [RED, RED, BLUE])
-            sage: P = T.train_track_polytope(VERTICAL)
-            sage: P
-            Cone of dimension 2 in ambient dimension 3 made of 2 facets (backend=ppl)
-            sage: sorted(P.rays())
-            [[0, 1, 1], [1, 1, 0]]
-
-            sage: P = T.train_track_polytope(VERTICAL, low_bound=3)  # not tested
-            sage: P.generators()  # not tested
-            Generator_System {ray(1, 1, 0), ray(0, 1, 1), point(3/1, 6/1, 3/1)}
-
-            sage: T = VeeringTriangulation([(0,1,2), (-1,-2,-3)], [GREEN, RED, BLUE])
-            sage: sorted(T.train_track_polytope(VERTICAL).rays())
-            [[0, 1, 1]]
-            sage: sorted(T.train_track_polytope(HORIZONTAL).rays())
-            [[1, 0, 1], [1, 1, 0]]
-
-            sage: T = VeeringTriangulation([(0,1,2), (-1,-2,-3)], [PURPLE, BLUE, RED])
-            sage: sorted(T.train_track_polytope(VERTICAL).rays())
-            [[1, 0, 1], [1, 1, 0]]
-            sage: sorted(T.train_track_polytope(HORIZONTAL).rays())
-            [[0, 1, 1]]
-
-        One can also use other backends::
-
-            sage: sorted(T.train_track_polytope(VERTICAL, backend='sage').rays())
-            [[1, 0, 1], [1, 1, 0]]
-            sage: sorted(T.train_track_polytope(HORIZONTAL, backend='sage').rays())
-            [[0, 1, 1]]
-
-        Examples with boundaries (meromorphic differentials)::
-
-            sage: VeeringTriangulation("", "(0:1)(~0:1)", "R").train_track_polytope()
-            Cone of dimension 1 in ambient dimension 1 made of 1 facets (backend=ppl)
-            sage: VeeringTriangulation("(0,1,2)(~1,~2,3)", "(~0:1)(~3:1)", "RBRR").train_track_polytope()
-            Cone of dimension 2 in ambient dimension 4 made of 2 facets (backend=ppl)
+        Deprecated method.
         """
-        from sage.rings.integer_ring import ZZ
-        L = LinearExpressions(ZZ)
-        cs = ConstraintSystem()
-        ne = self.num_edges()
-        variables = [L.variable(e) for e in range(ne)]
-        self._set_train_track_constraints(cs.insert, variables, slope, low_bound, False)
-        return cs.cone(backend)
+        if low_bound:
+            raise NotImplementedError
 
-    def train_track_min_solution(self, slope=VERTICAL, allow_degenerations=False):
+        from warnings import warn
+        warn('train_track_polytope is deprecated; use cone instead')
+        return self.cone(slope=slope, backend=backend)
+
+    def cone_min(self, slope=VERTICAL, allow_degenerations=False):
         r"""
         Return the minimal integral point satisfying the constraints.
 
         INPUT:
 
-        - ``slope`` - the slope of the train track
+        - ``slope`` - the slope of the cone constraints
 
         - ``allow_degenerations`` - boolean - if ``True`` then allow certain
           degenerations to occur.
@@ -3573,23 +3537,133 @@ class VeeringTriangulation(Triangulation):
             sage: from veerer import *
 
             sage: T = VeeringTriangulation([(0,1,2),(-1,-2,-3)], [RED, RED, BLUE])
+            sage: T.cone_min(VERTICAL)
+            (1, 2, 1)
+            sage: T.cone_min(VERTICAL, True)
+            (0, 1, 1)
+
+            sage: T.cone_min(HORIZONTAL)
+            (2, 1, 1)
+            sage: T.cone_min(HORIZONTAL, True)
+            (1, 0, 1)
+        """
+        R = self.base_ring()
+        if R is not ZZ and R is not QQ:
+            raise NotImplementedError
+
+        ne = self.num_edges()
+        M = ppl.MIP_Problem(ne)
+
+        x = [ppl.Variable(e) for e in range(ne)]
+        M.set_objective_function(-sum(x))
+        self._set_subspace_constraints(M.add_constraint, x, slope)
+        if allow_degenerations:
+            M.add_constraint(sum(x[e] for e in range(ne)) >= 1)
+            for e in range(ne):
+                M.add_constraint(x[e] >= 0)
+        else:
+            for e in range(ne):
+                M.add_constraint(x[e] >= 1)
+        return vector(R, M.optimizing_point().coefficients())
+
+    def train_track_min_solution(self, *args, **kwds):
+        r"""
+        Deprecated method.
+
+        TESTS::
+
+            sage: from veerer import *
+
+            sage: T = VeeringTriangulation([(0,1,2),(-1,-2,-3)], [RED, RED, BLUE])
             sage: T.train_track_min_solution(VERTICAL)
-            point(1/1, 2/1, 1/1)
+            doctest:warning
+            ...
+            UserWarning: train_track_min_solution is deprecated; use cone_min instead
+            (1, 2, 1)
             sage: T.train_track_min_solution(VERTICAL, allow_degenerations=True)
-            point(0/1, 1/1, 1/1)
+            (0, 1, 1)
 
             sage: T.train_track_min_solution(HORIZONTAL)
-            point(2/1, 1/1, 1/1)
+            (2, 1, 1)
             sage: T.train_track_min_solution(HORIZONTAL, allow_degenerations=True)
-            point(1/1, 0/1, 1/1)
+            (1, 0, 1)
         """
-        n = self.num_edges()
-        M = ppl.MIP_Problem(n)
+        from warnings import warn
+        warn('train_track_min_solution is deprecated; use cone_min instead')
+        return self.cone_min(*args, **kwds)
 
-        x = [ppl.Variable(e) for e in range(n)]
-        M.set_objective_function(-sum(x))
-        self._set_train_track_constraints(M.add_constraint, x, slope, 1, allow_degenerations)
-        return M.optimizing_point()
+    def cone(self, slope=VERTICAL, backend=None):
+        r"""
+        Return the cone of coordinates for the given ``slope``.
+
+        EXAMPLES::
+
+            sage: from veerer import *
+
+            sage: T = VeeringTriangulation([(0,1,2),(-1,-2,-3)], [RED, RED, BLUE])
+            sage: P = T.cone(VERTICAL)
+            sage: P
+            Cone of dimension 2 in ambient dimension 3 made of 2 facets (backend=ppl)
+            sage: sorted(P.rays())
+            [[0, 1, 1], [1, 1, 0]]
+
+            sage: P = T.cone(VERTICAL, low_bound=3)  # not tested
+            sage: P.generators()  # not tested
+            Generator_System {ray(1, 1, 0), ray(0, 1, 1), point(3/1, 6/1, 3/1)}
+
+            sage: T = VeeringTriangulation([(0,1,2), (-1,-2,-3)], [GREEN, RED, BLUE])
+            sage: sorted(T.cone(VERTICAL).rays())
+            [[0, 1, 1]]
+            sage: sorted(T.cone(HORIZONTAL).rays())
+            [[1, 0, 1], [1, 1, 0]]
+
+            sage: T = VeeringTriangulation([(0,1,2), (-1,-2,-3)], [PURPLE, BLUE, RED])
+            sage: sorted(T.cone(VERTICAL).rays())
+            [[1, 0, 1], [1, 1, 0]]
+            sage: sorted(T.cone(HORIZONTAL).rays())
+            [[0, 1, 1]]
+
+        One can also use other backends::
+
+            sage: sorted(T.cone(VERTICAL, backend='sage').rays())
+            [[1, 0, 1], [1, 1, 0]]
+            sage: sorted(T.cone(HORIZONTAL, backend='sage').rays())
+            [[0, 1, 1]]
+
+        Examples with boundaries (meromorphic differentials)::
+
+            sage: VeeringTriangulation("", "(0:1)(~0:1)", "R").cone()
+            Cone of dimension 1 in ambient dimension 1 made of 1 facets (backend=ppl)
+            sage: VeeringTriangulation("(0,1,2)(~1,~2,3)", "(~0:1)(~3:1)", "RBRR").cone()
+            Cone of dimension 2 in ambient dimension 4 made of 2 facets (backend=ppl)
+
+        Linear families::
+
+            sage: vt, s, t = VeeringTriangulations.L_shaped_surface(1, 3, 1, 1)
+            sage: f = VeeringTriangulationLinearFamily(vt, [s, t])
+            sage: f.cone(VERTICAL)
+            Cone of dimension 2 in ambient dimension 7 made of 2 facets (backend=ppl)
+            sage: f.cone(HORIZONTAL)
+            Cone of dimension 2 in ambient dimension 7 made of 2 facets (backend=ppl)
+
+            sage: sorted(f.cone(VERTICAL).rays())
+            [[0, 1, 3, 3, 1, 1, 0], [1, 0, 0, 1, 1, 1, 1]]
+            sage: sorted(f.cone(HORIZONTAL).rays())
+            [[1, 0, 0, 1, 1, 1, 1], [3, 1, 3, 0, 2, 2, 3]]
+        """
+        R = self.base_ring()
+        L = LinearExpressions(R)
+        zero = R.zero()
+        one = R.one()
+        ne = self.num_edges()
+        cs = ConstraintSystem(ne)
+
+        # non-negativity
+        for e in range(ne):
+            cs.insert(LinearConstraint(op_GE, L.element_class(L, {e : one}, zero)), check=False)
+
+        self._set_subspace_constraints_fast(cs, L, slope, 0)
+        return cs.cone(backend)
 
     def delaunay_cone(self, x_low_bound=0, y_low_bound=0, hw_bound=0, backend=None):
         r"""
@@ -3672,11 +3746,14 @@ class VeeringTriangulation(Triangulation):
         one = R.one()
         ne = self.num_edges()
         cs = ConstraintSystem(2 * ne)
+
+        # non-negativity
         for i in range(2 * ne):
             cs.insert(LinearConstraint(op_GE, L.element_class(L, {i : one}, zero)), check=False)
+
         self._set_delaunay_constraints_fast(cs, L)
-        self._set_subspace_constraints_fast(cs, L, VERTICAL)
-        self._set_subspace_constraints_fast(cs, L, HORIZONTAL)
+        self._set_subspace_constraints_fast(cs, L, VERTICAL, 0)
+        self._set_subspace_constraints_fast(cs, L, HORIZONTAL, ne)
         from .delaunay_cone import DelaunayCone
         delaunay_cone = DelaunayCone(self.copy(mutable=False), cs.cone(backend))
         if not self._mutable:
@@ -3824,18 +3901,18 @@ class VeeringTriangulation(Triangulation):
             sage: T, s, t = VeeringTriangulations.L_shaped_surface(1, 1, 1, 1)
             sage: Gx = matrix(QQ, 2, [s, t])
             sage: Gy = T._complexify_generators(Gx)
-            sage: T._set_switch_conditions(T._constraint_check, Gx.row(0), VERTICAL)
-            sage: T._set_switch_conditions(T._constraint_check, Gx.row(1), VERTICAL)
-            sage: T._set_switch_conditions(T._constraint_check, Gy.row(0), HORIZONTAL)
-            sage: T._set_switch_conditions(T._constraint_check, Gy.row(1), HORIZONTAL)
+            sage: T._set_subspace_constraints(T._constraint_check, Gx.row(0), VERTICAL)
+            sage: T._set_subspace_constraints(T._constraint_check, Gx.row(1), VERTICAL)
+            sage: T._set_subspace_constraints(T._constraint_check, Gy.row(0), HORIZONTAL)
+            sage: T._set_subspace_constraints(T._constraint_check, Gy.row(1), HORIZONTAL)
 
             sage: T, s, t = VeeringTriangulations.L_shaped_surface(2, 3, 4, 5, 1, 2)
             sage: Gx = matrix(QQ, 2, [s, t])
             sage: Gy = T._complexify_generators(Gx)
-            sage: T._set_switch_conditions(T._constraint_check, Gx.row(0), VERTICAL)
-            sage: T._set_switch_conditions(T._constraint_check, Gx.row(1), VERTICAL)
-            sage: T._set_switch_conditions(T._constraint_check, Gy.row(0), HORIZONTAL)
-            sage: T._set_switch_conditions(T._constraint_check, Gy.row(1), HORIZONTAL)
+            sage: T._set_subspace_constraints(T._constraint_check, Gx.row(0), VERTICAL)
+            sage: T._set_subspace_constraints(T._constraint_check, Gx.row(1), VERTICAL)
+            sage: T._set_subspace_constraints(T._constraint_check, Gy.row(0), HORIZONTAL)
+            sage: T._set_subspace_constraints(T._constraint_check, Gy.row(1), HORIZONTAL)
         """
         if Gx.ncols() != self._ne:
             raise ValueError
@@ -3934,8 +4011,8 @@ class VeeringTriangulation(Triangulation):
         """
         n = self.num_edges()
 
-        PH = self.train_track_polytope(HORIZONTAL, backend=backend)
-        PV = self.train_track_polytope(VERTICAL, backend=backend)
+        PH = self.cone(HORIZONTAL, backend=backend)
+        PV = self.cone(VERTICAL, backend=backend)
 
         # pick sum of rays
         VH = PH.rays()
@@ -3971,20 +4048,39 @@ class VeeringTriangulation(Triangulation):
             sage: F.constellation()                               # optional - surface_dynamics
             VeeringTriangulation("(0,18,~17)(~0,19,~18)...(~7,~23,8)", "RRRRRRRRBBBBBBBBBBBBBBBB")
         """
-        VH = self.train_track_min_solution(HORIZONTAL, allow_degenerations=allow_degenerations)
-        VV = self.train_track_min_solution(VERTICAL, allow_degenerations=allow_degenerations)
+        x = self.cone_min(VERTICAL, allow_degenerations=allow_degenerations)
+        y = self.cone_min(HORIZONTAL, allow_degenerations=allow_degenerations)
+        return self.flat_structure(x, y)
 
-        assert VH.is_point()
-        assert VV.is_point()
+    # TODO: examples
+    def flat_structure_cylinder(self):
+        r"""
+        Return a flat structure which makes all topological cylinders flat.
 
-        from sage.rings.rational import Rational
-        assert VH.divisor() == 1
-        VH = [Rational(c) for c in VH.coefficients()]
+        EXAMPLES::
 
-        assert VV.divisor() == 1
-        VV = [Rational(c) for c in VV.coefficients()]
+            sage: from veerer import *
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "BBRRRBBRR")
+            sage: vt.flat_structure_cylinder()
+            FlatVeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "BBRRRBBRR", (3, 1, 2, 2, 3, 1, 1, 1, 2), (1, 3, 2, 2, 1, 1, 1, 2, 1))
+        """
+        ne = self.num_edges()
+        M = ppl.MIP_Problem(2 * ne)
 
-        return self.flat_structure(VV, VH)
+        x = [ppl.Variable(e) for e in range(ne)]
+        y = [ppl.Variable(ne + e) for e in range(ne)]
+        # TODO: add linear subvariety constraints
+        self._set_subspace_constraints(M.add_constraint, x, VERTICAL)
+        self._set_subspace_constraints(M.add_constraint, y, HORIZONTAL)
+        self._set_train_track_constraints(M.add_constraint, x, VERTICAL, 1, False)
+        self._set_train_track_constraints(M.add_constraint, y, HORIZONTAL, 1, False)
+        for col in [BLUE, RED]:
+            for mid, lbdry, rbdry, folded in self.cylinders(col):
+                for h in lbdry + rbdry:
+                    M.add_constraint(x[h // 2] == y[h // 2])
+
+        xy = [Rational(c) for c in M.optimizing_point().coefficients()]
+        return self.flat_structure(xy[:ne], xy[ne:])
 
     def flat_structure_geometric_middle(self, backend=None):
         r"""
@@ -4311,8 +4407,8 @@ class VeeringTriangulation(Triangulation):
         # In theory LP should be much faster but in practice (in small dimensions)
         # polytope is much better
         d = self.dimension()
-        return self.train_track_polytope(HORIZONTAL, backend=backend).affine_dimension() == d and \
-               self.train_track_polytope(VERTICAL, backend=backend).affine_dimension() == d
+        return self.cone(VERTICAL, backend=backend).affine_dimension() == d and \
+               self.cone(HORIZONTAL, backend=backend).affine_dimension() == d
 
     def is_delaunay(self, backend=None):
         r"""
@@ -4440,12 +4536,12 @@ class VeeringTriangulation(Triangulation):
             sage: T2.is_core()
             False
 
-        Equivantly, the train track polytope is degenerate::
+        Equivalently, the cone is degenerate::
 
-            sage: P1 = T1.train_track_polytope(VERTICAL)
+            sage: P1 = T1.cone(VERTICAL)
             sage: P1.affine_dimension()
             3
-            sage: P2 = T2.train_track_polytope(VERTICAL)
+            sage: P2 = T2.cone(VERTICAL)
             sage: P2.affine_dimension()
             2
         """
@@ -4781,7 +4877,10 @@ class VeeringTriangulation(Triangulation):
                 else:
                     self.flip_back(e, old_col)
 
-    def switch_constraints_matrix(self, slope=VERTICAL):
+    def constraints_matrix(self, slope=VERTICAL):
+        r"""
+        Return a matrix of constraints on x or y coordinates.
+        """
         if slope == VERTICAL:
             LAR = PURPLE
             POS = BLUE
@@ -4836,15 +4935,13 @@ class VeeringTriangulation(Triangulation):
 
         return ans
 
-    constraints_matrix = switch_constraints_matrix
-
-    def switch_generators_matrix(self, slope=VERTICAL, mutable=True):
+    def generators_matrix(self, slope=VERTICAL, mutable=True):
         r"""
         EXAMPLES::
 
             sage: from veerer import VeeringTriangulation
             sage: vt = VeeringTriangulation("(0,1,2)(3,4,5)(6,7,8)(~0,~7,~5)(~3,~4,~2)(~6,~1,~8)", "RRBRRBRRB")
-            sage: m = vt.switch_generators_matrix()
+            sage: m = vt.generators_matrix()
             sage: m  # random
             sage: m.echelon_form()
             [ 1  0 -1  0 -1 -1  0  0  0]
@@ -4852,7 +4949,7 @@ class VeeringTriangulation(Triangulation):
             [ 0  0  0  1  1  0  0  0  0]
             [ 0  0  0  0  0  0  1  0 -1]
             sage: vt = VeeringTriangulation("", boundary="(0:1,1:1,2:1)(~2:3,~0:1,~1:2)", colouring="RRR")
-            sage: m = vt.switch_generators_matrix()  # random
+            sage: m = vt.generators_matrix()  # random
             sage: m  # random
             [1 0 0]
             [0 1 0]
@@ -4862,12 +4959,10 @@ class VeeringTriangulation(Triangulation):
             [0 1 0]
             [0 0 1]
         """
-        subspace = self.switch_constraints_matrix(slope).right_kernel_matrix()
+        subspace = self.constraints_matrix(slope).right_kernel_matrix()
         if not mutable:
             return subspace
         return subspace.__copy__()
-
-    generators_matrix = switch_generators_matrix
 
     def parallel_cylinders(self, col=RED):
         r"""
@@ -5817,12 +5912,12 @@ class VeeringTriangulations:
             (0, 1, 1, 1, 1, 1, 0)
             sage: t
             (1, 0, 0, 1, 1, 1, 1)
-            sage: T._set_switch_conditions(T._constraint_check, s, VERTICAL)
-            sage: T._set_switch_conditions(T._constraint_check, t, VERTICAL)
+            sage: T._set_subspace_constraints(T._constraint_check, s, VERTICAL)
+            sage: T._set_subspace_constraints(T._constraint_check, t, VERTICAL)
 
             sage: T, s, t = VeeringTriangulations.L_shaped_surface(2, 3, 4, 5, 1, 2)
-            sage: T._set_switch_conditions(T._constraint_check, s, VERTICAL)
-            sage: T._set_switch_conditions(T._constraint_check, t, VERTICAL)
+            sage: T._set_subspace_constraints(T._constraint_check, s, VERTICAL)
+            sage: T._set_subspace_constraints(T._constraint_check, t, VERTICAL)
         """
         # Return the (quotient by the hyperelliptic involution of the) L-shaped surface
         # together with the equations of the GL2R deformation

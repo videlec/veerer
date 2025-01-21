@@ -830,7 +830,7 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
         for row in subspace.right_kernel_matrix():
             insert(sum(row[i] * x[i] for i in range(ambient_dim)) == 0)
 
-    def _set_subspace_constraints_fast(self, cs, L, slope):
+    def _set_subspace_constraints_fast(self, cs, L, slope, shift):
         zero = L.base_ring().zero()
         if slope == VERTICAL:
             subspace = self._subspace
@@ -838,7 +838,6 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
                 cs.insert(LinearConstraint(op_EQ, L.element_class(L, row.dict(), zero)), check=False)
         elif slope == HORIZONTAL:
             subspace = self._horizontal_subspace()
-            shift = self.num_edges()
             for row in subspace.right_kernel_matrix():
                 cs.insert(LinearConstraint(op_EQ, L.element_class(L, {key + shift: value for key, value in row.dict().items()}, zero)), check=False)
 
@@ -848,34 +847,7 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
         # test that elements satisfy the switch condition
         subspace = self._subspace
         for v in subspace.rows():
-            self._set_switch_conditions(self._constraint_check, v, VERTICAL)
-
-    def train_track_polytope(self, slope=VERTICAL, low_bound=0, backend=None):
-        r"""
-        Return the polytope of non-negative elements in the subspace.
-
-        EXAMPLES::
-
-            sage: from veerer import *
-            sage: vt, s, t = VeeringTriangulations.L_shaped_surface(1, 3, 1, 1)
-            sage: f = VeeringTriangulationLinearFamily(vt, [s, t])
-            sage: f.train_track_polytope(VERTICAL)
-            Cone of dimension 2 in ambient dimension 7 made of 2 facets (backend=ppl)
-            sage: f.train_track_polytope(HORIZONTAL)
-            Cone of dimension 2 in ambient dimension 7 made of 2 facets (backend=ppl)
-
-            sage: sorted(f.train_track_polytope(VERTICAL).rays())
-            [[0, 1, 3, 3, 1, 1, 0], [1, 0, 0, 1, 1, 1, 1]]
-            sage: sorted(f.train_track_polytope(HORIZONTAL).rays())
-            [[1, 0, 0, 1, 1, 1, 1], [3, 1, 3, 0, 2, 2, 3]]
-        """
-        ne = self.num_edges()
-        L = LinearExpressions(self.base_ring())
-        cs = ConstraintSystem()
-        for i in range(ne):
-            cs.insert(L.variable(i) >= low_bound)
-        self._set_subspace_constraints(cs.insert, [L.variable(i) for i in range(ne)], slope)
-        return cs.cone(backend)
+            self.constellation()._set_subspace_constraints(self._constraint_check, v, VERTICAL)
 
     def flip(self, e, col, check=True):
         r"""
@@ -1437,7 +1409,7 @@ class VeeringTriangulationLinearFamilies:
         phi = K.gen()
         L = LinearExpressions(K)
         cs = ConstraintSystem(24)
-        vt._set_switch_conditions(cs.insert, [L.variable(e) for e in range(24)])
+        vt._set_subspace_constraints(cs.insert, [L.variable(e) for e in range(24)])
         cs.insert(L.variable(1) == phi * L.variable(0))
         cs.insert(L.variable(3) == phi * L.variable(17))
         cs.insert(L.variable(2) == phi * L.variable(6))
@@ -1474,7 +1446,7 @@ class VeeringTriangulationLinearFamilies:
         phi = K.gen()
         L = LinearExpressions(K)
         cs = ConstraintSystem(21)
-        vt._set_switch_conditions(cs.insert, [L.variable(e) for e in range(21)])
+        vt._set_subspace_constraints(cs.insert, [L.variable(e) for e in range(21)])
         cs.insert(L.variable(0) == phi * L.variable(2))
         cs.insert(L.variable(1) == phi * L.variable(14))
         cs.insert(L.variable(16) == phi * L.variable(9))
@@ -1504,7 +1476,7 @@ class VeeringTriangulationLinearFamilies:
         vt = VeeringTriangulation(fp, cols)
         L = LinearExpressions(QQ)
         cs = ConstraintSystem(15)
-        vt._set_switch_conditions(cs.insert, [L.variable(e) for e in range(15)])
+        vt._set_subspace_constraints(cs.insert, [L.variable(e) for e in range(15)])
         cs.insert(L.variable(0) == 2 * L.variable(6))
         cs.insert(L.variable(14) == 2 * L.variable(2))
         return VeeringTriangulationLinearFamily(vt, cs.linear_generators_matrix())
@@ -1532,7 +1504,7 @@ class VeeringTriangulationLinearFamilies:
         vt = VeeringTriangulation(fp, cols)
         L = LinearExpressions(QQ)
         cs = ConstraintSystem(13)
-        vt._set_switch_conditions(cs.insert, [L.variable(e) for e in range(13)])
+        vt._set_subspace_constraints(cs.insert, [L.variable(e) for e in range(13)])
         cs.insert(L.variable(11) == 2 * L.variable(4))
         return VeeringTriangulationLinearFamily(vt, cs.linear_generators_matrix())
 
@@ -1566,7 +1538,7 @@ class VeeringTriangulationLinearFamilies:
         sqrt2 = K.gen()
         L = LinearExpressions(K)
         cs = ConstraintSystem(20)
-        vt._set_switch_conditions(cs.insert, [L.variable(e) for e in range(20)])
+        vt._set_subspace_constraints(cs.insert, [L.variable(e) for e in range(20)])
         cs.insert(L.variable(0) == sqrt2 * L.variable(3))
         cs.insert(L.variable(1) == (sqrt2 - 1) * L.variable(11))
         cs.insert(L.variable(17) == sqrt2 * L.variable(6))
@@ -1603,7 +1575,7 @@ class VeeringTriangulationLinearFamilies:
         sqrt2 = K.gen()
         L = LinearExpressions(K)
         cs = ConstraintSystem(19)
-        vt._set_switch_conditions(cs.insert, [L.variable(e) for e in range(19)])
+        vt._set_subspace_constraints(cs.insert, [L.variable(e) for e in range(19)])
         cs.insert(L.variable(18) == sqrt2 * L.variable(2))
         cs.insert(L.variable(15) == sqrt2 * L.variable(3))
         cs.insert(L.variable(4) == sqrt2 * L.variable(16))
@@ -1640,7 +1612,7 @@ class VeeringTriangulationLinearFamilies:
         phi = K.gen()
         L = LinearExpressions(K)
         cs = ConstraintSystem(23)
-        vt._set_switch_conditions(cs.insert, [L.variable(e) for e in range(23)])
+        vt._set_subspace_constraints(cs.insert, [L.variable(e) for e in range(23)])
         cs.insert(L.variable(4) == phi * L.variable(21))
         cs.insert(L.variable(7) == (phi - 1) * L.variable(12))
         cs.insert(L.variable(9) == (2 - phi) * L.variable(17))
