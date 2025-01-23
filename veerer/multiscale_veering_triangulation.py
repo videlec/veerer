@@ -20,6 +20,8 @@ from .labelled_digraph import *
 from .monodromy import *
 
 
+# TODO: Store the data of horizontal and vertical nodes in terms of LabeleddDiGraph
+
 def str_to_label(h):
     r"""
     Turn a string into the label of the half-edge
@@ -29,24 +31,6 @@ def str_to_label(h):
     else:
         lh = 2*int(h[0:])
     return lh
-
-def _num_vertical_separatrices_in_corner(vt, halfedge):
-    r"""
-    Return the times of red-blue colouring changes in the corner of the half-edge.
-
-    The method is only used to boundary half-edges.
-    """
-
-    col = vt._colouring
-    h1 = vt.vertex_permutation()[halfedge]
-    a = vt.boundary_vector()[halfedge]
-
-    if (col[halfedge // 2] == RED) and (col[h1 // 2] == BLUE):
-        num = a + 1
-    else:
-        num = a
-
-    return num
 
 def in_connected_component(vt, h):
     r"""
@@ -86,7 +70,7 @@ def track_prong(vt, r_up, r_low, prong):
 
 def _vaninshing_red_blue_corner(vt, r_up, r_low, h):
     hh = vt.next_at_vertex(h)
-    if r_up[h] >= 0 and r_low[hh] >= 0 and vt.boundary_vector()[h] == 0 and _num_vertical_separatrices_in_corner(vt, h) == 1:
+    if r_up[h] >= 0 and r_low[hh] >= 0 and vt.boundary_vector()[h] == 0 and vt.half_edge_num_separatrices(h) == 1:
         return True
     else:
         return False
@@ -105,9 +89,9 @@ def _new_prong_matching(vt, f_low, r_up, r_low, level, comp):
                     f_pole = f
 
             if f_pole not in lpoles:
-                while ((_num_vertical_separatrices_in_corner(vt, h) == 0) and (r_up[h] >= 0)) or (_vaninshing_red_blue_corner(vt, r_up, r_low, h)):
+                while ((vt.half_edge_num_separatrices(h) == 0) and (r_up[h] >= 0)) or (_vaninshing_red_blue_corner(vt, r_up, r_low, h)):
                     h = vt.previous_at_vertex(h)
-                if (_num_vertical_separatrices_in_corner(vt, h) > 0) and (r_up[h] >= 0):
+                if (vt.half_edge_num_separatrices(h) > 0) and (r_up[h] >= 0):
                     vert_sep = ((-abs(level), comp), h, 0)
                     prong1 = ((-abs(level),comp), r_up[h], 0)
                     prong2 = track_prong(vt, r_up, r_low, vert_sep)
@@ -175,8 +159,8 @@ class MultiscaleVeeringTriangulation:
     - level1 > level2
     - h1 is an half-edge at a zero of the veering triangulation 'vt1' at level1, and h2 is an hal-edge in a boundary face of the veering triangulation 'vt2' at level2
     - angle1 and angle2 are the indices of the vertical separatrices in the corner of h1 and h2 respectively satisfying that:
-    the angle1 is in [0, vt1._num_vertical_separatrices_in_corner(h1)],
-    and the angle2 is in [0, vt2._num_vertical_separatrices_in_corner(h2)].
+    the angle1 is in [0, vt1.half_edge_num_separatrices(h1)],
+    and the angle2 is in [0, vt2.half_edge_num_separatrices(h2)].
 
     EXAMPLES::
 
@@ -302,12 +286,12 @@ class MultiscaleVeeringTriangulation:
                 level2, c2 = m2
                 vt = self._veering_triangulations[abs(level2)][c2]
                 assert vt.face_angle(h2) != 0
-                last_ang = _num_vertical_separatrices_in_corner(vt, h2) - 1 #the valid range is between 1 and the number of vertical separatrices
+                last_ang = vt.half_edge_num_separatrices(h2) - 1 #the valid range is between 1 and the number of vertical separatrices
                 while ang == last_ang:
                     h2 = vt.previous_in_face(h2)
                     ang = 0
                     prong2 = ((level2, c2), h2, ang)
-                    last_ang = _num_vertical_separatrices_in_corner(vt, h2) - 1
+                    last_ang = vt.half_edge_num_separatrices(h2) - 1
                 #Note that the resulting prong2 is always equivalent to the original prong2
 
                 pm = [prong1, prong2]
@@ -439,7 +423,7 @@ class MultiscaleVeeringTriangulation:
             if not ((col1[h1 // 2] == RED) and (col1[hh1 // 2] == BLUE)):
                 raise ValueError(f"The corner of {prong1} is not a red-blue corner")
         elif (alpha1[h1] > 0):
-            num_v = _num_vertical_separatrices_in_corner(vt1,h1)
+            num_v = vt1.half_edge_num_separatrices(h1)
             if a1 not in range(num_v):
                 raise ValueError(f"The angle label of {prong1} is out of the valid range [0, {num_v - 1}].")
 
@@ -447,7 +431,7 @@ class MultiscaleVeeringTriangulation:
         if alpha2[h2] == 0:
             raise ValueError(f"The input {prong2} is not in boundary")
         else:
-            num_p = _num_vertical_separatrices_in_corner(vt2,h2)
+            num_p = vt2.half_edge_num_separatrices(h2)
             if a2 not in range(num_p):
                 raise ValueError(f"The angle label of {prong2} is out of the valid range [0, {num_p}].")
 
@@ -509,10 +493,6 @@ class MultiscaleVeeringTriangulation:
             tuple(tuple(prong) for prong in match) for match in self._prong_matching
         )
         return hash((veering_triangulations_hashable, horizontal_nodes_hashable, prong_matching_hashable))
-
-    def veering_triangulation_at_level(self, level):
-        level = self._check_level(level)
-        return self._veering_triangulations[level]
 
     def num_levels(self):
         return len(self._veering_triangulations)
@@ -628,14 +608,14 @@ class MultiscaleVeeringTriangulation:
                 if (vt1._colouring[h // 2] == RED) and (vt1._colouring[hh // 2] == BLUE): #h corresponds to a red-blue corner
                     prongs1.append((m1,h,0))
             else:
-                num_p = _num_vertical_separatrices_in_corner(vt1, h)
+                num_p = vt1.half_edge_num_separatrices(h)
                 for j in range(num_p):
                     prongs1.append((m1,h,j))
 
         #compute the list of prongs at the pole
         pole.reverse()
         for h in pole:
-            num_p = _num_vertical_separatrices_in_corner(vt2, h) - 1
+            num_p = vt2.half_edge_num_separatrices(h) - 1
             for j in range(num_p):
                     prongs2.append((m2,h,j))
 
@@ -649,21 +629,6 @@ class MultiscaleVeeringTriangulation:
         shiftprong2 = prongs2[index2:] + prongs2[:index2]
 
         return [shiftprong1, shiftprong2]
-
-    def prong_matching_map(self, prong):
-        r"""
-        Return the prong matched with the input prong.
-
-        The prong is represented in the form of (level, half-edge, angle label)
-        """
-        for pm in self._prong_matching:
-            prongs1, prongs2 = self._local_prong_matching(pm)
-            if prong in prongs1:
-                j = prongs1.index(prong)
-                return prongs2[j]
-            if prong in prongs2:
-                j = prongs2.index(prong)
-                return prongs1[j]
 
     def _components_have_horiztal_nodes_with(self, level, label, comp_index):
         r"""
@@ -732,7 +697,6 @@ class MultiscaleVeeringTriangulation:
 
         #Step2: propagate through horizontal nodes
         for i in range(N):
-            #vt = self.veering_triangulation_at_level(-i)
             vts = self._veering_triangulations[i]
             l_component = []
             for vt in vts:
