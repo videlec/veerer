@@ -247,8 +247,9 @@ class LabelledDiGraphPath:
 
     def copy(self):
         ans = type(self).__new__(type(self))
-        ans._vertices = self._vertices[:]
-        ans._edges = self._edges[:]
+        ans._graph = self._graph
+        ans._vertices = self._vertices.copy()
+        ans._edges = self._edges.copy()
         return ans
 
     def __bool__(self):
@@ -325,11 +326,24 @@ class LabelledDiGraphPath:
             raise TypeError("path index must be integer or slice")
 
     def __invert__(self):
+        r"""
+        TESTS::
+
+            sage: from veerer.labelled_digraph import LabelledDiGraph, LabelledDiGraphPath
+            sage: G = LabelledDiGraph(digraphs.ButterflyGraph(5), sort=True)
+            sage: path = LabelledDiGraphPath(G, 0)
+            sage: ~path
+            Path of length 0 in LabelledDiGraph on 192 vertices and 320 edge from start=0 to target=0 made of edges=[]
+            sage: path = LabelledDiGraphPath(G, 98, [-163, -2, 0, -161])
+            sage: ~path
+            Path of length 4 in LabelledDiGraph on 192 vertices and 320 edge from start=96 to target=98 made of edges=[160, -1, 1, 162]
+        """
         ans = self.copy()
         ans._vertices.reverse()
         ans._edges.reverse()
-        for i, j in ans._edges:
-            ans[i] = ~j
+        for i, j in enumerate(ans._edges):
+            ans._edges[i] = ~j
+        return ans
 
     def __mul__(self, other):
         if type(self) != type(other):
