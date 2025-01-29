@@ -31,6 +31,7 @@ from sage.categories.groups import Groups
 from sage.structure.richcmp import op_LT, op_LE, op_EQ, op_NE, op_GT, op_GE, rich_to_bool
 from sage.structure.element import Element, parent
 from sage.structure.parent import Parent
+from sage.structure.unique_representation import UniqueRepresentation
 from sage.rings.integer_ring import ZZ
 from sage.groups.libgap_wrapper import ElementLibGAP, ParentLibGAP
 from sage.libs.gap.libgap import libgap
@@ -40,7 +41,7 @@ from sage.functions.other import factorial
 from sage.groups.perm_gps.permgroup import PermutationGroup
 from sage.groups.perm_gps.permgroup_named import SymmetricGroup
 
-from veerer.permutation import perm_cycles, perm_id, perm_init, str_to_cycles_and_data, perm_compose, perm_check, perm_invert
+from veerer.permutation import perm_cycles, perm_id, perm_init, str_to_cycles_and_data, perm_compose, perm_check, perm_invert, perm_is_one
 
 
 def runs(l):
@@ -85,7 +86,7 @@ class FramingGroupElement(Element):
     r"""
     Holds two attributes ``p`` (a permutation) and ``r`` (an array)
     """
-    def __init__(self, parent, p, r=None, check=False):
+    def __init__(self, parent, p, r=None, check=True):
         self._p = p  # list of length n (permutation for each factor)
         if r is None:
             self._r = array.array('i', [0] * parent._n)
@@ -101,7 +102,7 @@ class FramingGroupElement(Element):
     def _check(self):
         P = self.parent()
 
-        if not isinstance(self._p, array.array) or self._p.typecode != 'i' or len(self._p) != P._n:
+        if not perm_check(self._p, P._n):
             raise ValueError("wrong p={}".format(self._p))
 
         if not isinstance(self._r, array.array) or self._r.typecode != 'i' or len(self._r) != P._n:
@@ -114,17 +115,54 @@ class FramingGroupElement(Element):
         A = P._angles[0]
         for x, (y, a) in enumerate(zip(self._p, self._r)):
             if x == block_end:
-                block_start, block_end = block_end, block_end + P._multiplicities[j]
                 j += 1
-                if j < len(P._angles):
-                    A = P._angles[j]
+                if j < P._n:
+                    block_start, block_end = block_end, block_end + P._multiplicities[j]
             assert block_start <= x < block_end
             if y < block_start or y >= block_end:
                 raise ValueError("permutation does not preserve blocks")
-            if a < 0 or a >= A:
+            if a < 0 or a >= P._angles_flat[x]:
                 raise ValueError("angle out of range a={} at x={}".format(a, x))
 
+    def __call__(self, i, a=None):
+        r"""
+        EXAMPLES::
+
+            sage: from veerer.framing_group import FramingGroup
+            sage: G = FramingGroup([1,3],[2,3])
+            sage: g = G("(0,1)(2:1,3:2,4:0)")
+            sage: g(0, 0)
+            (1, 0)
+            sage: g(2, 0)
+            (3, 1)
+            sage: g(2, 1)
+            (3, 2)
+            sage: g(3, 0)
+            (4, 2)
+        """
+        if not isinstance(i, numbers.Integral):
+            raise TypeError
+        P = self.parent()
+        i = int(i)
+        if i < 0 or i >= P._n:
+            raise ValueError("index out of range")
+        if a is not None:
+            if not isinstance(a, numbers.Integral):
+                raise TypeError
+            return (self._p[i], (a + self._r[i]) % P._angles_flat[i])
+        return self._p[i]
+
     def _richcmp_(self, other, op):
+        r"""
+        EXAMPLES::
+
+            sage: from veerer.framing_group import FramingGroup
+            sage: G = FramingGroup([1,3],[2,3])
+            sage: for i, g in enumerate(G):
+            ....:     for j, h in enumerate(G):
+            ....:         assert (g == h) == (i == j)
+            ....:         assert (g != h) == (i != j)
+        """
         if op == op_EQ:
             return self._p == other._p and self._r == other._r
         elif op == op_NE:
@@ -136,6 +174,18 @@ class FramingGroupElement(Element):
         x = ((x ^ hash(self._p.tobytes())) * 2147483693) + 82520 + len(self._p)
         x = ((x ^ hash(self._r.tobytes())) * 2147483693) + 82520 + len(self._r)
         return x
+
+    def is_one(self):
+        r"""
+        EXAMPLES::
+
+            sage: from veerer.framing_group import FramingGroup
+            sage: G = FramingGroup([0,1,2,3], [2,1,3,2])
+            sage: [g for g in G if g.is_one()]
+            [()]
+        """
+        P = self.parent()
+        return perm_is_one(self._p, P._n) and not any(self._r)
 
     def __invert__(self):
         P = self.parent()
@@ -284,7 +334,7 @@ class FramingGroupElement(Element):
         return o
 
 
-class FramingGroup(Parent):
+class FramingGroup(Parent, UniqueRepresentation):
     r"""
     A product of wreath products of cyclic group.
 
@@ -308,7 +358,8 @@ class FramingGroup(Parent):
     """
     Element = FramingGroupElement
 
-    def __init__(self, angles, multiplicities=None):
+    @staticmethod
+    def __classcall_private__(cls, angles, multiplicities=None):
         if multiplicities is None:
             if isinstance(angles, dict):
                 it = angles.items()
@@ -322,14 +373,19 @@ class FramingGroup(Parent):
         else:
             it = zip(angles, multiplicities)
 
-        self._angles = []
-        self._multiplicities = []
+        clean_angles = []
+        clean_multiplicities = []
         for a, m in it:
             if not isinstance(a, numbers.Integral) or a < 0 or not isinstance(m, numbers.Integral) or m <= 0:
                 raise ValueError
-            self._angles.append(max(1, int(a)))
-            self._multiplicities.append(int(m))
+            clean_angles.append(max(1, int(a)))
+            clean_multiplicities.append(int(m))
 
+        return super().__classcall__(cls, tuple(clean_angles), tuple(clean_multiplicities))
+
+    def __init__(self, angles, multiplicities):
+        self._angles = angles
+        self._multiplicities = multiplicities
         self._n = sum(self._multiplicities)
         self._angles_flat = []
 
@@ -409,8 +465,10 @@ class FramingGroup(Parent):
 
             sage: from veerer.framing_group import FramingGroup
             sage: G = FramingGroup([2, 3], [3, 3])
-            sage: G("(0:1,3:0,1:10)")
-            (0:1, 3:0, 1:0)
+            sage: G("(0:1,2:0,1:10)")
+            (0:1, 2:0, 1:0)
+            sage: G([2,1,0,5,4,3], [1,10,3,0,1,0])
+            (0:1, 2:1)(3:0, 5:0)(4:1)
         """
         if isinstance(p, str):
             if r is None:
@@ -425,6 +483,10 @@ class FramingGroup(Parent):
             p = perm_init(p, self._n)
         elif not p or p == 1:
             return self.one()
+
+        if isinstance(r, (tuple, list)):
+            r = array.array('i', [x % a for x, a in zip(r, self._angles_flat)])
+
         return self.element_class(self, p, r)
 
     @cached_method
@@ -529,7 +591,7 @@ class FramingGroup(Parent):
         """
         return prod(ZZ(m).factorial() * ZZ(a) ** m for a, m in zip(self._angles, self._multiplicities))
 
-    def subgroup(self, gens, mutable=False):
+    def subgroup(self, gens=None, mutable=False):
         return FramingSubgroup(self, gens, mutable)
 
     def _libgap_(self):
@@ -598,6 +660,9 @@ class FramingSubgroup(Parent):
                 self.add_generator(g)
         self._mutable = mutable
 
+    def set_immutable(self):
+        self._mutable = False
+
     def _repr_(self):
         return "FramingSubgroup({})".format(self._generators)
 
@@ -664,6 +729,9 @@ class FramingSubgroup(Parent):
 
     def cardinality(self):
         return self.permutation_group().cardinality()
+
+    def structure_description(self):
+        return self.permutation_group().structure_description()
 
     __len__ = cardinality
 

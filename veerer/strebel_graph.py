@@ -375,9 +375,17 @@ class StrebelGraph(Constellation):
             [(3, 0), (5, 1), (5, 0)]
             sage: seps = sg.face_separatrices(flat=False)
             sage: seps
-            [[], [(3, 0), (5, 1), (5, 0)]]
+            [[(3, 0), (5, 1), (5, 0)]]
             sage: all(sg.face_angle(h) == -len(sep) for sep in seps for h, a in sep)
             True
+
+        An example in H(1^2, -1^2) where the two faces have no separatrices::
+
+            sage: sg = StrebelGraph("(0,1,2,3)(~0,~1,~2,~3)")
+            sage: sg.face_separatrices(flat=False)
+            []
+            sage: sg.face_separatrices(flat=True)
+            []
         """
         separatrices = []
         for cycle in self.faces():
@@ -385,10 +393,11 @@ class StrebelGraph(Constellation):
             for h in cycle:
                 for a in range(self._excess[h] -1, -1, -1):
                     orbit.append((h, a))
-            if flat:
-                separatrices.extend(orbit)
-            else:
-                separatrices.append(orbit)
+            if orbit:
+                if flat:
+                    separatrices.extend(orbit)
+                else:
+                    separatrices.append(orbit)
         return separatrices
 
     def stratum(self):

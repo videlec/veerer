@@ -22,6 +22,8 @@ Monodromy in linear subvarieties
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 # ****************************************************************************
 
+from array import array
+
 from sage.graphs.digraph import DiGraph
 from sage.groups.perm_gps.permgroup_named import SymmetricGroup
 
@@ -43,16 +45,16 @@ class SeparatrixMonodromy:
         sage: from veerer import VeeringTriangulation
         sage: from veerer.monodromy import SeparatrixMonodromy
         sage: vt = VeeringTriangulation("(0,8,~7)(~0,~6,7)(1,11,~10)(~1,~11,4)(2,10,~9)(~2,~4,5)(3,9,~8)(~3,~5,6)", "RRRRBBBBBBBB")
-        sage: ds_graph = vt.delaunay_strebel_graph()
-        sage: monodromy = SeparatrixMonodromy(ds_graph)
-        sage: path = ds_graph.path(0)
-        sage: path.random_append(10, reverse=False)
-        sage: start = ds_graph.vertex_label(path.start())
-        sage: end = ds_graph.vertex_label(path.end())
-        sage: separatrices = start.vertex_separatrices()
-        sage: separatrices_image = [monodromy.vertex_separatrix_transport(path, h, a) for (h, a) in separatrices]
-        sage: separatrices_target = end.vertex_separatrices()
-        sage: assert set(separatrices_image) == set(separatrices_target)
+        sage: ds_graph = vt.delaunay_strebel_graph()  # long time
+        sage: monodromy = SeparatrixMonodromy(ds_graph)  # long time
+        sage: path = ds_graph.path(0)  # long time
+        sage: path.random_append(10, reverse=False)  # long time
+        sage: start = ds_graph.vertex_label(path.start())  # long time
+        sage: end = ds_graph.vertex_label(path.end())  # long time
+        sage: separatrices = start.vertex_separatrices()  # long time
+        sage: separatrices_image = [monodromy.vertex_separatrix_transport(path, h, a) for (h, a) in separatrices]  # long time
+        sage: separatrices_target = end.vertex_separatrices()  # long time
+        sage: assert set(separatrices_image) == set(separatrices_target)  # long time
     """
     def __init__(self, graph):
         self._graph = graph
@@ -301,9 +303,9 @@ class SeparatrixMonodromy:
             sage: from veerer import VeeringTriangulationLinearFamily
             sage: from veerer.monodromy import SeparatrixMonodromy
             sage: vt = VeeringTriangulationLinearFamily("(0:1,1:1,2:1)(~0:1,~1:1,~2:1)", "RRR", [(1, 0, 0), (0, 1, 0), (0, 0, 1)])
-            sage: ds_graph = vt.delaunay_strebel_graph()
-            sage: mono = SeparatrixMonodromy(ds_graph)
-            sage: for i in range(ds_graph.num_edges()):
+            sage: ds_graph = vt.delaunay_strebel_graph()  # long time
+            sage: mono = SeparatrixMonodromy(ds_graph)  # long time
+            sage: for i in range(ds_graph.num_edges()):  # long time
             ....:     p1 = ds_graph.path(ds_graph.edge_source(i), [i])
             ....:     p2 = ds_graph.path(ds_graph.edge_target(i), [-i-1])
             ....:     for path in [p1, p2]:
@@ -348,67 +350,64 @@ class SeparatrixMonodromy:
         return min(perm_orbit(self._graph.vertex_label(path.end())._fp, half_edge))
 
 
-def monodromy(ds_graph):
+def framing_group_element(state, G, vseps0, vseps1, fseps0, fseps1, cseps0, cseps1):
     r"""
-    EXAMPLES::
+    Return the group element corresponding to the element mapping the separatrices 0
+    onto the separatrices 1 in the coordinates of separatrices 0.
 
-        sage: from veerer import VeeringTriangulation
-        sage: from veerer.monodromy import monodromy
+    INPUT:
 
-    The case of H(1^2)::
+    - ``state`` - a veering triangulation or a Strebel graph
 
-        sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,9)(~8,10,11)(~9,~10,~11)", "BRBBRBBRBBRB")
-        sage: ds_graph = vt.delaunay_strebel_graph()
-        sage: G = monodromy(ds_graph)
-        sage: G.cardinality()
-        8
-        sage: G.structure_description()
-        'C4 x C2'
+    - ``G`` - the framing group of state
 
-    The case of H(1^2, -1^2)::
+    - ``vseps0``, ``vseps1`` - batches of vertex separatrices
 
-        sage: vt = VeeringTriangulation("(~0,1,2)(~1,3,4)(~2,5,6)(~3,~5,7)(~6,8,9)(~7,~8,~9)(0:1)(~4:1)", "BRRRBBRRRB")
-        sage: ds_graph = vt.delaunay_strebel_graph()
-        sage: G = monodromy(ds_graph)
-        sage: G.cardinality()
-        16
-        sage: G.structure_description()
-        'C4 x C2 x C2'
+    - ``fseps0``, ``fseps`` - batches of face separatrices
 
-    The case of H(3^2, -3^2)::
-
-        sage: vt = VeeringTriangulation("(~0,1,2)(~1,3,4)(~2,5,6)(~3,~5,7)(~6,8,9)(~7,~8,~9)(0:2)(~4:2)", "BRRRBBRRRB")
-        sage: ds_graph = vt.delaunay_strebel_graph()
-        sage: G = monodromy(ds_graph)
-        sage: G.cardinality()
-        20
-        sage: G.structure_description()
-        'C10 x C2'
+    - ``cseps0``, ``cseps1`` - batches of infinite cylinder separatrices
     """
-    root = ds_graph.root()
+    # we choose a non-canonical numbering of separatrices and conjugate at the end
+    seps = [(len(sep), sep) for sep in state.vertex_separatrices(flat=False)]
+    seps.sort()
+    seps_indices = {}
+    seps_angles = {}
+    nv = len(seps)
+    for i, (_, sep) in enumerate(seps):
+        for a, s in enumerate(sep):
+            seps_indices[s] = i
+            seps_angles[s] = a
+    p0 = [seps_indices[s] for s in vseps0]
+    r0 = [seps_angles[s] for s in vseps0]
+    p1 = [seps_indices[s] for s in vseps1]
+    r1 = [seps_angles[s] for s in vseps1]
+    assert len(p0) == len(r0) == len(p1) == len(r1) == nv
 
-    mon = SeparatrixMonodromy(ds_graph)
+    seps = [(len(sep), sep) for sep in state.face_separatrices(flat=False)]
+    seps.sort()
+    seps_indices = {}
+    seps_angles = {}
+    nf = len(seps)
+    for i, (_, sep) in enumerate(seps):
+        for a, s in enumerate(sep):
+            seps_indices[s] = nv + i
+            seps_angles[s] = a
+    p0.extend(seps_indices[s] for s in fseps0)
+    r0.extend(seps_angles[s] for s in fseps0)
+    p1.extend(seps_indices[s] for s in fseps1)
+    r1.extend(seps_angles[s] for s in fseps1)
+    assert len(p0) == len(p1) == len(r0) == len(r1) == nv + nf
 
-    vertex_separatrices = root.vertex_separatrices(flat=True)
-    vertex_separatrix_index = {ha: i for i, ha in enumerate(vertex_separatrices)}
-    nv = len(vertex_separatrices)
+    seps_indices = {}
+    nc = len(cseps1)
+    for i, s in enumerate(cseps1):
+        seps_indices[s] = nv + nf + i
+    p0.extend(seps_indices[s] for s in cseps0)
+    r0.extend([0] * nc)
+    p1.extend(seps_indices[s] for s in cseps1)
+    r1.extend([0] * nc)
+    assert len(p0) == len(r0) == len(p1) == len(r1) == nv + nf + nc
 
-    face_separatrices = root.face_separatrices(flat=True)
-    face_separatrix_index = {ha: nv + i for i, ha in enumerate(face_separatrices)}
-    nf = len(face_separatrices)
-
-    infinite_cylinders = [min(f) for f in root.boundary_faces() if root.face_angle(f[0]) == 0]
-    infinite_cylinder_index = {h: nv + nf + i for i, h in enumerate(infinite_cylinders)}
-    nc = len(infinite_cylinders)
-
-    n = nv + nf + nc
-
-    perms = set()
-    for path in ds_graph.fundamental_group_basis():
-        p_vert = [vertex_separatrix_index[mon.vertex_separatrix_transport(path, h, a)] for (h, a) in vertex_separatrices]
-        p_face = [face_separatrix_index[mon.face_separatrix_transport(path, h, a)] for (h, a) in face_separatrices]
-        p_cyl = [infinite_cylinder_index[mon.infinite_cylinder_transport(path, h)] for h in infinite_cylinders]
-        perms.add(tuple(p_vert) + tuple(p_face) + tuple(p_cyl))
-
-    S = SymmetricGroup(range(n))
-    return S.subgroup([S(list(p)) for p in perms])
+    g0 = G(array('i', p0), array('i', r0))
+    g1 = G(array('i', p1), array('i', r1))
+    return g1 * ~g0

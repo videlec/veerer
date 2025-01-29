@@ -1005,6 +1005,14 @@ class VeeringTriangulation(Triangulation):
             [[(1, 0), (9, 0)], [(5, 1), (5, 0), (7, 0)]]
             sage: all(vt.face_angle(h) == -len(sep) for sep in seps for h, a in sep)
             True
+
+        An example in H(1^2, -1^2) where the two faces have no separatrices::
+
+            sage: vt = VeeringTriangulation("(~0,1,2)(~1,3,4)(~2,5,6)(~3,~5,7)(~6,8,9)(~7,~8,~9)(0:1)(~4:1)", "BRRRBBRRRB")
+            sage: vt.face_separatrices(flat=True)
+            []
+            sage: vt.face_separatrices(flat=False)
+            []
         """
         if slope == VERTICAL:
             right = RED
@@ -1022,10 +1030,12 @@ class VeeringTriangulation(Triangulation):
             for h in cycle:
                 for a in range(self.half_edge_num_separatrices(h, slope, check=False) - 2, -1, -1):
                     orbit.append((h, a))
-            if flat:
-                separatrices.extend(orbit)
-            else:
-                separatrices.append(orbit)
+            if orbit:
+                if flat:
+                    separatrices.extend(orbit)
+                else:
+                    separatrices.append(orbit)
+
         return separatrices
 
     def vertex_angle(self, h):

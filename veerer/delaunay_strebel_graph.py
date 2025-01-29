@@ -2,6 +2,9 @@ r"""
 Delaunay-Strebel graph (for prime components).
 """
 
+from array import array
+
+from sage.misc.cachefunc import cached_method
 from sage.graphs.digraph import DiGraph
 from sage.misc.prandom import randrange
 
@@ -54,12 +57,12 @@ class DelaunayStrebelGraph(LabelledDiGraph):
         root = min(vt for vt in ds_graph if isinstance(vt, VeeringTriangulation))
         LabelledDiGraph.__init__(self, ds_graph, root)
 
-        # store both the spanning tree "towards" the root and "against"
-        self._spanning_tree_towards, self._complementary_edges = self.spanning_tree()
-        self._spanning_tree_against = [[] for _ in range(len(self))]
-        for i in self._spanning_tree_towards:
+        # store both the spanning tree oriented "towards" the root and "from" the root
+        self._spanning_tree_to, self._complementary_edges = self.spanning_tree()
+        self._spanning_tree_from = [[] for _ in range(len(self))]
+        for i in self._spanning_tree_to:
             if i is not None:
-                self._spanning_tree_against[self.edge_target(i)].append(~i)
+                self._spanning_tree_from[self.edge_target(i)].append(~i)
 
     def __eq__(self, other):
         if type(self) is not type(other):
@@ -126,6 +129,223 @@ class DelaunayStrebelGraph(LabelledDiGraph):
 
     def root(self):
         return self._vertices[0]
+
+    @cached_method
+    def separatrix_trivialization(self):
+        r"""
+        Return a trivialization of singularity labelling and choice of separatrices along the spanning tree.
+        """
+        from .monodromy import SeparatrixMonodromy
+        monodromy = SeparatrixMonodromy(self)
+
+        vertex_separatrices = [None] * len(self)
+        face_separatrices = [None] * len(self)
+        infinite_cylinders = [None] * len(self)
+
+        root = self._vertices[0]
+
+        seps = [(len(sep), sep[0]) for sep in root.vertex_separatrices(flat=False)]
+        seps.sort()
+        seps = [sep for a, sep in seps]
+        vertex_separatrices[0] = seps
+
+        seps = [(len(sep), sep[0]) for sep in root.face_separatrices(flat=False)]
+        seps.sort()
+        seps = [sep for a, sep in seps]
+        face_separatrices[0] = seps
+
+        infinite_cylinders[0] = [min(f) for f in root.boundary_faces() if root.face_angle(f[0]) == 0]
+
+        todo = self._spanning_tree_from[0][:]
+        while todo:
+            i = todo.pop()
+            u = self.edge_source(i)
+            v = self.edge_target(i)
+
+            assert vertex_separatrices[u] is not None
+            assert face_separatrices[u] is not None
+            assert infinite_cylinders[u] is not None
+
+            assert vertex_separatrices[v] is None
+            assert face_separatrices[v] is None
+            assert infinite_cylinders[v] is None
+
+            # TODO: we might want to avoid building a path if we just do parallel transport
+            # along a single edge
+            edge = self.path(u, [i])
+
+            vertex_separatrices[v] = [monodromy.vertex_separatrix_transport(edge, h, a) for h, a in vertex_separatrices[u]]
+            face_separatrices[v] = [monodromy.face_separatrix_transport(edge, h, a) for h, a in face_separatrices[u]]
+            infinite_cylinders[v] = [monodromy.infinite_cylinder_transport(edge, h) for h in infinite_cylinders[u]]
+
+            todo.extend(self._spanning_tree_from[v])
+
+        return tuple(vertex_separatrices), tuple(face_separatrices), tuple(infinite_cylinders)
+
+    def framing_group(self):
+        r"""
+        Ambient framing group.
+
+        The framing group is the group of permutation of singularities and
+        separatrices. Any such permutation should respect the degree of
+        singularties and the cyclic ordering of separatrices.
+        """
+        from .framing_group import FramingGroup, runs
+
+        root = self._vertices[0]
+        vseps, fseps, cseps = self.separatrix_trivialization()
+        vertex_angles = [root.vertex_angle(h) for h, a in vseps[0]]
+        face_angles = [-root.face_angle(h) for h, a in fseps[0]]
+
+        angles = []
+        multiplicities = []
+        for a, m in runs(vertex_angles):
+            angles.append(a)
+            multiplicities.append(m)
+        for a, m in runs(face_angles):
+            angles.append(a)
+            multiplicities.append(m)
+        if cseps[0]:
+            angles.append(1)
+            multiplicities.append(len(cseps[0]))
+
+        return FramingGroup(angles, multiplicities)
+
+    def path_framing_monodromy(self, path):
+        r"""
+        Return the framing monodromy of a (not necessarily closed) path.
+
+        EXAMPLES::
+
+            sage: from veerer import *
+            sage: vt = VeeringTriangulation("(~0,1,2)(~1,3,4)(~2,5,6)(~3,~5,7)(~6,8,9)(~7,~8,~9)(0:1)(~4:1)", "BRRRBBRRRB")
+            sage: ds_graph = vt.delaunay_strebel_graph()  # long time
+            sage: tree, complementary_edges = ds_graph.spanning_tree()  # long time
+
+        The monodromy is trivial along the spanning tree::
+
+            sage: for i in tree:  # long time
+            ....:     if i is None:
+            ....:         continue
+            ....:     path = ds_graph.path(ds_graph.edge_source(i), [i])
+            ....:     assert ds_graph.path_framing_monodromy(path).is_one()
+            ....:     assert ds_graph.path_framing_monodromy(~path).is_one()
+
+        And for complementary edges, it coincides with the canonical loop taken along the spanning tree::
+
+            sage: for i in complementary_edges:  # long time
+            ....:     path0 = ds_graph.path(ds_graph.edge_source(i), [i])
+            ....:     g0 = ds_graph.path_framing_monodromy(path0)
+            ....:     path1 = ds_graph.path(ds_graph.edge_target(i), [-i-1])
+            ....:     g1 = ~ds_graph.path_framing_monodromy(path1)
+            ....:     assert g0 == g1, (path0, path1, g0, g1, g0._p, g0._r, g1._p, g1._r)
+            ....:     path2 = ds_graph.path(ds_graph.edge_source(i), [i])
+            ....:     v = ds_graph.edge_source(i)
+            ....:     while v != 0:
+            ....:         i = tree[v]
+            ....:         path2.appendleft(-i - 1)
+            ....:         v = ds_graph.edge_target(i)
+            ....:     v = ds_graph.edge_target(i)
+            ....:     while v != 0:
+            ....:         i = tree[v]
+            ....:         path2.append(i)
+            ....:         v = ds_graph.edge_target(i)
+            ....:     g2 = ds_graph.path_framing_monodromy(path2)
+            ....:     assert g0 == g2, (path0, path2, g0, g2, g0._p, g0._r, g2._p, g2._r)
+        """
+        if path._graph is not self:
+            raise ValueError
+
+        from .monodromy import SeparatrixMonodromy, framing_group_element
+
+        monodromy = SeparatrixMonodromy(self)
+
+        u = path.start()
+        v = path.end()
+
+        vseps, fseps, cseps = self.separatrix_trivialization()
+
+        vseps0 = vseps[v]
+        vseps1 = [monodromy.vertex_separatrix_transport(path, h, a) for h, a in vseps[u]]
+
+        fseps0 = fseps[v]
+        fseps1 = [monodromy.face_separatrix_transport(path, h, a) for h, a in fseps[u]]
+
+        cseps0 = cseps[v]
+        cseps1 = [monodromy.infinite_cylinder_transport(path, h) for h in cseps[u]]
+
+        return framing_group_element(self._vertices[v], self.framing_group(), vseps0, vseps1, fseps0, fseps1, cseps0, cseps1)
+
+    @cached_method
+    def framing_monodromy(self):
+        r"""
+        Return the monodromy of framing obtained by parallel transport along
+        this Delaunay-Strebel graph.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+
+        The case of H(1^2)::
+
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,9)(~8,10,11)(~9,~10,~11)", "BRBBRBBRBBRB")
+            sage: ds_graph = vt.delaunay_strebel_graph()  # long time
+            sage: G = ds_graph.framing_monodromy()  # long time
+            sage: G.cardinality()  # long time
+            8
+            sage: G.structure_description()  # long time
+            'C4 x C2'
+
+        The case of H(1^2, -1^2)::
+
+            sage: vt = VeeringTriangulation("(~0,1,2)(~1,3,4)(~2,5,6)(~3,~5,7)(~6,8,9)(~7,~8,~9)(0:1)(~4:1)", "BRRRBBRRRB")
+            sage: ds_graph = vt.delaunay_strebel_graph()  # long time
+            sage: G = ds_graph.framing_monodromy()  # long time
+            sage: G.cardinality()  # long time
+            16
+            sage: G.structure_description()  # long time
+            'C4 x C2 x C2'
+
+        The case of H(3^2, -3^2)::
+
+            sage: vt = VeeringTriangulation("(~0,1,2)(~1,3,4)(~2,5,6)(~3,~5,7)(~6,8,9)(~7,~8,~9)(0:2)(~4:2)", "BRRRBBRRRB")
+            sage: ds_graph = vt.delaunay_strebel_graph()  # long time
+            sage: G = ds_graph.framing_monodromy()  # long time
+            sage: G.cardinality()  # long time
+            20
+            sage: G.structure_description()  # long time
+            'C10 x C2'
+        """
+        from .monodromy import SeparatrixMonodromy, framing_group_element
+
+        vseps, fseps, cseps = self.separatrix_trivialization()
+
+        G = self.framing_group()
+        H = G.subgroup(mutable=True)
+        monodromy = SeparatrixMonodromy(self)
+
+        H.add_generator(G.rotation())
+
+        for edge in self._complementary_edges:
+            u = self.edge_source(edge)
+            v = self.edge_target(edge)
+            path = self.path(u, [edge])
+
+            vseps0 = vseps[v]
+            vseps1 = [monodromy.vertex_separatrix_transport(path, h, a) for h, a in vseps[u]]
+
+            fseps0 = fseps[v]
+            fseps1 = [monodromy.face_separatrix_transport(path, h, a) for h, a in fseps[u]]
+
+            cseps0 = cseps[v]
+            cseps1 = [monodromy.infinite_cylinder_transport(path, h) for h in cseps[u]]
+
+            g = framing_group_element(self._vertices[v], G, vseps0, vseps1, fseps0, fseps1, cseps0, cseps1)
+
+            H.add_generator(g)
+
+        H.set_immutable()
+        return H
 
     # The following is clearly not the optimal strategy. We could have a self-loop
     # that commutes with many other flips. We could delete all such loops but one
