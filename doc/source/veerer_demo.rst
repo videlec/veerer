@@ -215,17 +215,17 @@ Core vs not core
 
 ::
 
-    sage: print(S.train_track_polytope(HORIZONTAL))
+    sage: print(S.cone(HORIZONTAL))
     Cone of dimension 4 in ambient dimension 9 made of 5 facets (backend=ppl)
-    sage: print(S.train_track_polytope(VERTICAL))
+    sage: print(S.cone(VERTICAL))
     Cone of dimension 3 in ambient dimension 9 made of 3 facets (backend=ppl)
 
 ::
 
     sage: # check that we indeed started with a core veering triangulation
-    sage: print(T1.train_track_polytope(HORIZONTAL))
+    sage: print(T1.cone(HORIZONTAL))
     Cone of dimension 4 in ambient dimension 9 made of 4 facets (backend=ppl)
-    sage: print(T1.train_track_polytope(VERTICAL))
+    sage: print(T1.cone(VERTICAL))
     Cone of dimension 4 in ambient dimension 9 made of 5 facets (backend=ppl)
 
 

@@ -160,6 +160,9 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
     """
     __slots__ = ['_x', '_y']
 
+    def base_ring(self):
+        return self._x.base_ring()
+
     def _check(self, error=ValueError):
         r"""
         EXAMPLES::
@@ -178,8 +181,8 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
         if self._mutable != x.is_mutable() or self._mutable != y.is_mutable():
             raise error("incoherent mutability state: self._mutable={}, x.is_mutable()={}, y.is_mutable()={}".format(self._mutable, x.is_mutable(), y.is_mutable()))
 
-        self._set_subspace_constraints(lambda c: self._constraint_check(c, error), x, VERTICAL, False, False)
-        self._set_subspace_constraints(lambda c: self._constraint_check(c, error), y, HORIZONTAL, False, False)
+        self._set_subspace_constraints(lambda c: self._constraint_check(c, error), x, VERTICAL)
+        self._set_subspace_constraints(lambda c: self._constraint_check(c, error), y, HORIZONTAL)
 
     def __str__(self):
         r"""
