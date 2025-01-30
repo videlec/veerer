@@ -550,7 +550,7 @@ class LinearFamily:
 
         EXAMPLES::
 
-            sage: from veerer import StrebelGraph, VeeringTriangulation
+            sage: from veerer import StrebelGraph, VeeringTriangulation, VeeringTriangulationLinearFamily, StrebelGraphLinearFamily
 
             sage: G = StrebelGraph("(0,2,~3,~1)(1)(3,~0)(~2)")
             sage: G.as_linear_family().residue_constraints().echelon_form()
@@ -578,6 +578,34 @@ class LinearFamily:
             sage: f = VeeringTriangulation(fp, cols).as_linear_family(mutable=True)
             sage: f.residue_constraints()
             []
+
+        Examples in the gothic locus::
+
+            sage: f = VeeringTriangulationLinearFamily("(~0,1,2)(~2,3,4)(~3,~4,5)(~5,6,7)(0:1)(~6:1,~7:1,8:1)(~8:1)(9:1)", "RRBRRBRRRR", [(1, 0, -1, 0, -1, -1, 1, 0, 1, 2), (0, 2, 2, 0, 2, 2, -1, 1, 0, 0), (0, 0, 0, 1, 1, 0, 0, 0, 0, 0)])
+            sage: f.residue_constraints()
+            [ 1  0  1 -1]
+            [ 0  1  0 -1]
+            [ 0  0  2 -1]
+            sage: f = VeeringTriangulationLinearFamily("(~2,3,4)(~3,5,6)(~4,7,~5)(0:1)(1:1,2:1)(~6:1,8:1)(~7:1,~8:1)", "RRRRBBRRR", [(2, 0, 2, 0, -2, -1, 1, 1, 0), (0, 2, -2, 0, 2, 1, -1, -1, 1), (0, 0, 0, 1, 1, 1, 0, 0, 0)])
+            sage: f.residue_constraints()
+            [ 1  0  0 -2]
+            [ 0  1  0 -2]
+            [ 0  0  1 -1]
+            sage: f = VeeringTriangulationLinearFamily("(1,2,3)(~3,6,7)(0:1)(~2:1,4:1,5:1)(~4:1,~7:1)(~5:1,~6:1)", "BBBRBBBB", [(2, 0, 0, 0, 1, 1, 0, 0), (0, 2, 0, 2, 1, -1, 1, -1), (0, 0, 1, -1, -1, 0, 0, 1)])
+            sage: f.residue_constraints()
+            [ 1  0  0 -2]
+            [ 0  1 -1 -1]
+            [ 0  0  1 -1]
+            sage: f = VeeringTriangulationLinearFamily("(0:1)(1:1,2:1,3:1,4:1)(~2:1,~4:1,5:1)(~3:1,~5:1)", "RRRRRR", [(2, 0, 0, 1, 1, 0), (0, 2, 0, -1, -1, 1), (0, 0, 1, 0, -1, 0)])
+            sage: f.residue_constraints()
+            [ 1  0  0 -2]
+            [ 0  1 -1 -1]
+            [ 0  0  1 -1]
+            sage: f = StrebelGraphLinearFamily("(0)(1,2,3,4)(~2,~4,5)(~3,~5)", [(2, 0, 0, 1, 1, 0), (0, 2, 0, -1, -1, 1), (0, 0, 1, 0, -1, 0)])
+            sage: f.residue_constraints()
+            [ 1  0  0 -2]
+            [ 0  1 -1 -1]
+            [ 0  0  1 -1]
         """
         # We want vectors that are linear combinations of self.residue_matrix()
         # and self.constraints_matrix().

@@ -800,19 +800,45 @@ class StrebelGraph(Constellation):
             [-1  0  0  0  1 -1  1  0  0  0 -1  1]
             [ 0 -1  0  1  0  1  0  1  0 -1  0 -1]
             [ 0  0 -1 -1 -1  0  0  0  1  1  1  0]
-        """
-        nf = self.num_faces()
+
+        Examples in the gothic locus::
+
+            sage: StrebelGraph("(0)(1,2,3,4)(~2,~4,5)(~3,~5)").residue_matrix()
+            [1 0 0 0 0 0]
+            [0 1 1 1 1 0]
+            [0 0 1 0 1 1]
+            [0 0 0 1 0 1]
+                """
         ne = self.num_edges()
-        r = matrix(ZZ, nf, ne)
 
-        ans, orientations = self.is_abelian(certificate=True)
-        if not ans:
-            raise ValueError('not an Abelian differential')
-        orientations = [1 if x else -1 for x in orientations]
 
-        for i, f in enumerate(self.faces()):
-            for h in f:
-                r[i, h // 2] += orientations[h]
+        is_abelian, orientations = self.is_abelian(certificate=True)
+        if is_abelian:
+            # Abelian differential: we make a consistent global choice of signs for the residues
+            nf = self.num_faces()
+            r = matrix(ZZ, nf, ne)
+
+            orientations = [1 if x else -1 for x in orientations]
+
+            for i, f in enumerate(self.faces()):
+                for h in f:
+                    r[i, h // 2] += orientations[h]
+
+        else:
+            # quadratic differentials: we can only have a local choice of signs
+            # Note that faces whose angle is an odd multiple of pi have residue zero and we
+            # ignore them
+            fp = self._fp
+            even_angle_faces = [f for f in self.boundary_faces() if self.face_angle(f[0]) % 2 == 0]
+            r = matrix(ZZ, len(even_angle_faces), ne)
+            for i, f in enumerate(even_angle_faces):
+                o = 1
+                for h0 in f:
+                    r[i, h0 // 2] += o
+
+                    h1 = fp[h0]
+                    if self.half_edge_num_separatrices(h1) % 2 == 0:
+                        o *= -1
 
         return r
 

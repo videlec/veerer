@@ -914,10 +914,12 @@ class VeeringTriangulation(Triangulation):
 
     def half_edge_num_separatrices(self, h, slope=VERTICAL, check=True):
         h = self._check_half_edge(h)
+        col0 = self._colouring[h // 2]
+        col1 = self._colouring[self._vp[h] // 2]
         if slope == VERTICAL:
-            return self._bdry[h] + (self._colouring[h // 2] == RED and self._colouring[self._vp[h] // 2] == BLUE)
+            return self._bdry[h] + ((col0 == RED or col0 == PURPLE) and (col1 == BLUE or col1== GREEN))
         elif slope == HORIZONTAL:
-            return self._bdry[h] + (self._colouring[h // 2] == BLUE and self._colouring[self._vp[h] // 2] == RED)
+            return self._bdry[h] + ((col0 == BLUE or col0 == GREEN) and (col1 == RED or col1 == PURPLE))
         else:
             raise ValueError("invalid slope argument")
 
@@ -1327,37 +1329,37 @@ class VeeringTriangulation(Triangulation):
         q = []
 
         while any(x is None for x in oris):
-            e0 = 0
-            while oris[e0] is not None:
-                e0 += 1
-            oris[e0] = True
-            oris[e0 ^ 1] = False
-            q = [e0, e0 ^ 1]
+            h0 = 0
+            while oris[h0] is not None:
+                h0 += 1
+            oris[h0] = True
+            oris[h0 ^ 1] = False
+            q = [h0, h0 ^ 1]
 
             while q:
-                e = q.pop()
-                o = oris[e]
+                h0 = q.pop()
+                h1 = vp[h0]
+                o = oris[h0]
                 assert o is not None
-                f = vp[e]
                 while True:
                     # compute the orientation of f from the one of e
-                    if (((cols[e // 2] == RED or cols[e // 2] == PURPLE) and (cols[f // 2] == BLUE or cols[f // 2] == GREEN)) + self._bdry[e]) % 2:
+                    if self.half_edge_num_separatrices(h0) % 2:
                         o = not o
 
-                    if oris[f] is None:
+                    if oris[h1] is None:
                         # f is not oriented yet
-                        assert oris[f ^ 1] is None
-                        oris[f] = o
-                        oris[f ^ 1] = not o
-                        q.append(f ^ 1)
-                    elif oris[f] != o:
+                        assert oris[h1 ^ 1] is None
+                        oris[h1] = o
+                        oris[h1 ^ 1] = not o
+                        q.append(h1 ^ 1)
+                    elif oris[h1] != o:
                         # f is incoherently oriented
                         return (False, None) if certificate else False
                     else:
                         # f is correctly oriented
                         break
 
-                    e, f = f, vp[f]
+                    h0, h1 = h1, vp[h1]
 
         return (True, oris) if certificate else True
 
@@ -2906,6 +2908,8 @@ class VeeringTriangulation(Triangulation):
 
     def residue_matrix(self, slope=VERTICAL):
         r"""
+        Return the matrix of residues.
+
         EXAMPLES::
 
             sage: from veerer import VeeringTriangulation, StrebelGraph, VERTICAL, HORIZONTAL
@@ -2923,26 +2927,52 @@ class VeeringTriangulation(Triangulation):
             ....:             r = vt.residue_matrix(slope)
             ....:             for x in vt.generators_matrix(slope).rows():
             ....:                 assert sum(r * x) == 0, (vt, slope, x)
-       """
-        nf = self.num_boundary_faces()
+
+        Some quadratic differentials with double poles::
+
+            sage: VeeringTriangulation("(~2,4,5)(~3,6,~4)(0:1)(1:1,2:1,3:1)(~5:1,7:1)(~6:1,~7:1)", "BBBBRBBB").residue_matrix()
+            [1 0 0 0 0 0 0 0]
+            [0 1 1 1 0 0 0 0]
+            [0 0 0 0 0 1 0 1]
+            [0 0 0 0 0 0 1 1]
+        """
         ne = self._ne
         colouring = self._colouring
-        r = matrix(ZZ, nf, ne)
 
-        ans, orientations = self.is_abelian(certificate=True)
-        if not ans:
-            raise ValueError('not an Abelian differential')
+        if any(col == PURPLE or col == GREEN for col in colouring):
+            raise NotImplementedError
 
-        if slope == VERTICAL:
-            orientations = [1 if x else -1 for x in orientations]
-        elif slope == HORIZONTAL:
-            orientations = [1 if (orientations[i] == (colouring[i // 2] == RED)) else -1 for i in range(2 * ne)]
+        is_abelian, orientations = self.is_abelian(certificate=True)
+        if is_abelian:
+            # Abelian differential: we make a consistent global choice of signs for the residues
+            nf = self.num_boundary_faces()
+            r = matrix(ZZ, nf, ne)
+            if slope == VERTICAL:
+                orientations = [1 if x else -1 for x in orientations]
+            elif slope == HORIZONTAL:
+                orientations = [1 if (orientations[i] == (colouring[i // 2] == RED)) else -1 for i in range(2 * ne)]
+            else:
+                raise ValueError('invalid slope argument; must be VERTICAL or HORIZONTAL')
+
+            for i, f in enumerate(self.boundary_faces()):
+                for h in f:
+                    r[i, h // 2] += orientations[h]
+
         else:
-            raise ValueError('invalid slope argument; must be VERTICAL or HORIZONTAL')
+            # quadratic differentials: we can only have a local choice of signs
+            # Note that faces whose angle is an odd multiple of pi have residue zero and we
+            # ignore them
+            fp = self._fp
+            even_angle_faces = [f for f in self.boundary_faces() if self.face_angle(f[0]) % 2 == 0]
+            r = matrix(ZZ, len(even_angle_faces), ne)
+            for i, f in enumerate(even_angle_faces):
+                o = 1
+                for h0 in f:
+                    r[i, h0 // 2] += o
 
-        for i, f in enumerate(self.boundary_faces()):
-            for h in f:
-                r[i, h // 2] += orientations[h]
+                    h1 = fp[h0]
+                    if self.half_edge_num_separatrices(h1, slope) % 2 == 0:
+                        o *= -1
 
         return r
 
