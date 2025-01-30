@@ -131,7 +131,7 @@ def tree_with_target(self, root=0, target_vertices=[]):
                 tree[u] = i
                 seen[u] = True
                 todo.append(u)
-        
+
         for i, target in enumerate(target_vertices):
             paths[i] = path_dic.get(target)
     return paths
@@ -345,7 +345,7 @@ class MultiscaleVeeringTriangulation:
             for hhh in f1:
                 if vt._colouring[hh // 2] != vt._colouring[hhh // 2]:
                     raise ValueError(f"The boundary edges in the face of {h1} and the face of {h2} have different colors")
-    
+
     def _check_horizontal_residue_conditions(self):
         for level, nodes in enumerate(self._horizontal_nodes):
             for c, nodes_at_c in enumerate(nodes):
@@ -889,7 +889,7 @@ class MultiscaleVeeringTriangulation:
         l2 = [] #new horizontal nodes at (level - 1, 0) if the degeneration has two levels
         l_horiz = copy.deepcopy(self._horizontal_nodes)
         #existing horizontal nodes
-        for h1, h2 in self._horizontal_nodes[abs(level)][component]: 
+        for h1, h2 in self._horizontal_nodes[abs(level)][component]:
             if r_up[h1] >= 0:
                 h1 = r_up[h1]
                 h2 = r_up[h2]
@@ -1238,7 +1238,7 @@ class MultiscaleVeeringTriangulation:
                     if (-abs(level), c) in lc:
                         l1 = []
                         i = lc.index((-abs(level), c))
-                        vertex_separatrices, vertex_separatrix_index, face_separatrices, face_separatrix_index, infinite_cylinders, infinite_cylinder_index, nv, nf, nc, n = l_info[i]                    
+                        vertex_separatrices, vertex_separatrix_index, face_separatrices, face_separatrix_index, infinite_cylinders, infinite_cylinder_index, nv, nf, nc, n = l_info[i]
                         for h1, h2 in nodes_at_c:
                             a = infinite_cylinder_index[h1]
                             aa = g[i][a]
@@ -1342,10 +1342,10 @@ class MultiscaleVeeringTriangulation:
             mvts.append(MultiscaleVeeringTriangulation(new_vts, new_horiz_nodes, new_pms))
 
         return mvts
-    
+
     def codimension_one_vertical_prime_degenerations(self, level, component, ind_ds_graph, D, index=False):
         r"""
-        Return a list of lists of multi-scale veering triangulations obtained 
+        Return a list of lists of multi-scale veering triangulations obtained
         by codimension-one vertical degenerations of the component.
 
         The returned list is organized as `l = [l0, l1, ...]`, where each Each sublist li satisfies that:
@@ -1355,7 +1355,7 @@ class MultiscaleVeeringTriangulation:
 
         Input:
         - `ds_graph`: The index of the Delaunay-Strebel graph of the prime component (which is the `component`-th component at the `level`).
-        - `D`: An instance of the `PrimeDegeneration` class, responsible for computing the codimension-one vertical degenerations 
+        - `D`: An instance of the `PrimeDegeneration` class, responsible for computing the codimension-one vertical degenerations
         of the `component` in `ds_graph`.
 
         EXAMPLES::
@@ -1452,10 +1452,10 @@ class MultiscaleVeeringTriangulation:
             llmvt = llmvt + l_deg_connected_comps
 
         return llmvt if not index else (llmvt, lindex)
-    
+
     def codimension_one_horizontal_prime_degenerations(self, level, component, ind_ds_graph, D, index=False):
         r"""
-        Return a list of lists of multi-scale veering triangulations obtained 
+        Return a list of lists of multi-scale veering triangulations obtained
         by codimension-one horizontal degenerations of the component.
 
         The returned list is organized as `l = [l0, l1, ...]`, where each Each sublist li satisfies that:
@@ -1465,7 +1465,7 @@ class MultiscaleVeeringTriangulation:
 
         Input:
         - `ds_graph`: The index of the Delaunay-Strebel graph of the prime component (which is the `component`-th component at the `level`).
-        - `D`: An instance of the `PrimeDegeneration` class, responsible for computing the codimension-one horizontal degenerations 
+        - `D`: An instance of the `PrimeDegeneration` class, responsible for computing the codimension-one horizontal degenerations
         of the `component` in `ds_graph`.
 
         EXAMPLES::
@@ -1504,15 +1504,15 @@ class MultiscaleVeeringTriangulation:
         assert vt == ds_graph.root() #it is required to be the root of the Delaunay Strebel graph
 
         l = D._horizontal_degenerations[ind_ds_graph]
-        
+
         list_comps_after_degen = list(l.keys())
-        
+
         llmvt = []
         lindex = []
         for list_comp in list_comps_after_degen:
             l_vt_edge = l[list_comp]
             l_ds_g = [D._components[index] for index in list_comp]
-            
+
             lc = [(-abs(level), component + index) for index in range(len(list_comp))]
             ld = l_ds_g
 
@@ -1528,12 +1528,12 @@ class MultiscaleVeeringTriangulation:
             #make vertical degeneration and compute all transitions under monodromy groups and level-wise permutations
             l_deg_connected_comps = []
             all_mvt = []
-            
+
             for i, mvt in enumerate(lmvt):
                 _, edges_up, edges_low = l_vt_edge[i]
                 mvt = mvt.degeneration(-abs(level), component, edges_low=edges_low, edges_up=edges_up)
                 mvt = mvt.prime_decomposition(-abs(level), component)
-                
+
                 if mvt not in all_mvt:
                     l_mono = mvt.transport_by_monodromy(lc, ld)
                     new_connected_comp = []
@@ -1546,20 +1546,20 @@ class MultiscaleVeeringTriangulation:
             llmvt = llmvt + l_deg_connected_comps
 
         return llmvt if not index else (llmvt, lindex)
-    
+
 
 def multiscale_compactification_representatives(L, D, index=False):
     r"""
     Return all connected components of the boundary in the multiscale compoactification of L as a dictionary.
-    
+
     The value of the key `(i,j)` is a list [l0, l1, ....], where:
     - li is a list of multi-scale veering triangulations in the same connected components.
     - A triangulation in a list has `i` levels and `j` horizontal nodes.
 
     INPUT:
     - L: a prime linear family
-    - D: An instance of the `PrimeDegeneration` class, responsible for computing all the degenerations of L 
-    
+    - D: An instance of the `PrimeDegeneration` class, responsible for computing all the degenerations of L
+
     EXAMPLES::
 
         sage: from veerer import *
@@ -1569,7 +1569,7 @@ def multiscale_compactification_representatives(L, D, index=False):
         sage: from veerer.multiscale_veering_triangulation import *
 
         sage: vt = VeeringTriangulation("(0,6,~5)(~0,~4,5)(1,8,~7)(~1,~8,3)(2,7,~6)(~2,~3,4)", "RRRBBBBBB")
-    
+
     We compare two computations in the followings. We first compute by using the class MultiscaleCompactification::
         sage: L = vt.linear_subvariety()
         sage: M = L.multiscale_compactification()
@@ -1593,17 +1593,17 @@ def multiscale_compactification_representatives(L, D, index=False):
     """
     assert L.is_prime()
     #mvt = mvt.prime_decomposition(0,0)
-    
+
     ds_graph = L.delaunay_strebel_graph()
     L = ds_graph.root() #move to root
     mvt = MultiscaleVeeringTriangulation([L], [[""]], [])
-    
+
     l = collections.defaultdict(list)
     l[0, 0].append([mvt])
     lindex = collections.defaultdict(list)
     ind = D.find(ds_graph) #find the initial index
     lindex[0, 0].append([[ind,]])
-    
+
     all_mvt = []
     d = L.dimension()
     # vertical degenerations
@@ -1616,8 +1616,8 @@ def multiscale_compactification_representatives(L, D, index=False):
                     ind = ind_comp[0][comp] #the index of the comp
                     if len(D._vertical_degenerations[ind]) > 0:
                         l_mvts, inds = mvt.codimension_one_vertical_prime_degenerations(0, comp, ind, D, index=True)
-                        for j, mvts in enumerate(l_mvts): 
-                            if mvts[0] not in all_mvt: 
+                        for j, mvts in enumerate(l_mvts):
+                            if mvts[0] not in all_mvt:
                                 assert all(mvt not in all_mvt for mvt in mvts)
                                 l[codim + 1, 0].append(mvts)
                                 new = copy.deepcopy(ind_comp)
@@ -1625,7 +1625,7 @@ def multiscale_compactification_representatives(L, D, index=False):
                                 new[0][comp:comp + 1] = inds[j][0]
                                 lindex[codim + 1, 0].append(new)
                                 all_mvt = all_mvt + mvts
-    
+
     #horizontal degenerations
     for codim in range(d):
         h = 0
@@ -1641,8 +1641,8 @@ def multiscale_compactification_representatives(L, D, index=False):
                             ind = ind_comp[abs(level)][comp] #the index of the comp
                             if len(D._horizontal_degenerations[ind]) >0:
                                 l_mvts, inds = mvt.codimension_one_horizontal_prime_degenerations(-abs(level), comp, ind, D, index=True)
-                                for j, mvts in enumerate(l_mvts): 
-                                    if mvts[0] not in all_mvt: 
+                                for j, mvts in enumerate(l_mvts):
+                                    if mvts[0] not in all_mvt:
                                         assert all(mvt not in all_mvt for mvt in mvts)
                                         l[codim, h + 1].append(mvts)
                                         new = copy.deepcopy(ind_comp)
