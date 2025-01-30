@@ -1454,7 +1454,7 @@ class VeeringTriangulation(Triangulation):
 
     def stratum(self):
         r"""
-        Return the Abelian or quadratic stratum of this coloured triagulation.
+        Return the Abelian or quadratic stratum of this coloured triangulation.
 
         EXAMPLES::
 

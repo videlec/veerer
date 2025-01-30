@@ -1570,7 +1570,7 @@ def multiscale_compactification_representatives(L, D, index=False):
 
         sage: vt = VeeringTriangulation("(0,6,~5)(~0,~4,5)(1,8,~7)(~1,~8,3)(2,7,~6)(~2,~3,4)", "RRRBBBBBB")
 
-    We compare two computations in the followings. We first compute by using the class MultiscaleCompactification::
+    We compare two computations in the following. We first compute by using the class MultiscaleCompactification::
         sage: L = vt.linear_subvariety()
         sage: M = L.multiscale_compactification()
         sage: M
