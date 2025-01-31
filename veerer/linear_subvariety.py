@@ -31,11 +31,11 @@ from .automaton import DelaunayStrebelAutomaton
 from .veering_triangulation import VeeringTriangulation
 from .strebel_graph import StrebelGraph
 from .delaunay_strebel_graph import DelaunayStrebelGraph
+from .polyhedron.linear_algebra import is_rank_one
 
 from sage.structure.richcmp import op_LT, op_LE, op_EQ, op_NE, op_GT, op_GE, rich_to_bool
 from sage.misc.cachefunc import cached_method
 from sage.graphs.digraph import DiGraph
-
 
 # TODO: optimization: vertical/horizontal degenerations commute
 class PrimeDegenerations:
@@ -257,8 +257,11 @@ class PrimeDegenerations:
                     assert f_up is not None, (state,)
                     # NOTE: the projectivization makes us loose one dimension
                     assert f_low.dimension() + f_up.dimension() == state.dimension()
-                    # too long assert f_low.is_delaunay()
-                    # too long assert f_up.is_delaunay()
+
+                    # too expensive!!
+                    # assert f_low.is_delaunay()
+                    # too expensive!
+                    # assert f_up.is_delaunay()
 
                     known_up, unknown_up, all_roots_up = self.find_and_decompose(f_up)
                     f_up_decomposed = tuple(known_up + unknown_up)
@@ -364,6 +367,8 @@ class PrimeDegenerations:
         return ans
 
 
+# TODO: change the name; we should reserve the name IrreducibleRealLinearSubvariety for
+# an element in BCGGM compactification
 class IrreducibleRealLinearSubvariety:
     r"""
     Irreducible real linear subvariety of the moduli space of multiscale
@@ -691,6 +696,32 @@ class IrreducibleRealLinearSubvariety:
         """
         return MultiscaleCompactification(self)
 
+    # TODO
+    @cached_method
+    def framing_group(self):
+        r"""
+        Return the monodromy of framing obtained by parallel transport in each
+        prime component and exchange of isomorphic components in the same
+        level.
+        """
+        raise NotImplementedError
+
+    def framing_group_element_permutation(self, g, v=None):
+        r"""
+        Given an element of the framing group ``g`` return a quadruple of
+        dictionaries ``(d_vseps, d_fseps, d_cseps, d_fedges)`` encoding
+        permutations of vertex separatrices, face separatrices, infinite
+        cylinders and folded edges.
+
+        The keys and values
+        - for ``d_vseps`` are quadruples ``(level, component, half_edge, angle)``
+        - for ``d_fseps`` are quadruples ``(level, component, half_edge, angle)``
+        - for ``d_cseps`` are triples ``(level, component, half_edge)``
+        - for ``d_fedges`` are triples ``(level, component, half_edge)
+
+        The argument ``v`` is an optional vertex
+        """
+        raise NotImplementedError
 
 
 # TODO: this class could also easily handle LinearSubvariety by not performing

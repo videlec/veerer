@@ -67,21 +67,12 @@ def runs(l):
     else:
         raise TypeError
 
-#     sage: from sage.groups.libgap_wrapper import ElementLibGAP, ParentLibGAP
-#     sage: from sage.groups.group import Group
-#     sage: class FooElement(ElementLibGAP):
-#     ....:     pass
-#     sage: class FooGroup(Group, ParentLibGAP):
-#     ....:     Element = FooElement
-#     ....:     def __init__(self):
-#     ....:         lg = libgap(libgap.CyclicGroup(3))    # dummy
-#     ....:         ParentLibGAP.__init__(self, lg)
-#     ....:         Group.__init__(self)
 
-
-
-# i -> (j,a)
-# means that g((i,x)) = (j,x+a)
+# TODO: in order to handle multiscale monodromy, it would be convenient to be able to consider
+# any (permutation) group obtained by the following operations
+# basic blocks: cyclic groups Ck
+# direct products: G1 x G2
+# wreath products: G wreath Sym(n)
 class FramingGroupElement(Element):
     r"""
     Holds two attributes ``p`` (a permutation) and ``r`` (an array)
