@@ -8,7 +8,7 @@ from sage.misc.cachefunc import cached_method
 from sage.graphs.digraph import DiGraph
 from sage.misc.prandom import randrange
 
-from .permutation import perm_preimage
+from .permutation import perm_preimage, perm_orbit
 from .labelled_digraph import LabelledDiGraph, LabelledDiGraphPath
 from .veering_triangulation import VeeringTriangulation
 from .strebel_graph import StrebelGraph
@@ -182,9 +182,9 @@ class DelaunayStrebelGraph(LabelledDiGraph):
 
         return tuple(vertex_separatrices), tuple(face_separatrices), tuple(infinite_cylinders)
 
-    def framing_group(self):
+    def _ambient_framing_group(self):
         r"""
-        Ambient framing group.
+        Return the ambient framing group.
 
         The framing group is the group of permutation of singularities and
         separatrices. Any such permutation should respect the degree of
@@ -211,7 +211,7 @@ class DelaunayStrebelGraph(LabelledDiGraph):
 
         return FramingGroup(angles, multiplicities)
 
-    def path_framing_monodromy(self, path):
+    def path_framing_group(self, path):
         r"""
         Return the framing monodromy of a (not necessarily closed) path.
 
@@ -228,16 +228,16 @@ class DelaunayStrebelGraph(LabelledDiGraph):
             ....:     if i is None:
             ....:         continue
             ....:     path = ds_graph.path(ds_graph.edge_source(i), [i])
-            ....:     assert ds_graph.path_framing_monodromy(path).is_one()
-            ....:     assert ds_graph.path_framing_monodromy(~path).is_one()
+            ....:     assert ds_graph.path_framing_group(path).is_one()
+            ....:     assert ds_graph.path_framing_group(~path).is_one()
 
         And for complementary edges, it coincides with the canonical loop taken along the spanning tree::
 
             sage: for i in complementary_edges:  # long time
             ....:     path0 = ds_graph.path(ds_graph.edge_source(i), [i])
-            ....:     g0 = ds_graph.path_framing_monodromy(path0)
+            ....:     g0 = ds_graph.path_framing_group(path0)
             ....:     path1 = ds_graph.path(ds_graph.edge_target(i), [-i-1])
-            ....:     g1 = ~ds_graph.path_framing_monodromy(path1)
+            ....:     g1 = ~ds_graph.path_framing_group(path1)
             ....:     assert g0 == g1, (path0, path1, g0, g1, g0._p, g0._r, g1._p, g1._r)
             ....:     path2 = ds_graph.path(ds_graph.edge_source(i), [i])
             ....:     v = ds_graph.edge_source(i)
@@ -250,7 +250,7 @@ class DelaunayStrebelGraph(LabelledDiGraph):
             ....:         i = tree[v]
             ....:         path2.append(i)
             ....:         v = ds_graph.edge_target(i)
-            ....:     g2 = ds_graph.path_framing_monodromy(path2)
+            ....:     g2 = ds_graph.path_framing_group(path2)
             ....:     assert g0 == g2, (path0, path2, g0, g2, g0._p, g0._r, g2._p, g2._r)
         """
         if path._graph is not self:
@@ -274,10 +274,10 @@ class DelaunayStrebelGraph(LabelledDiGraph):
         cseps0 = cseps[v]
         cseps1 = [monodromy.infinite_cylinder_transport(path, h) for h in cseps[u]]
 
-        return framing_group_element(self._vertices[v], self.framing_group(), vseps0, vseps1, fseps0, fseps1, cseps0, cseps1)
+        return framing_group_element(self._vertices[v], self._ambient_framing_group(), vseps0, vseps1, fseps0, fseps1, cseps0, cseps1)
 
     @cached_method
-    def framing_monodromy(self):
+    def framing_group(self):
         r"""
         Return the monodromy of framing obtained by parallel transport along
         this Delaunay-Strebel graph.
@@ -290,7 +290,7 @@ class DelaunayStrebelGraph(LabelledDiGraph):
 
             sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,9)(~8,10,11)(~9,~10,~11)", "BRBBRBBRBBRB")
             sage: ds_graph = vt.delaunay_strebel_graph()  # long time
-            sage: G = ds_graph.framing_monodromy()  # long time
+            sage: G = ds_graph.framing_group()  # long time
             sage: G.cardinality()  # long time
             8
             sage: G.structure_description()  # long time
@@ -300,7 +300,7 @@ class DelaunayStrebelGraph(LabelledDiGraph):
 
             sage: vt = VeeringTriangulation("(~0,1,2)(~1,3,4)(~2,5,6)(~3,~5,7)(~6,8,9)(~7,~8,~9)(0:1)(~4:1)", "BRRRBBRRRB")
             sage: ds_graph = vt.delaunay_strebel_graph()  # long time
-            sage: G = ds_graph.framing_monodromy()  # long time
+            sage: G = ds_graph.framing_group()  # long time
             sage: G.cardinality()  # long time
             16
             sage: G.structure_description()  # long time
@@ -310,7 +310,7 @@ class DelaunayStrebelGraph(LabelledDiGraph):
 
             sage: vt = VeeringTriangulation("(~0,1,2)(~1,3,4)(~2,5,6)(~3,~5,7)(~6,8,9)(~7,~8,~9)(0:2)(~4:2)", "BRRRBBRRRB")
             sage: ds_graph = vt.delaunay_strebel_graph()  # long time
-            sage: G = ds_graph.framing_monodromy()  # long time
+            sage: G = ds_graph.framing_group()  # long time
             sage: G.cardinality()  # long time
             20
             sage: G.structure_description()  # long time
@@ -320,7 +320,7 @@ class DelaunayStrebelGraph(LabelledDiGraph):
 
         vseps, fseps, cseps = self.separatrix_trivialization()
 
-        G = self.framing_group()
+        G = self._ambient_framing_group()
         H = G.subgroup(mutable=True)
         monodromy = SeparatrixMonodromy(self)
 
@@ -346,6 +346,82 @@ class DelaunayStrebelGraph(LabelledDiGraph):
 
         H.set_immutable()
         return H
+
+    def framing_group_element_permutation(self, g, v=0):
+        r"""
+        Given an element of the framing group ``g`` return a triple of
+        dictionaries ``(d_vseps, d_fseps, d_cseps)`` encoding permutations of
+        the separatrices.
+
+        EXAMPLES::
+
+            sage: from veerer import *
+            sage: f = VeeringTriangulationLinearFamily("(0:1)(~0:1,1:1,2:1,~1:1)(~2:1)", "RBR", [(1, 0, 1), (0, 1, 0)])
+            sage: ds_graph = f.delaunay_strebel_graph()
+            sage: G = ds_graph.framing_group()
+
+            sage: g = G("(0:1)(1:1)(2:1)")
+            sage: d_vseps, d_fseps, d_cseps = ds_graph.framing_group_element_permutation(g)
+            sage: print(", ".join(f"{sep} -> {d_vseps[sep]}" for sep in sorted(d_vseps)))
+            (0, 0) -> (1, 0), (1, 0) -> (1, 1), (1, 1) -> (2, 0), (2, 0) -> (0, 0), (3, 0) -> (5, 0), (4, 0) -> (4, 1), (4, 1) -> (3, 0), (5, 0) -> (4, 0)
+            sage: print(", ".join(f"{sep} -> {d_fseps[sep]}" for sep in sorted(d_fseps)))
+            (1, 0) -> (4, 0), (4, 0) -> (1, 0)
+            sage: print(", ".join(f"{sep} -> {d_cseps[sep]}" for sep in sorted(d_cseps)))
+            0 -> 0, 5 -> 5
+
+            sage: g = G("(0:0, 1:2)")
+            sage: d_vseps, d_fseps, d_cseps = ds_graph.framing_group_element_permutation(g)
+            sage: print(", ".join(f"{sep} -> {d_vseps[sep]}" for sep in sorted(d_vseps)))
+            (0, 0) -> (3, 0), (1, 0) -> (5, 0), (1, 1) -> (4, 0), (2, 0) -> (4, 1), (3, 0) -> (1, 1), (4, 0) -> (0, 0), (4, 1) -> (1, 0), (5, 0) -> (2, 0)
+            sage: print(", ".join(f"{sep} -> {d_fseps[sep]}" for sep in sorted(d_fseps)))
+            (1, 0) -> (1, 0), (4, 0) -> (4, 0)
+            sage: print(", ".join(f"{sep} -> {d_cseps[sep]}" for sep in sorted(d_cseps)))
+            0 -> 0, 5 -> 5
+        """
+        state = self._vertices[v]
+        vseps, fseps, cseps = self.separatrix_trivialization()
+
+        all_seps = []
+        for h, a in vseps[v]:
+            orbit = [(h, b) for b in range(a, state.half_edge_num_separatrices(h, check=False))]
+            for hh in perm_orbit(state._vp, h)[1:]:
+                orbit.extend((hh, b) for b in range(state.half_edge_num_separatrices(hh, check=False)))
+            orbit.extend((h, b) for b in range(a))
+            all_seps.append(orbit)
+
+        for h, a in fseps[v]:
+            orbit = [(h, b) for b in range(a, -1, -1)]
+            for hh in perm_orbit(state._fp, h)[1:]:
+                orbit.extend((hh, b) for b in range(state.half_edge_num_separatrices(hh, check=False) - 2, -1, -1))
+            orbit.extend((h, b) for b in range(state.half_edge_num_separatrices(h, check=False)  - 2, a, -1))
+            all_seps.append(orbit)
+
+        all_seps.extend(cseps[v])
+
+        nv = len(vseps[v])
+        nf = len(fseps[v])
+        nc = len(cseps[v])
+
+        d_vseps = {}
+        d_fseps = {}
+        d_cseps = {}
+
+        for i in range(nv):
+            seps = all_seps[i]
+            for a, sep in enumerate(seps):
+                j, b = g(i, a)
+                d_vseps[sep] = all_seps[j][b]
+        for i in range(nv, nv + nf):
+            seps = all_seps[i]
+            for a, sep in enumerate(seps):
+                j, b = g(i, a)
+                d_fseps[sep] = all_seps[j][b]
+        for i in range(nv + nf, nv + nf + nc):
+            sep = all_seps[i]
+            j = g(i)
+            d_cseps[sep] = all_seps[j]
+
+        return (d_vseps, d_fseps, d_cseps)
 
     # The following is clearly not the optimal strategy. We could have a self-loop
     # that commutes with many other flips. We could delete all such loops but one

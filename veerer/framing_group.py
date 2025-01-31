@@ -660,6 +660,32 @@ class FramingSubgroup(Parent):
                 self.add_generator(g)
         self._mutable = mutable
 
+    def gens(self):
+        r"""
+        Return generators of this framing subgroup.
+        """
+        return tuple(self._generators)
+
+    def _element_constructor_(self, *args, **kwds):
+        r"""
+        EXAMPLES::
+
+            sage: from veerer import *
+            sage: f = VeeringTriangulationLinearFamily("(0:1)(~0:1,1:1,2:1,~1:1)(~2:1)", "RBR", [(1, 0, 1), (0, 1, 0)])
+            sage: ds_graph = f.delaunay_strebel_graph()
+            sage: G = ds_graph.framing_group()
+            sage: G("(0:1)(1:1)(2:1)")
+            (0:1)(1:1)(2:1)
+            sage: G("(0:1)(1:1)")
+            Traceback (most recent call last):
+            ...
+            ValueError: not an element of this framing group subgroup
+        """
+        g = self._ambient_group(*args, **kwds)
+        if g not in self:
+            raise ValueError("not an element of this framing group subgroup")
+        return g
+
     def set_immutable(self):
         self._mutable = False
 
@@ -673,17 +699,34 @@ class FramingSubgroup(Parent):
         r"""
         Test whether self is a subgroup of other
         """
-        if self._ambient_group != other._ambient_group:
-            raise TypeError
+        if isinstance(self, FramingSubgroup) and isinstance(other, FramingSubgroup):
+            if self._ambient_group != other._ambient_group:
+                raise TypeError
 
-        for g in self._generators:
+        elif isinstance(self, FramingGroup):
+            if other._ambient_group != self:
+                raise TypeError
+
+        elif isinstance(other, FramingGroup):
+            if self._ambient_group != other:
+                raise TypeError
+
+            return True
+
+        else:
+            return NotImplemented
+
+        for g in self.gens():
             if g not in other:
                 return False
 
         return True
 
     def __eq__(self, other):
-        return self <= other and other <= self
+        if type(self) is type(other) or (isinstance(self, (FramingGroup, FramingSubgroup)) and isinstance(other, (FramingGroup, FramingSubgroup))):
+            return self <= other and other <= self
+
+        return NotImplemented
 
     def __ne__(self, other):
         return not (self == other)
