@@ -42,8 +42,8 @@ def in_connected_component(vt, h):
             return l_comp.index(comp)
 
 def track_prong(vt, r_up, r_low, prong):
-
-    m, h, ang = prong
+    l, c, h, ang = prong
+    l = abs(l)
 
     for v in vt.vertices():
         if h in v:
@@ -52,10 +52,10 @@ def track_prong(vt, r_up, r_low, prong):
 
     if min(vh) >= 0: #The case that vh is in f_up
         h = r_up[h]
-        return (m, h, ang)
+        return (l, c, h, ang)
     else: #The case that vh is in f_low
          if max(r_up) == -1:
-            return (m, r_low[h],ang)
+            return (l, c, r_low[h],ang)
          else:
             a = 0
             while r_up[h] >= 0:
@@ -66,7 +66,7 @@ def track_prong(vt, r_up, r_low, prong):
                     a = a + 1
             ang = ang + a
             assert r_low[h] >= 0
-            return ((m[0] - 1,0), r_low[h], ang)
+            return (l + 1, 0, r_low[h], ang)
 
 def _vaninshing_red_blue_corner(vt, r_up, r_low, h):
     hh = vt.next_at_vertex(h)
@@ -76,7 +76,7 @@ def _vaninshing_red_blue_corner(vt, r_up, r_low, h):
         return False
 
 def _new_prong_matching(vt, f_low, r_up, r_low, level, comp):
-
+    level = abs(level)
     nh = 2 * vt.num_edges()
     newpm = []
     lpoles = [] #the poles at nodes in f_low considered so far
@@ -92,10 +92,10 @@ def _new_prong_matching(vt, f_low, r_up, r_low, level, comp):
                 while ((vt.half_edge_num_separatrices(h) == 0) and (r_up[h] >= 0)) or (_vaninshing_red_blue_corner(vt, r_up, r_low, h)):
                     h = vt.previous_at_vertex(h)
                 if (vt.half_edge_num_separatrices(h) > 0) and (r_up[h] >= 0):
-                    vert_sep = ((-abs(level), comp), h, 0)
-                    prong1 = ((-abs(level),comp), r_up[h], 0)
+                    vert_sep = (level, comp, h, 0)
+                    prong1 = (level,comp, r_up[h], 0)
                     prong2 = track_prong(vt, r_up, r_low, vert_sep)
-                    assert prong2[0][0] == -abs(level) - 1
+                    assert prong2[0] == level + 1
                     pm = [prong1, prong2]
                     newpm.append(pm)
                     lpoles.append(f_pole)
@@ -153,8 +153,8 @@ class MultiscaleVeeringTriangulation:
     , where the half-edges h1 and h2 are contained in the boundary face of simple poles.
 
     prong_matching : a list consistings of pairs (prong1,prong2) with
-    prong1 = ((level1, label1), h1, angle1)
-    prong2 = ((level2, label2), h2, angle2)
+    prong1 = (level1, label1, h1, angle1)
+    prong2 = (level2, label2, h2, angle2)
     where:
     - level1 > level2
     - h1 is an half-edge at a zero of the veering triangulation 'vt1' at level1, and h2 is an hal-edge in a boundary face of the veering triangulation 'vt2' at level2
@@ -183,7 +183,7 @@ class MultiscaleVeeringTriangulation:
             [VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])]
         ],
         horizontal_nodes=[[[]], [[]]],
-        prong_matching=[(((0, 0), 0, 0), ((1, 0), 0, 0)), (((0, 0), 10, 0), ((1, 0), 4, 0))]
+        prong_matching=[[(0, 0, 0, 0), (1, 0, 0, 0)], [(0, 0, 10, 0), (1, 0, 4, 0)]]
         )
         sage: vt0 = mvt1._veering_triangulations[0][0]
         sage: vt1 = mvt1._veering_triangulations[1][0]
@@ -216,6 +216,7 @@ class MultiscaleVeeringTriangulation:
             if len(horizontal_nodes) != len(self._veering_triangulations):
                 raise ValueError("Miss information for horizontal nodes at some levels")
             self._horizontal_nodes = []
+            data_horiz_nodes =[] #the data used to build the digraph
             for level in range(len(horizontal_nodes)):
                 self._horizontal_nodes.append([])
                 nodes = horizontal_nodes[level]
@@ -252,11 +253,14 @@ class MultiscaleVeeringTriangulation:
                     for node in nodes_at_c:
                         h1, h2 = node
                         h1 = min(perm_orbit(fp, h1))
+                        cc1 = in_connected_component(vt,h1)
                         h2 = min(perm_orbit(fp, h2))
+                        cc2= in_connected_component(vt, h2)
                         node = tuple(sorted((h1, h2)))
                         if check:
                             self._check_horizontal_node(level, c, node)
                         self._horizontal_nodes[level][c].append(node)
+                        data_horiz_nodes.append((level, c, cc1, h1, cc2, h2))
                     self._horizontal_nodes[level][c] = sorted(self._horizontal_nodes[level][c], key=lambda x: x[0])
         elif horizontal_nodes is None:
             self._horizontal_nodes = [[[] for _ in range(len(vts))] for vts in self._veering_triangulations]
@@ -267,8 +271,8 @@ class MultiscaleVeeringTriangulation:
             self._prong_matchings = []
             for pm in prong_matching:
                 prong1, prong2 = pm
-                ((l1, c1), h1, a1) = prong1
-                ((l2, c2), h2, a2) = prong2
+                (l1, c1, h1, a1) = prong1
+                (l2, c2, h2, a2) = prong2
 
                 l1 = self._check_level(l1)
                 l2 = self._check_level(l2)
@@ -296,7 +300,7 @@ class MultiscaleVeeringTriangulation:
                         h2 = hh2
                         a2 = aa2
 
-                pm = (((l1, c1), h1, a1), ((l2, c2), h2, a2))
+                pm = ((l1, c1, h1, a1), (l2, c2, h2, a2))
                 if check:
                     self._check_local_prong_matching(pm)
                 self._prong_matchings.append(pm)
@@ -376,30 +380,31 @@ class MultiscaleVeeringTriangulation:
 
             sage: vt00 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)","RBRBB")
             sage: vt01 = VeeringTriangulation("(~0,1,2)(~1,~2,3)(~4,~6,~7)(6,7,~5)(0:5)(~3:1)(4:4,5:4)","BBRBBBRR")
-            sage: pm = [((0, 0), 0,4),((-1, 0), 0, 1)]
+            sage: pm = [(0, 0, 0,4),(-1, 0, 0, 1)]
             sage: MultiscaleVeeringTriangulation([vt00,vt01],[[""],[""]],[pm])
             Traceback (most recent call last):
             ...
             ValueError: angle (=4) out of range for separatrix at half_edge=0; must be >= 0 and < 4
-            sage: pm = [((0, 0),7,0),((-1, 0),0,1)]
+            sage: pm = [(0,0,7,0),(1,0,0,1)]
             sage: MultiscaleVeeringTriangulation([vt00,vt01],[[""],[""]],[pm])
             Traceback (most recent call last):
             ...
             ValueError: angle (=0) out of range for separatrix at half_edge=7; must be >= 0 and < 0
-            sage: pm = [((0,0),1,0),((-1,0),0,1)]
+            sage: pm = [((0,0,1,0),(1,0,0,1)]
             sage: MultiscaleVeeringTriangulation([vt00,vt01],[[""],[""]],[pm])
             Traceback (most recent call last):
             ...
-            ValueError: The orders of the zero in ((0, 0), 1, 0) and  the pole in ((1, 0), 0, 1) are not matched
+            ValueError: The orders of the zero in (0, 0, 1, 0) and  the pole in (1, 0, 0, 1) are not matched
         """
 
         N = len(self._veering_triangulations)
         prong1, prong2= pm
 
-        m1, h1, a1 = prong1
-        m2, h2, a2 = prong2
-        l1, c1 = m1
-        l2, c2 = m2
+        l1, c1, h1, a1 = prong1
+        l2, c2, h2, a2 = prong2
+
+        l1 = self._check_level(l1)
+        l2 = self._check_level(l2)
 
         #check the levels are valid
         if l1 < 0 or l1 >= N or l2 < 0 or l2 >= N:
@@ -407,8 +412,8 @@ class MultiscaleVeeringTriangulation:
         if l1 >= l2:
             raise ValueError(f"The level of {prong1} should be greater than the level of {prong2}")
 
-        vt1 = self._veering_triangulations[abs(l1)][c1]
-        vt2 = self._veering_triangulations[abs(l2)][c2]
+        vt1 = self._veering_triangulations[l1][c1]
+        vt2 = self._veering_triangulations[l2][c2]
 
         #check the orders of the zero and pole are matched
         if vt2.face_angle(h2) == 0:
@@ -443,24 +448,21 @@ class MultiscaleVeeringTriangulation:
 
     def _check_prong_matching(self):
         pms = self._prong_matchings
-        NN = self.num_levels()
-        for level in range(NN):
-            l1 = []
-            l2 = []
-            for pm in pms:
-                p1, p2 = pm
-                if p1[0][0] == level:
-                    v = self.vertical_node(pm)[0]
-                    if v in l1:
-                        raise ValueError(f"There are prongs at the same zero as {pm[0]}")
-                    else:
-                        l1.append((p1[0][1], v))
-                if p2[0][0] == level:
-                    f = self.vertical_node(pm)[1]
-                    if f in l2:
-                        raise ValueError(f"There are prongs at the same pole as {pm[1]}")
-                    else:
-                        l2.append((p2[0][1], f))
+        l1 = []
+        l2 = []
+        for pm in pms:
+            p1, p2 = pm
+            level1, c1, _, _ = p1
+            level2, c2, _, _ = p2
+            v, f = self.vertical_node(pm)
+            if (level1, c1, v) in l1:
+                raise ValueError(f"There are prongs at the same zero as {pm[0]}")
+            else:
+                l1.append((level1, c1, v))
+            if (level2, c2, f) in l2:
+                raise ValueError(f"There are prongs at the same pole as {pm[1]}")
+            else:
+                l2.append((level2, c2, f))
 
     def __str__(self):
         vt_strings = ",\n    ".join("[" + ", ".join(str(vt) for vt in l) + "]" for l in self._veering_triangulations)
@@ -616,15 +618,15 @@ class MultiscaleVeeringTriangulation:
 
     def vertical_node(self, pm):
         r"""
-        Return the underlying node of the prong matching.
-
-        The vertical node is represented as a pair of zero and face
+        Return the underlying node of the prong matching, which is represented as a pair of zero and face
         """
         p1, p2 = pm
-        m1, h1, _ = p1
-        m2, h2, _ = p2
-        vt1 = self._veering_triangulations[abs(m1[0])][m1[1]]
-        vt2 = self._veering_triangulations[abs(m2[0])][m2[1]]
+        l1, c1, h1, _ = p1
+        l2, c2, h2, _ = p2
+        l1 = self._check_level(l1)
+        l2 = self._check_level(l2)
+        vt1 = self._veering_triangulations[l1][c1]
+        vt2 = self._veering_triangulations[l2][c2]
         for v in vt1.vertices():
             if h1 in v:
                 v1 = v
@@ -649,11 +651,11 @@ class MultiscaleVeeringTriangulation:
             sage: from veerer import VeeringTriangulation, MultiscaleVeeringTriangulation
             sage: vt00 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)","RBRBB")
             sage: vt01 = VeeringTriangulation("(~0,1,2)(~1,~2,3)(~4,~6,~7)(6,7,~5)(0:5)(~3:1)(4:4,5:4)","BBRBBBRR")
-            sage: mvt0 = MultiscaleVeeringTriangulation([vt00,vt01],[[""],[""]],[[((0,0),"0",0),((-1,0),"0",1)],[((0,0),"2",0),((-1,0),"5",1)]])
-            sage: mvt0._local_prong_matching([((0,0),0,0),((-1,0),0,1)])
+            sage: mvt0 = MultiscaleVeeringTriangulation([vt00,vt01],[[""],[""]],[[(0,0,"0",0),(-1,0,"0",1)],[(0,0,"2",0),(-1,0,"5",1)]])
+            sage: mvt0._local_prong_matching([(0,0,0,0),(-1,0,0,1)])
             [[(0, 0), (0, 1), (0, 2), (0, 3)], [(0, 1), (0, 0), (0, 3), (0, 2)]]
         """
-        (((l1, c1), h1, a1), ((l2, c2), h2, a2)) = pm
+        ((l1, c1, h1, a1), (l2, c2, h2, a2)) = pm
 
         vt1 = self._veering_triangulations[l1][c1]
         vt2 = self._veering_triangulations[l2][c2]
@@ -668,12 +670,14 @@ class MultiscaleVeeringTriangulation:
         r"""
         Return the indices of the connected components that have horizontal nodes with the input component at `label`-th component at level-`level`.
         """
+        level = self._check_level(level)
         l_node = self.horizontal_nodes_at_level(level)
 
         l = []
         for level, s, f1, f2 in l_node:
+            assert level >= 0
             #compute the connected component indices of the face f1 and f2
-            vt = self._veering_triangulations[abs(level)][s]
+            vt = self._veering_triangulations[level][s]
             c1 = in_connected_component(vt, f1[0])
             c2 = in_connected_component(vt, f2[0])
 
@@ -707,11 +711,11 @@ class MultiscaleVeeringTriangulation:
             True
             sage: vt1.is_abelian()
             True
-            sage: mvt0 = MultiscaleVeeringTriangulation([vt0,vt1], [[""], ["(~4,7)"]], [[((0,0),"0",0), ((-1,0),"0",1)], [((0,0),"2",0),((-1,0),"5",1)]])
+            sage: mvt0 = MultiscaleVeeringTriangulation([vt0,vt1],[[""],["(~4,7)"]],[[(0,0,"0",0),(-1,0,"0",1)],[(0,0,"2",0),(-1,0,"5",1)]])
             sage: mvt0.is_abelian()
             False
             sage: vt2 = VeeringTriangulationLinearFamily("(~0,1,4)(~1,~2,3)(~5,6,9)(~6,~7,8)(0:5)(2:1)(~3:1)(~4:1)(5:5)(7:1)(~8:1)(~9:1)", "BBRBRBBRBR", [(1, 0, 0, 0, 1, 0, 0, 0, 0, 0), (0, 1, 0, 1, -1, 0, 0, 1, 1, 0), (0, 0, 1, 1, 0, 0, 0, 1, 1, 0), (0, 0, 0, 0, 0, 1, 0, 0, 0, 1), (0, 0, 0, 0, 0, 0, 1, -1, 0, -1)])
-            sage: mvt1 = MultiscaleVeeringTriangulation([vt0,vt2],[[""],["(~3,~8)"]],[[((0,0),"0",0),((-1,0),"0",1)],[((0,0),"2",0),((-1,0),"5",1)]])
+            sage: mvt1 = MultiscaleVeeringTriangulation([vt0,vt2],[[""],["(~3,~8)"]],[[(0,0,"0",0),(-1,0,"0",1)],[(0,0,"2",0),(-1,0,"5",1)]])
             sage: print(mvt1.is_abelian(certificate=True))
             (True, [[[True, False, True, False, False, True, False, True, False, True]], [[False, True, False, True, False, True, False, True, False, True, True, False, True, False, True, False, True, False, True, False]]])
         """
@@ -782,11 +786,11 @@ class MultiscaleVeeringTriangulation:
 
         lv = [] #the list of component adjusted so far, where the component is labeled by (level, index of the component in this level)
 
-        for pm in self._prong_matchings:
-            m1, h1, ang1 = pm[0]
-            m2, h2, ang2 = pm[1]
-            level1, s1 = m1
-            level2, s2 = m2
+        for pm in self._prong_matching:
+
+            level1, s1, h1, ang1 = pm[0]
+            level2, s2, h2, ang2 = pm[1]
+            assert level1 >= 0 and level2 >= 0
 
             vt1 = self._veering_triangulations[level1][s1]
             vt2 = self._veering_triangulations[level2][s2]
@@ -886,7 +890,7 @@ class MultiscaleVeeringTriangulation:
 
             sage: vt00 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)","RBRBB")
             sage: vt01 = VeeringTriangulation("(~0,1,2)(~1,~2,3)(~4,~6,~7)(6,7,~5)(0:5)(~3:1)(4:4,5:4)","BBRBBBRR")
-            sage: mvt0 = MultiscaleVeeringTriangulation([vt00,vt01],[[""],[""]],[[((0,0),"0",0),((-1,0),"0",1)],[((0,0),"2",0),((-1,0),"5",1)]])
+            sage: mvt0 = MultiscaleVeeringTriangulation([vt00,vt01],[[""],[""]],[[(0,0,"0",0),(-1,0,"0",1)],[(0,0,"2",0),(-1,0,"5",1)]])
             sage: mvt0.degeneration(-1,0, edges_low=[0, 1, 2, 3, 4, 5], edges_up=[6, 7])
             MultiscaleVeeringTriangulation(
             veering_triangulations=[
@@ -894,7 +898,7 @@ class MultiscaleVeeringTriangulation:
                 [VeeringTriangulationLinearFamily("(~0,1,2)(~1,~2,3)(0:5)(~3:1)(4:4,5:4)(~4:1)(~5:1)", "BBRBBB", [(1, 0, 1, 1, 0, 0), (0, 1, -1, 0, 0, 0), (0, 0, 0, 0, 1, 1)])]
             ],
             horizontal_nodes=[[[]], [[(9, 11)]]],
-            prong_matching=[(((0, 0), 0, 0), ((1, 0), 0, 1)), (((0, 0), 4, 0), ((1, 0), 10, 1))]
+            prong_matching=[[(0, 0, 0, 0), (1, 0, 0, 1)], [(0, 0, 4, 0), (1, 0, 10, 1)]]
             )
         """
         level = self._check_level(level)
@@ -973,21 +977,21 @@ class MultiscaleVeeringTriangulation:
         original_pm = copy.deepcopy(self._prong_matchings)
         for pm in original_pm:
             prong1, prong2 = pm
-            if prong1[0] == (level, component):
+            if prong1[0] == level and prong1[1] == component:
                 prong1 = track_prong(vt, r_up, r_low, prong1)
                 if f_up is None:
                     l_pm.append([prong1, prong2])
                 else:
-                    prong2 = ((prong2[0][0] + 1,prong2[0][1]), prong2[1], prong2[2])
+                    prong2 = (prong2[0] + 1,prong2[1], prong2[2], prong2[3])
                     l_pm.append([prong1,prong2])
-            elif prong2[0] == (level, component):
+            elif prong2[0] == level and prong2 == component:
                 prong2 = track_prong(vt, r_up, r_low, prong2)
                 l_pm.append([prong1,prong2])
             else:
                 l_pm.append(pm)
         #new vertical nodes
         if f_up is not None:
-            l_pm  = l_pm + _new_prong_matching(vt, f_low, r_up, r_low, -abs(level), component)
+            l_pm  = l_pm + _new_prong_matching(vt, f_low, r_up, r_low, level, component)
 
         #build the degeneration
         return MultiscaleVeeringTriangulation(vts, l_horiz, l_pm)
@@ -1067,7 +1071,7 @@ class MultiscaleVeeringTriangulation:
                 [VeeringTriangulationLinearFamily("(0:4,~0:4)", "R", [(1)])]
             ],
             horizontal_nodes=[[[]], [[]]],
-            prong_matching=[(((0, 0), 0, 0), ((1, 0), 0, 1))]
+            prong_matching=[((0, 0, 0, 0), (1, 0, 0, 1))]
             )
             sage: vt0 = mvt._veering_triangulations[0][0]
             sage: ds_graph = vt0.delaunay_strebel_graph()
@@ -1082,37 +1086,40 @@ class MultiscaleVeeringTriangulation:
             prong_matching=[(((0, 0), 2, 0), ((1, 0), 0, 1))]
             )
         """
+        level = self._check_level(level)
+
         ds_graph = path._graph
         vt0 = ds_graph.vertex_label(path.start())
         vt1 = ds_graph.vertex_label(path.end())
-        assert self._veering_triangulations[abs(level)][component] == vt0
+        assert self._veering_triangulations[level][component] == vt0
 
         vts = copy.deepcopy(self._veering_triangulations)
-        vts[abs(level)][component] = vt1
+        vts[level][component] = vt1
 
         mono = SeparatrixMonodromy(ds_graph)
 
         #new horizontal nodes
         l1 = [] #new horizontal nodes at (level, component)
         l_horiz = copy.deepcopy(self._horizontal_nodes)
-        for h1, h2 in l_horiz[abs(level)][component]:
+        for h1, h2 in l_horiz[level][component]:
             h1 = mono.infinite_cylinder_transport(path, h1)
             h2 = mono.infinite_cylinder_transport(path, h2)
             l1.append((h1,h2))
-        l_horiz[abs(level)][component] = l1
-
+        l_horiz[level][component] = l1
+        
         #new vertical nodes
         l2 = []
         l_vert = copy.deepcopy(self._prong_matchings)
         for pm in l_vert:
             p1, p2 = pm
-            m1, h1, ang1 = p1
-            m2, h2, ang2 = p2
-            if m1 == (-abs(level), component):
+            level1, c1, h1, ang1 = p1
+            level2, c2, h2, ang2 = p2
+            if level1 == level and c1 == component:
                 h1, ang1 = mono.vertex_separatrix_transport(path, h1, ang1)
-            if m2 == (-abs(level), component):
+            if level2 == level and c2 == component:
                 h2, ang2 = mono.face_separatrix_transport(path, h2, ang2)
-            l2.append([(m1, h1, ang1),(m2, h2, ang2)])
+            assert level1 >= 0 and level2 >= 0
+            l2.append([(level1, c1, h1, ang1),(level2, c2, h2, ang2)])
         l_vert = l2
 
         return MultiscaleVeeringTriangulation(vts,l_horiz,l_vert)
@@ -1136,7 +1143,7 @@ class MultiscaleVeeringTriangulation:
                 [VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])]
             ],
             horizontal_nodes=[[[]], [[]]],
-            prong_matching=[(((0, 0), 0, 0), ((1, 0), 0, 0)), (((0, 0), 10, 0), ((1, 0), 4, 0))]
+            prong_matching=[((0, 0, 0, 0), (1, 0, 0, 0)), ((0, 0, 10, 0), (1, 0, 4, 0))]
             )
             sage: mvt1.prime_decomposition(0, 0)
             MultiscaleVeeringTriangulation(
@@ -1145,11 +1152,12 @@ class MultiscaleVeeringTriangulation:
                 [VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])]
             ],
             horizontal_nodes=[[[], []], [[]]],
-            prong_matching=[(((0, 0), 0, 0), ((1, 0), 0, 0)), (((0, 1), 0, 0), ((1, 0), 4, 0))]
+            prong_matching=[((0, 0, 0, 0), (1, 0, 0, 0)), ((0, 1, 0, 0), (1, 0, 4, 0))]
             )
         """
+        level = self._check_level(level)
         vts = copy.deepcopy(self._veering_triangulations)
-        vt = vts[abs(level)][component]
+        vt = vts[level][component]
 
         l = copy.deepcopy(vt.prime_decomposition())
 
@@ -1170,7 +1178,7 @@ class MultiscaleVeeringTriangulation:
             l_mapping.append(mapping)
 
         #build veering triangulations
-        vts[abs(level)][component : component + 1] = l_vts_canonical
+        vts[level][component : component + 1] = l_vts_canonical
 
         def label_in_prime_comp(h, l_comp, l_mapping):
             for edges in l_comp:
@@ -1186,30 +1194,30 @@ class MultiscaleVeeringTriangulation:
         #new horizontal nodes
         l1 = [[] for i in range(len(l))]
         l_horiz = copy.deepcopy(self._horizontal_nodes)
-        for h1, h2 in l_horiz[abs(level)][component]:
+        for h1, h2 in l_horiz[level][component]:
             cp1, h1 = label_in_prime_comp(h1, l_comp, l_mapping)
             cp2, h2 = label_in_prime_comp(h2, l_comp, l_mapping)
             assert cp1 == cp2
             l1[cp1].append((h1,h2))
-        l_horiz[abs(level)][component:component + 1] = l1
+        l_horiz[level][component:component + 1] = l1
 
         #new vertical nodes
         l2 = []
         l_vert = copy.deepcopy(self._prong_matchings)
         for pm in l_vert:
             p1, p2 = pm
-            m1, h1, ang1 = p1
-            m2, h2, ang2 = p2
-            if m1 == (-abs(level), component):
+            level1, c1, h1, ang1 = p1
+            level2, c2, h2, ang2 = p2
+            if (level1, c1) == (level, component):
                 cp1, h1 = label_in_prime_comp(h1, l_comp, l_mapping)
-                p1 = ((-abs(level), cp1 + component), h1, ang1)
-            if m2 == (-abs(level), component):
+                p1 = (level, cp1 + component, h1, ang1)
+            if (level2, c2) == (level, component):
                 cp2, h2 = label_in_prime_comp(h2, l_comp, l_mapping)
-                p2 = ((-abs(level), cp2 + component), h2, ang2)
-            if m1[0] == -abs(level) and m1[1] > component:
-                p1 = ((-abs(level), m1[1] + len(l_vts_canonical) - 1), h1, ang1)
-            if m2[0] == -abs(level) and m2[1] > component:
-                p2 = ((-abs(level), m2[1] + len(l_vts_canonical) - 1), h2, ang2)
+                p2 = (level, cp2 + component, h2, ang2)
+            if level1 == level and c1 > component:
+                p1 = (level, c1 + len(l_vts_canonical) - 1, h1, ang1)
+            if level2 == level and c2 > component:
+                p2 = (level, c2 + len(l_vts_canonical) - 1, h2, ang2)
             l2.append([p1,p2])
         l_vert = l2
 
@@ -1229,12 +1237,10 @@ class MultiscaleVeeringTriangulation:
         raise NotImplementedError
 
         from itertools import product
-        l_g = []
-        l_info = []
+        l_g = [] #list of monodromy groups
         for dsg in ld:
-            i = ld.index(dsg)
-            level, c = lc[i]
-            vt = self._veering_triangulations[abs(level)][c]
+            monog = dsg.framing_group()
+            l_g.append(list(monog))
 
             vertex_separatrices = vt.vertex_separatrices(flat=True)
             vertex_separatrix_index = {ha: i for i, ha in enumerate(vertex_separatrices)}
@@ -1260,53 +1266,41 @@ class MultiscaleVeeringTriangulation:
         G = product(*l_g)
         lmvts = set()
         for g in G:
+            
+            per = [ld[i].framing_group_element_permutation(g[i]) for i in range(len(lc))]
+            
             #do not change veering triangulations
             vts = copy.deepcopy(self._veering_triangulations)
 
             #new horizontal nodes
             l_horiz = copy.deepcopy(self._horizontal_nodes)
-            for level, nodes in enumerate(l_horiz):
-                for c, nodes_at_c in enumerate(nodes):
-                    if (-abs(level), c) in lc:
-                        l1 = []
-                        i = lc.index((-abs(level), c))
-                        vertex_separatrices, vertex_separatrix_index, face_separatrices, face_separatrix_index, infinite_cylinders, infinite_cylinder_index, nv, nf, nc, n = l_info[i]
-                        for h1, h2 in nodes_at_c:
-                            a = infinite_cylinder_index[h1]
-                            aa = g[i][a]
-                            h1 = infinite_cylinders[aa - nv - nf]
-
-                            a = infinite_cylinder_index[h2]
-                            aa = g[i][a]
-                            h2 = infinite_cylinders[aa - nv - nf]
-                            l1.append((h1,h2))
-                        l_horiz[abs(level)][c] = l1
+            for (level, c) in lc:
+                i = lc.index((level, c))
+                l1 = []
+                for h1, h2 in l_horiz[level][c]:
+                    h1 = per[i][2][h1]
+                    h2 = per[i][2][h2]
+                    assert h1 == min(perm_orbit(vts[level][c]._fp, h1)) and h2 == min(perm_orbit(vts[level][c]._fp, h2)) 
+                    l1.append((h1, h2))
+                l_horiz[level][c] = l1
 
             #new vertical nodes
             l2 = []
             l_vert = copy.deepcopy(self._prong_matchings)
             for pm in l_vert:
                 p1, p2 = pm
-                m1, h1, ang1 = p1
-                m2, h2, ang2 = p2
+                level1, c1, h1, ang1 = p1
+                level2, c2, h2, ang2 = p2
 
-                if m1 in lc:#the zero of the node is contained in the component
-                    i = lc.index(m1)
-                    vertex_separatrices, vertex_separatrix_index, face_separatrices, face_separatrix_index, infinite_cylinders, infinite_cylinder_index, nv, nf, nc, n = l_info[i]
-
-                    a = vertex_separatrix_index[(h1, ang1)]
-                    aa = g[i][a]
-                    h1, ang1 = vertex_separatrices[aa]
-                if m2 in lc: #the pole of the node is contained in the component
-                    i = lc.index(m2)
-                    vertex_separatrices, vertex_separatrix_index, face_separatrices, face_separatrix_index, infinite_cylinders, infinite_cylinder_index, nv, nf, nc, n = l_info[i]
-
-                    a = face_separatrix_index[(h2, ang2)]
-                    aa = g[i][a]
-                    h2, ang2 = face_separatrices[aa - nv]
-                l2.append([(m1, h1, ang1),(m2, h2, ang2)])
+                if (level1, c1) in lc:#the zero of the node is contained in the component
+                    i = lc.index((level1, c1))
+                    assert (ang1 == 0) and (h1 == min(perm_orbit(vts[level1][c1]._vp, h1))) #check that the data is normalized 
+                    h1, ang1 = per[i][0][h1, ang1]
+                if (level2, c2) in lc: #the pole of the node is contained in the component
+                    i = lc.index((level2, c2))
+                    h2, ang2 = per[i][1][h2, ang2]
+                l2.append([(level1, c1, h1, ang1),(level2, c2, h2, ang2)])
             l_vert = l2
-
             mvtnew = MultiscaleVeeringTriangulation(vts,l_horiz,l_vert)
             lmvts.add(mvtnew)
         return list(lmvts)
@@ -1314,6 +1308,30 @@ class MultiscaleVeeringTriangulation:
     def transport_by_permutation_in_levels(self):
         r"""
         Return the list of multi-scale veering triangulations by permutes the same components in each level.
+
+        EXAMPLES::
+            
+            sage: vt = VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)])
+            sage: vt1 = VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])
+            sage: veering_triangulations = [[vt, vt], vt1]
+            sage: mvt  = MultiscaleVeeringTriangulation(veering_triangulations, horizontal_nodes=[[[], []], [[]]], prong_matching=[[(0, 0, 0, 0), (1, 0, 0, 0)], [(0, 1, 0, 0), (1, 0, 4, 0)]])
+            sage: mvt.transport_by_permutation_in_levels()
+            [MultiscaleVeeringTriangulation(
+            veering_triangulations=[
+                VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)]), VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)]),
+                VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])
+            ],
+            horizontal_nodes=[[[], []], [[]]],
+            prong_matching=[[(0, 0, 0, 0), (1, 0, 0, 0)], [(0, 1, 0, 0), (1, 0, 4, 0)]]
+            ),
+            MultiscaleVeeringTriangulation(
+            veering_triangulations=[
+                VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)]), VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)]),
+                VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])
+            ],
+            horizontal_nodes=[[[], []], [[]]],
+            prong_matching=[[(0, 0, 0, 0), (1, 0, 4, 0)], [(0, 1, 0, 0), (1, 0, 0, 0)]]
+            )]
         """
         N = self.num_levels()
 
@@ -1363,13 +1381,10 @@ class MultiscaleVeeringTriangulation:
             orig_pms = copy.deepcopy(self._prong_matchings)
             new_pms = []
             for p1, p2 in orig_pms:
-                m1, h1, ang1 = p1
-                m2, h2, ang2 = p2
-                l1, c1 = m1
-                l2, c2 = m2
-                m1 = (l1, p[l1][c1])
-                m2 = (l2, p[l2][c2])
-                new_pms.append([(m1, h1, ang1), (m2, h2, ang2)])
+                l1, c1, h1, ang1 = p1
+                l2, c2, h2, ang2 = p2
+                assert l1 >= 0 and l2 >= 0
+                new_pms.append([(l1, p[l1][c1], h1, ang1), (l2, p[l2][c2], h2, ang2)])
 
             mvts.append(MultiscaleVeeringTriangulation(new_vts, new_horiz_nodes, new_pms))
 
@@ -1432,7 +1447,9 @@ class MultiscaleVeeringTriangulation:
                 5 Strebel transitions,))
         """
 
-        vt = self._veering_triangulations[abs(level)][component]
+        level = self._check_level(level)
+
+        vt = self._veering_triangulations[level][component]
         ds_graph = D._components[ind_ds_graph]
 
         assert vt.is_prime()
@@ -1448,8 +1465,8 @@ class MultiscaleVeeringTriangulation:
             l_vt_edge = l[(list_comp_up, list_comp_low)]#the list of (vt, edges_up, edges_low) such that vt degenerates to prime components in list_com_yp and list_comp_low respectively.
             l_ds_g_up = [D._components[index] for index in list_comp_up]
             l_ds_g_low = [D._components[index] for index in list_comp_low]
-            lc0 = [(-abs(level), component + index) for index in range(len(list_comp_up))]
-            lc1 = [(-abs(level) - 1, index) for index in range(len(list_comp_low))]
+            lc0 = [(level, component + index) for index in range(len(list_comp_up))]
+            lc1 = [(level + 1, index) for index in range(len(list_comp_low))]
             lc = lc0 + lc1
             ld = l_ds_g_up + l_ds_g_low
 
@@ -1459,7 +1476,7 @@ class MultiscaleVeeringTriangulation:
             assert len(paths) == len(l_vt_edge)
 
             #transport mvt
-            lmvt = [self.transport_along_path(-abs(level), component, path) for path in paths]
+            lmvt = [self.transport_along_path(level, component, path) for path in paths]
             assert len(lmvt) == len(l_vt_edge)
 
             #make vertical degeneration and compute all transitions under monodromy groups and level-wise permutations
@@ -1467,9 +1484,9 @@ class MultiscaleVeeringTriangulation:
             all_mvt = []
             for i, mvt in enumerate(lmvt):
                 _, edges_up, edges_low = l_vt_edge[i]
-                mvt = mvt.degeneration(-abs(level), component, edges_low=edges_low, edges_up=edges_up)
-                mvt = mvt.prime_decomposition(-abs(level), component)
-                mvt = mvt.prime_decomposition(-abs(level) - 1, 0)
+                mvt = mvt.degeneration(level, component, edges_low=edges_low, edges_up=edges_up)
+                mvt = mvt.prime_decomposition(level, component)
+                mvt = mvt.prime_decomposition(level + 1, 0)
 
                 if mvt not in all_mvt:
                     l_mono = mvt.transport_by_monodromy(lc, ld)
@@ -1528,7 +1545,9 @@ class MultiscaleVeeringTriangulation:
             sage: lmvts = mvt2.codimension_one_horizontal_prime_degenerations(-1, 0, 8, D)[0][2]  # not tested
         """
 
-        vt = self._veering_triangulations[abs(level)][component]
+        level = self._check_level(level)
+
+        vt = self._veering_triangulations[level][component]
         ds_graph = D._components[ind_ds_graph]
         assert vt.is_prime()
         assert vt == ds_graph.root() #it is required to be the root of the Delaunay Strebel graph
@@ -1542,8 +1561,8 @@ class MultiscaleVeeringTriangulation:
         for list_comp in list_comps_after_degen:
             l_vt_edge = l[list_comp]
             l_ds_g = [D._components[index] for index in list_comp]
-
-            lc = [(-abs(level), component + index) for index in range(len(list_comp))]
+            
+            lc = [(level, component + index) for index in range(len(list_comp))]
             ld = l_ds_g
 
             #construct paths
@@ -1552,7 +1571,7 @@ class MultiscaleVeeringTriangulation:
             assert len(paths) == len(l_vt_edge)
 
             #transport mvt
-            lmvt = [self.transport_along_path(-abs(level), component, path) for path in paths]
+            lmvt = [self.transport_along_path(level, component, path) for path in paths]
             assert len(lmvt) == len(l_vt_edge)
 
             #make vertical degeneration and compute all transitions under monodromy groups and level-wise permutations
@@ -1561,9 +1580,9 @@ class MultiscaleVeeringTriangulation:
 
             for i, mvt in enumerate(lmvt):
                 _, edges_up, edges_low = l_vt_edge[i]
-                mvt = mvt.degeneration(-abs(level), component, edges_low=edges_low, edges_up=edges_up)
-                mvt = mvt.prime_decomposition(-abs(level), component)
-
+                mvt = mvt.degeneration(level, component, edges_low=edges_low, edges_up=edges_up)
+                mvt = mvt.prime_decomposition(level, component)
+                
                 if mvt not in all_mvt:
                     l_mono = mvt.transport_by_monodromy(lc, ld)
                     new_connected_comp = []
