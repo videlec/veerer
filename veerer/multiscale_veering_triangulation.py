@@ -180,8 +180,8 @@ class MultiscaleVeeringTriangulation:
         sage: mvt1
         MultiscaleVeeringTriangulation(
         veering_triangulations=[
-            VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)(3,4,5)(~3,~4,~5)", "RBBRBR", [(1, 0, -1, 0, 0, 0), (0, 1, 1, 0, 0, 0), (0, 0, 0, 1, 0, 1), (0, 0, 0, 0, 1, -1)]),
-            VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])
+            [VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)(3,4,5)(~3,~4,~5)", "RBBRBR", [(1, 0, -1, 0, 0, 0), (0, 1, 1, 0, 0, 0), (0, 0, 0, 1, 0, 1), (0, 0, 0, 0, 1, -1)])],
+            [VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])]
         ],
         horizontal_nodes=[[[]], [[]]],
         prong_matching=[[((0, 0), 0, 0), ((-1, 0), 0, 0)], [((0, 0), 10, 0), ((-1, 0), 4, 0)]]
@@ -459,7 +459,7 @@ class MultiscaleVeeringTriangulation:
                         l2.append((p2[0][1], f))
 
     def __str__(self):
-        vt_strings = ",\n    ".join(", ".join(str(vt) for vt in l) for l in self._veering_triangulations)
+        vt_strings = ",\n    ".join("[" + ", ".join(str(vt) for vt in l) + "]" for l in self._veering_triangulations)
         horizontal_nodes_str = "[" + ", ".join(str(hn) for hn in self._horizontal_nodes) + "]"
         prong_matching_str = "[" + ", ".join(str(pm) for pm in self._prong_matching) + "]"
         return (
@@ -862,8 +862,8 @@ class MultiscaleVeeringTriangulation:
             sage: mvt0.degeneration(-1,0, edges_low=[0, 1, 2, 3, 4, 5], edges_up=[6, 7])
             MultiscaleVeeringTriangulation(
             veering_triangulations=[
-                VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)", "RBRBB"),
-                VeeringTriangulationLinearFamily("(~0,1,2)(~1,~2,3)(0:5)(~3:1)(4:4,5:4)(~4:1)(~5:1)", "BBRBBB", [(1, 0, 1, 1, 0, 0), (0, 1, -1, 0, 0, 0), (0, 0, 0, 0, 1, 1)])
+                [VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)", "RBRBB")],
+                [VeeringTriangulationLinearFamily("(~0,1,2)(~1,~2,3)(0:5)(~3:1)(4:4,5:4)(~4:1)(~5:1)", "BBRBBB", [(1, 0, 1, 1, 0, 0), (0, 1, -1, 0, 0, 0), (0, 0, 0, 0, 1, 1)])]
             ],
             horizontal_nodes=[[[]], [[(9, 11)]]],
             prong_matching=[[((0, 0), 0, 0), ((-1, 0), 0, 1)], [((0, 0), 4, 0), ((-1, 0), 10, 1)]]
@@ -1034,8 +1034,8 @@ class MultiscaleVeeringTriangulation:
             sage: mvt
             MultiscaleVeeringTriangulation(
             veering_triangulations=[
-                VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "RRBBRRRRB", [(1, 0, -1, -1, 0, -1, -1, 0, 1), (0, 1, 1, 1, 0, 1, 1, 0, -1), (0, 0, 0, 0, 1, 1, 1, 0, -1), (0, 0, 0, 0, 0, 0, 0, 1, 1)]),
-                VeeringTriangulationLinearFamily("(0:4,~0:4)", "R", [(1)])
+                [VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "RRBBRRRRB", [(1, 0, -1, -1, 0, -1, -1, 0, 1), (0, 1, 1, 1, 0, 1, 1, 0, -1), (0, 0, 0, 0, 1, 1, 1, 0, -1), (0, 0, 0, 0, 0, 0, 0, 1, 1)])],
+                [VeeringTriangulationLinearFamily("(0:4,~0:4)", "R", [(1)])]
             ],
             horizontal_nodes=[[[]], [[]]],
             prong_matching=[[((0, 0), 11, 0), ((-1, 0), 0, 0)]]
@@ -1046,8 +1046,8 @@ class MultiscaleVeeringTriangulation:
             sage: mvt.transport_along_path(0, 0, path)
             MultiscaleVeeringTriangulation(
             veering_triangulations=[
-                VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "BRBBRRRBR", [(1, 0, 1, 1, 0, 1, 1, 0, 1), (0, 1, 1, 1, 0, 1, 1, 0, 1), (0, 0, 0, 0, 1, 1, 1, 0, 1), (0, 0, 0, 0, 0, 0, 0, 1, -1)]),
-                VeeringTriangulationLinearFamily("(0:4,~0:4)", "R", [(1)])
+                [VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "BRBBRRRBR", [(1, 0, 1, 1, 0, 1, 1, 0, 1), (0, 1, 1, 1, 0, 1, 1, 0, 1), (0, 0, 0, 0, 1, 1, 1, 0, 1), (0, 0, 0, 0, 0, 0, 0, 1, -1)])],
+                [VeeringTriangulationLinearFamily("(0:4,~0:4)", "R", [(1)])]
             ],
             horizontal_nodes=[[[]], [[]]],
             prong_matching=[[((0, 0), 16, 0), ((-1, 0), 0, 0)]]
@@ -1104,8 +1104,8 @@ class MultiscaleVeeringTriangulation:
             sage: mvt1
             MultiscaleVeeringTriangulation(
             veering_triangulations=[
-                VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)(3,4,5)(~3,~4,~5)", "RBBRBR", [(1, 0, -1, 0, 0, 0), (0, 1, 1, 0, 0, 0), (0, 0, 0, 1, 0, 1), (0, 0, 0, 0, 1, -1)]),
-                VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])
+                [VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)(3,4,5)(~3,~4,~5)", "RBBRBR", [(1, 0, -1, 0, 0, 0), (0, 1, 1, 0, 0, 0), (0, 0, 0, 1, 0, 1), (0, 0, 0, 0, 1, -1)])],
+                [VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])]
             ],
             horizontal_nodes=[[[]], [[]]],
             prong_matching=[[((0, 0), 0, 0), ((-1, 0), 0, 0)], [((0, 0), 10, 0), ((-1, 0), 4, 0)]]
@@ -1113,8 +1113,8 @@ class MultiscaleVeeringTriangulation:
             sage: mvt1.prime_decomposition(0, 0)
             MultiscaleVeeringTriangulation(
             veering_triangulations=[
-                VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RBB", [(1, 0, -1), (0, 1, 1)]), VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)]),
-                VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])
+                [VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RBB", [(1, 0, -1), (0, 1, 1)]), VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)])],
+                [VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])]
             ],
             horizontal_nodes=[[[], []], [[]]],
             prong_matching=[[((0, 0), 0, 0), ((-1, 0), 0, 0)], [((0, 1), 0, 0), ((-1, 0), 4, 0)]]
