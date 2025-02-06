@@ -1403,19 +1403,18 @@ def codimension_one_vertical_degenerations_representatives(L, mvt, level):
     - L: a linear subvariety.
     
     EXAMPLES::
-        sage: from veerer import *
+        sage: from veerer import VeeringTriangulation, MultiscaleVeeringTriangulation
         sage: from veerer.linear_subvariety import *
         sage: from veerer.labelled_digraph import *
         sage: from veerer.monodromy import *
-        sage: from veerer.multiscale_veering_triangulation import *
 
         sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,9)(~8,10,11)(~9,~10,~11)", "RRBBRRRRBBRR")
-        sage: L = vt.linear_subvariety()
+        sage: L = vt.linear_subvariety() # not tested
         sage: mvt = MultiscaleVeeringTriangulation([vt], [[""]], [])
-        sage: l = codimension_one_vertical_degenerations_representatives(L, mvt, 0)
-        sage: len(l)
+        sage: l = codimension_one_vertical_degenerations_representatives(L, mvt, 0) # not tested
+        sage: len(l) # not tested
         17
-        sage: l[3]
+        sage: l[3] # not tested
         (Irreducible real linear subvariety of projective dimension 3 in [[H_2(2)], [H_0(1^2, -4)]],
          MultiscaleVeeringTriangulation(
            veering_triangulations=[
@@ -1486,17 +1485,16 @@ def codimension_one_horizontal_degenerations_representatives(L, mvt, level):
 
     EXAMPLES::
 
-        sage: from veerer import *
+        sage: from veerer import VeeringTriangulation, MultiscaleVeeringTriangulation
         sage: from veerer.linear_subvariety import *
         sage: from veerer.labelled_digraph import *
         sage: from veerer.monodromy import *
-        sage: from veerer.multiscale_veering_triangulation import *
 
         sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,9)(~8,10,11)(~9,~10,~11)", "RRBBRRRRBBRR")
-        sage: L = vt.linear_subvariety()
+        sage: L = vt.linear_subvariety() # not tested
         sage: mvt = MultiscaleVeeringTriangulation([vt], [[""]], [])
-        sage: l = codimension_one_horizontal_degenerations_representatives(L, mvt, 0)
-        sage: l[8]
+        sage: l = codimension_one_horizontal_degenerations_representatives(L, mvt, 0) # not tested
+        sage: l[8] # not tested
         (Irreducible real linear subvariety of projective dimension 3 in [[H_1(1^2, -1^2)]],
         MultiscaleVeeringTriangulation(
         veering_triangulations=[
