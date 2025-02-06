@@ -164,8 +164,7 @@ class MultiscaleVeeringTriangulation:
 
     EXAMPLES::
 
-        sage: from veerer import VeeringTriangulation
-        sage: from veerer.multiscale_veering_triangulation import *
+        sage: from veerer import VeeringTriangulation, MultiscaleVeeringTriangulation
 
     An example with non-trivial glabal residue condition::
 
@@ -176,7 +175,7 @@ class MultiscaleVeeringTriangulation:
         True
         sage: edges_low = [4,5,7,8,14]
         sage: mvt = MultiscaleVeeringTriangulation([vt], [[""]], [])
-        sage: mvt1 = mvt.degeneration(0,0,edges_low=edges_low)
+        sage: mvt1 = mvt.degeneration(0, 0, edges_low=edges_low)
         sage: mvt1
         MultiscaleVeeringTriangulation(
         veering_triangulations=[
@@ -368,8 +367,8 @@ class MultiscaleVeeringTriangulation:
         r"""
         EXAMPLES::
 
-            sage: from veerer import VeeringTriangulation
-            sage: from veerer.multiscale_veering_triangulation import *
+            sage: from veerer import VeeringTriangulation, MultiscaleVeeringTriangulation
+
             sage: vt00 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)","RBRBB")
             sage: vt01 = VeeringTriangulation("(~0,1,2)(~1,~2,3)(~4,~6,~7)(6,7,~5)(0:5)(~3:1)(4:4,5:4)","BBRBBBRR")
             sage: pm = [((0, 0), 0,4),((-1, 0), 0, 1)]
@@ -571,8 +570,7 @@ class MultiscaleVeeringTriangulation:
 
         EXAMPLES::
 
-            sage: from veerer import VeeringTriangulation
-            sage: from veerer.multiscale_veering_triangulation import *
+            sage: from veerer import VeeringTriangulation, MultiscaleVeeringTriangulation
             sage: vt00 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)","RBRBB")
             sage: vt01 = VeeringTriangulation("(~0,1,2)(~1,~2,3)(~4,~6,~7)(6,7,~5)(0:5)(~3:1)(4:4,5:4)","BBRBBBRR")
             sage: mvt0 = MultiscaleVeeringTriangulation([vt00,vt01],[[""],[""]],[[((0,0),"0",0),((-1,0),"0",1)],[((0,0),"2",0),((-1,0),"5",1)]])
@@ -659,7 +657,6 @@ class MultiscaleVeeringTriangulation:
         EXAMPLES::
 
             sage: from veerer import *
-            sage: from veerer.multiscale_veering_triangulation import *
 
         A horizontal node between the same components::
 
@@ -840,7 +837,6 @@ class MultiscaleVeeringTriangulation:
         EXAMPLES::
 
             sage: from veerer import *
-            sage: from veerer.multiscale_veering_triangulation import *
 
         Reach all vertical boundary component of H_1(2) from a single veering triangulaiton (TO BE COMPLETED)::
 
@@ -997,7 +993,6 @@ class MultiscaleVeeringTriangulation:
         EXAMPLES::
 
             sage: from veerer import *
-            sage: from veerer.multiscale_veering_triangulation import *
 
             sage: vt = VeeringTriangulation("(~0,2,3)(~1,4,5)(~2,6,7)(~3,~5,8)(~4,9,10)(~6,11,12)(~7,13,14)(~8,~12,15)(~9,16,~15)(~11,17,18)(~14,~18,19)(~16,~17,20)(0:1)(1:1)(~10:1)(~13:1)(~19:1)(~20:1)", "BBRRRBBBRBBRRBRBRRBBB")
             sage: f = vt.add_residue_constraints([[1,-1,0,0,0,0],[0,0,1,-1,0,0],[0,0,0,0,1,-1]])
@@ -1025,7 +1020,6 @@ class MultiscaleVeeringTriangulation:
         EXAMPLES::
 
             sage: from veerer import *
-            sage: from veerer.multiscale_veering_triangulation import *
 
             sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,9)(~8,10,11)(~9,~10,~11)", "RRBBRRRRBBBR")
             sage: edges_up = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
@@ -1042,7 +1036,7 @@ class MultiscaleVeeringTriangulation:
             )
             sage: vt0 = mvt._veering_triangulations[0][0]
             sage: ds_graph = vt0.delaunay_strebel_graph()
-            sage: path = LabelledDiGraphPath(ds_graph, 0, [3, 13, 16])
+            sage: path = ds_graph.path(0, [3, 13, 16])
             sage: mvt.transport_along_path(0, 0, path)
             MultiscaleVeeringTriangulation(
             veering_triangulations=[
@@ -1095,7 +1089,6 @@ class MultiscaleVeeringTriangulation:
         EXAMPLES::
 
             sage: from veerer import *
-            sage: from veerer.multiscale_veering_triangulation import *
 
             sage: vt = VeeringTriangulation("(0,1,2)(4,~2,3)(~3,5,6)(~6,~0,~1)(11, 12,~10)(8,9,10)(~13, 7, ~9)(13,~11,~12)(~5,~7,14)(~14,~4,~8)", "RBBBRRBBBRRBRRB")
             sage: edges_low = [4,5,7,8,14]
@@ -1368,7 +1361,6 @@ class MultiscaleVeeringTriangulation:
             sage: from veerer.linear_subvariety import *
             sage: from veerer.labelled_digraph import *
             sage: from veerer.monodromy import *
-            sage: from veerer.multiscale_veering_triangulation import *
 
             sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,9)(~8,10,11)(~9,~10,~11)", "RRBBRRRRBBRR")
             sage: mvt = MultiscaleVeeringTriangulation([vt], [[""]], [])
@@ -1478,7 +1470,6 @@ class MultiscaleVeeringTriangulation:
             sage: from veerer.linear_subvariety import *
             sage: from veerer.labelled_digraph import *
             sage: from veerer.monodromy import *
-            sage: from veerer.multiscale_veering_triangulation import *
 
             sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,9)(~8,10,11)(~9,~10,~11)", "RRBBRRRRBBRR")
             sage: mvt = MultiscaleVeeringTriangulation([vt], [[""]], [])
@@ -1570,7 +1561,6 @@ def multiscale_compactification_representatives(L, D, index=False):
         sage: from veerer.linear_subvariety import *
         sage: from veerer.labelled_digraph import *
         sage: from veerer.monodromy import *
-        sage: from veerer.multiscale_veering_triangulation import *
 
         sage: vt = VeeringTriangulation("(0,6,~5)(~0,~4,5)(1,8,~7)(~1,~8,3)(2,7,~6)(~2,~3,4)", "RRRBBBBBB")
 
