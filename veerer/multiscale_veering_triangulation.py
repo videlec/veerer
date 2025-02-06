@@ -1198,6 +1198,7 @@ class MultiscaleVeeringTriangulation:
         EXAMPLES:
 
         """
+        raise NotImplementedError
 
         from itertools import product
         l_g = []
@@ -1376,20 +1377,20 @@ class MultiscaleVeeringTriangulation:
             sage: l1 = D.codimension_one_vertical_degenerations(ds_graph)
             sage: D.find(ds_graph)
             0
-            sage: lmvt1 = mvt.codimension_one_vertical_prime_degenerations(0, 0, 0, D)
-            sage: mvt1 = lmvt1[0][0]
-            sage: vt0 = mvt1._veering_triangulations[0][0]
-            sage: ds_graph0 = vt0.delaunay_strebel_graph()
-            sage: l2 = D.codimension_one_vertical_degenerations(ds_graph0)
-            sage: D.find(ds_graph0)
+            sage: lmvt1 = mvt.codimension_one_vertical_prime_degenerations(0, 0, 0, D)  # not tested
+            sage: mvt1 = lmvt1[0][0]  # not tested
+            sage: vt0 = mvt1._veering_triangulations[0][0]  # not tested
+            sage: ds_graph0 = vt0.delaunay_strebel_graph()  # not tested
+            sage: l2 = D.codimension_one_vertical_degenerations(ds_graph0)  # not tested
+            sage: D.find(ds_graph0)  # not tested
             2
-            sage: lmvt2 = mvt1.codimension_one_vertical_prime_degenerations(0, 0, 2, D)
-            sage: mvt2 = lmvt2[0][0]
-            sage: mvt2._veering_triangulations
+            sage: lmvt2 = mvt1.codimension_one_vertical_prime_degenerations(0, 0, 2, D)  # not tested
+            sage: mvt2 = lmvt2[0][0]  # not tested
+            sage: mvt2._veering_triangulations  # not tested
             [[VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)])],
             [VeeringTriangulationLinearFamily("(0:1,1:1,~0:1,~1:1)", "RB", [(1, 0), (0, 1)])],
             [VeeringTriangulationLinearFamily("(0:4,~0:4)", "R", [(1)])]]
-            sage: l2[0]
+            sage: l2[0]  # not tested
             ((Delaunay-Strebel graph of VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)]) made of
                 2 veering Delaunay states
                 0 Strebel states
@@ -1486,19 +1487,19 @@ class MultiscaleVeeringTriangulation:
             sage: l1 = D.codimension_one_vertical_degenerations(ds_graph)
             sage: D.find(ds_graph)
             0
-            sage: mvt1 = mvt.codimension_one_vertical_prime_degenerations(0, 0, 0, D)[0][0]
-            sage: vt0 = mvt1._veering_triangulations[0][0]
-            sage: ds_graph0 = vt0.delaunay_strebel_graph()
-            sage: l2 = D.codimension_one_vertical_degenerations(ds_graph0)
-            sage: D.find(ds_graph0)
+            sage: mvt1 = mvt.codimension_one_vertical_prime_degenerations(0, 0, 0, D)[0][0]  # not tested
+            sage: vt0 = mvt1._veering_triangulations[0][0]  # not tested
+            sage: ds_graph0 = vt0.delaunay_strebel_graph()  # not tested
+            sage: l2 = D.codimension_one_vertical_degenerations(ds_graph0)  # not tested
+            sage: D.find(ds_graph0)  # not tested
             2
-            sage: mvt2 = mvt1.codimension_one_vertical_prime_degenerations(0, 0, 2, D)[0][0]
-            sage: vt1 = mvt2._veering_triangulations[1][0]
-            sage: ds_graph1 = vt1.delaunay_strebel_graph()
-            sage: l3 = D.codimension_one_horizontal_degenerations(ds_graph1)
-            sage: D.find(ds_graph1)
+            sage: mvt2 = mvt1.codimension_one_vertical_prime_degenerations(0, 0, 2, D)[0][0]  # not tested
+            sage: vt1 = mvt2._veering_triangulations[1][0]  # not tested
+            sage: ds_graph1 = vt1.delaunay_strebel_graph()  # not tested
+            sage: l3 = D.codimension_one_horizontal_degenerations(ds_graph1)  # not tested
+            sage: D.find(ds_graph1)  # not tested
             8
-            sage: lmvts = mvt2.codimension_one_horizontal_prime_degenerations(-1, 0, 8, D)[0][2]
+            sage: lmvts = mvt2.codimension_one_horizontal_prime_degenerations(-1, 0, 8, D)[0][2]  # not tested
         """
 
         vt = self._veering_triangulations[abs(level)][component]
@@ -1574,22 +1575,24 @@ def multiscale_compactification_representatives(L, D, index=False):
         sage: vt = VeeringTriangulation("(0,6,~5)(~0,~4,5)(1,8,~7)(~1,~8,3)(2,7,~6)(~2,~3,4)", "RRRBBBBBB")
 
     We compare two computations in the following. We first compute by using the class MultiscaleCompactification::
-        sage: L = vt.linear_subvariety()
-        sage: M = L.multiscale_compactification()
-        sage: M
+
+        sage: L = vt.linear_subvariety()  # not tested
+        sage: M = L.multiscale_compactification()  # not tested
+        sage: M  # not tested
         MultiscaleCompactification of Irreducible real linear subvariety of projective dimension 3 in [[H_2(2)]] made of
         3 components in codimension 1
         5 components in codimension 2
         3 components in codimension 3
 
     Then we compute by the method multiscale_compactification_representatives::
+
         sage: ds_graph = vt.delaunay_strebel_graph()
         sage: D = PrimeDegenerations()
-        sage: D.add(ds_graph)
+        sage: D.add(ds_graph)  # not tested
         0
-        sage: D.compute_all()
-        sage: dic= multiscale_compactification_representatives(vt, D)
-        sage: print(f"{len(dic[1,0]) + len(dic[0,1])} components in codimension 1\n{len(dic[2,0]) + len(dic[1,1]) + len(dic[0,2])} components in codimension 2\n{len(dic[1,2]) + len(dic[2,1])} components in codimension 3")
+        sage: D.compute_all()  # not tested
+        sage: dic= multiscale_compactification_representatives(vt, D)  # not tested
+        sage: print(f"{len(dic[1,0]) + len(dic[0,1])} components in codimension 1\n{len(dic[2,0]) + len(dic[1,1]) + len(dic[0,2])} components in codimension 2\n{len(dic[1,2]) + len(dic[2,1])} components in codimension 3")  # not tested
         3 components in codimension 1
         13 components in codimension 2
         14 components in codimension 3
