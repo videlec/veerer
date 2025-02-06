@@ -359,7 +359,9 @@ class MultiscaleVeeringTriangulation:
                         v2[h // 2] += 1
 
                     gens = vt.generators_matrix()
-                    if gens * v1 != gens * v2:
+                    gv1 = gens * v1
+                    gv2 = gens * v2
+                    if gv1 != gv2 and gv1 != -gv2:
                         raise ValueError(f"distinct residues at horizontal node {(h1, h2)} at the {c}-th component at level-{level}")
 
     def _check_local_prong_matching(self, pm):
@@ -998,7 +1000,8 @@ class MultiscaleVeeringTriangulation:
             sage: from veerer.multiscale_veering_triangulation import *
 
             sage: vt = VeeringTriangulation("(~0,2,3)(~1,4,5)(~2,6,7)(~3,~5,8)(~4,9,10)(~6,11,12)(~7,13,14)(~8,~12,15)(~9,16,~15)(~11,17,18)(~14,~18,19)(~16,~17,20)(0:1)(1:1)(~10:1)(~13:1)(~19:1)(~20:1)", "BBRRRBBBRBBRRBRBRRBBB")
-            sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[vt], horizontal_nodes=[[[(0, 2), (21, 27), (39, 41)]]], prong_matching=[])
+            sage: f = vt.add_residue_constraints([[1,-1,0,0,0,0],[0,0,1,-1,0,0],[0,0,0,0,1,-1]])
+            sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[f], horizontal_nodes=[[[(0, 2), (21, 27), (39, 41)]]], prong_matching=[])
             sage: for mvt2 in mvt.codimension_one_vertical_degenerations():
             ....:     print(mvt2)
         """
