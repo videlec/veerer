@@ -196,8 +196,7 @@ class MultiscaleVeeringTriangulation:
         [0 1]
     """
 
-    def __init__(self, veering_triangulations=None, horizontal_nodes=None, prong_matching=None, check=True):
-
+    def __init__(self, veering_triangulations=None, horizontal_nodes=None, prong_matching=None, mutable=False, check=True):
         if isinstance(veering_triangulations, list):
             self._veering_triangulations = []
             for level, vts in enumerate(veering_triangulations):
@@ -259,8 +258,10 @@ class MultiscaleVeeringTriangulation:
                             self._check_horizontal_node(level, c, node)
                         self._horizontal_nodes[level][c].append(node)
                     self._horizontal_nodes[level][c] = sorted(self._horizontal_nodes[level][c], key=lambda x: x[0])
+        elif horizontal_nodes is None:
+            self._horizontal_nodes = [[[] for _ in range(len(vts))] for vts in self._veering_triangulations]
         else:
-            raise TypeError("The 'horizontal_nodes' must be a list.")
+            raise TypeError("The 'horizontal_nodes' must be a list; got {}".format(type(horizontal_nodes)))
 
         if isinstance(prong_matching, list):
             self._prong_matchings = []
@@ -304,9 +305,17 @@ class MultiscaleVeeringTriangulation:
         else:
             raise ValueError("The 'prong_matching' must be a list.")
 
+        self._mutable = True
+        if not mutable:
+            self.set_immutable()
+
         if check:
             self._check_prong_matching()
             self._check_horizontal_residue_conditions()
+
+    def _check(self):
+        self._check_horizontal_residue_conditions()
+        self._check_prong_matching()
 
     def _check_level(self, level):
         r"""
@@ -476,17 +485,54 @@ class MultiscaleVeeringTriangulation:
     def __ne__(self, other):
         if type(self) != type(other):
             raise TypeError
-        return self._veering_triangulations != other._veering_triangulations and self._horizontal_nodes != other._horizontal_nodes and self._prong_matching != other._prong_matching
+        return self._veering_triangulations != other._veering_triangulations and self._horizontal_nodes != other._horizontal_nodes and self._prong_matchings != other._prong_matchings
+
+    def copy(self, mutable=None):
+        if mutable is None:
+            mutable = self._mutable
+
+        if not mutable and not self._mutable:
+            return self
+
+        ans = MultiscaleVeeringTriangulation.__new__(MultiscaleVeeringTriangulation)
+        ans._veering_triangulations = [[vt.copy(mutable) for vt in vts] for vts in self._veering_triangulations]
+        ans._horizontal_nodes = [[nodes[:] for nodes in hnodes] for hnodes in self._horizontal_nodes]
+        ans._prong_matchings = self._prong_matchings[:]
+        ans._mutable = mutable
+
+        return ans
+
+    def set_immutable(self):
+        if self._mutable:
+            for vts in self._veering_triangulations:
+                for vt in vts:
+                    vt.set_immutable()
+            self._mutable = False
 
     def __hash__(self):
-        veering_triangulations_hashable = tuple(
-            tuple(map(hash, level)) for level in self._veering_triangulations
-        )
-        horizontal_nodes_hashable = tuple(
-        tuple(tuple(tuple(node) for node in group) for group in level
-        ) for level in self._horizontal_nodes
-        )
-        prong_matching_hashable = hash(self._prong_matchings)
+        """
+        TESTS::
+
+            sage: from veerer import *
+
+            sage: f0 = VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RBB", [(1, 0, -1), (0, 1, 1)])
+            sage: f1 = VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)])
+            sage: f2 = VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])
+
+            sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[f0, f1], [f2]], prong_matching=[[((0, 0), 0, 0), ((1, 0), 0, 0)], [((0, 1), 0, 0), ((1, 0), 4, 0)]], mutable=False)
+            sage: hash(mvt) # random
+            313904658927315188
+            sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[f0, f1], [f2]], prong_matching=[[((0, 0), 0, 0), ((1, 0), 0, 0)], [((0, 1), 0, 0), ((1, 0), 4, 0)]], mutable=True)
+            sage: hash(mvt)
+            Traceback (most recent call last):
+            ...
+            ValueError: mutable veering triangulation are not hashable
+        """
+        if self._mutable:
+            raise ValueError("mutable veering triangulation are not hashable")
+        veering_triangulations_hashable = tuple(tuple(vts) for vts in self._veering_triangulations)
+        horizontal_nodes_hashable = tuple(tuple(tuple(comp) for comp in level) for level in self._horizontal_nodes)
+        prong_matching_hashable = hash(tuple(self._prong_matchings))
         return hash((veering_triangulations_hashable, horizontal_nodes_hashable, prong_matching_hashable))
 
     def num_levels(self):
@@ -494,7 +540,7 @@ class MultiscaleVeeringTriangulation:
 
     def permute_level(self, level, p):
         r"""
-        Apply the permutation ``p`` at the components of level ``level``.
+        Apply the permutation ``p`` on the components of level ``level``.
 
         EXAMPLES::
 
@@ -504,24 +550,37 @@ class MultiscaleVeeringTriangulation:
             sage: f1 = VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)])
             sage: f2 = VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])
 
-            MultiscaleVeeringTriangulation(veering_triangulations=[[f0, f1], [f2]], prong_matching=[[((0, 0), 0, 0), ((1, 0), 0, 0)], [((0, 1), 0, 0), ((1, 0), 4, 0)]])
+            sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[f0, f1], [f2]], prong_matching=[[((0, 0), 0, 0), ((1, 0), 0, 0)], [((0, 1), 0, 0), ((1, 0), 4, 0)]], mutable=True)
+            sage: mvt.permute_level(0, [1, 0])
+            sage: mvt
+            MultiscaleVeeringTriangulation(
+              veering_triangulations=[
+                [VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)]), VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RBB", [(1, 0, -1), (0, 1, 1)])],
+                [VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])]
+              ],
+              horizontal_nodes=[[[], []], [[]]],
+              prong_matching=[(((0, 0), 0, 0), ((1, 0), 4, 0)), (((0, 1), 0, 0), ((1, 0), 0, 0))]
+            )
         """
+        if not self._mutable:
+            raise ValueError("immutable multiscale veering triangulation; use a multable copy instead")
         level = self._check_level(level)
         n = len(self._veering_triangulations[level])
         p = perm_init(p, n)
         perm_on_list(self._veering_triangulations[level], p, n)
         perm_on_list(self._horizontal_nodes[level], p, n)
 
-        # prong matchings
-        for i, (pm0, pm1) in enumerate(self._prong_matchingss):
+        # permute prong matchings
+        for i, (pm0, pm1) in enumerate(self._prong_matchings):
             (level0, comp0), h0, a0 = pm0
             (level1, comp1), h1, a1 = pm1
             if level0 == level:
                 pm0 = ((level0, p[comp0]), h0, a0)
-                self._prong_matchingss[i] = (pm0, pm1)
+                self._prong_matchings[i] = (pm0, pm1)
             elif level1 == level:
                 pm1 = ((level1, p[comp1]), h1, a1)
-                self._prong_matchingss[i] = (pm0, pm1)
+                self._prong_matchings[i] = (pm0, pm1)
+        self._prong_matchings.sort()
 
         self._check()
 
