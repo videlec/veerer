@@ -263,7 +263,7 @@ class MultiscaleVeeringTriangulation:
             raise TypeError("The 'horizontal_nodes' must be a list.")
 
         if isinstance(prong_matching, list):
-            self._prong_matching = []
+            self._prong_matchings = []
             for pm in prong_matching:
                 prong1, prong2 = pm
                 ((l1, c1), h1, a1) = prong1
@@ -298,9 +298,9 @@ class MultiscaleVeeringTriangulation:
                 pm = (((l1, c1), h1, a1), ((l2, c2), h2, a2))
                 if check:
                     self._check_local_prong_matching(pm)
-                self._prong_matching.append(pm)
+                self._prong_matchings.append(pm)
 
-            self._prong_matching = sorted(self._prong_matching)
+            self._prong_matchings = sorted(self._prong_matchings)
         else:
             raise ValueError("The 'prong_matching' must be a list.")
 
@@ -433,7 +433,7 @@ class MultiscaleVeeringTriangulation:
                 raise ValueError(f"The angle label of {prong2} is out of the valid range [0, {num_p}].")
 
     def _check_prong_matching(self):
-        pms = self._prong_matching
+        pms = self._prong_matchings
         NN = self.num_levels()
         for level in range(NN):
             l1 = []
@@ -456,7 +456,7 @@ class MultiscaleVeeringTriangulation:
     def __str__(self):
         vt_strings = ",\n    ".join("[" + ", ".join(str(vt) for vt in l) + "]" for l in self._veering_triangulations)
         horizontal_nodes_str = "[" + ", ".join(str(hn) for hn in self._horizontal_nodes) + "]"
-        prong_matching_str = "[" + ", ".join(str(pm) for pm in self._prong_matching) + "]"
+        prong_matching_str = "[" + ", ".join(str(pm) for pm in self._prong_matchings) + "]"
         return (
             f"MultiscaleVeeringTriangulation(\n"
             f"  veering_triangulations=[\n    {vt_strings}\n  ],\n"
@@ -471,7 +471,7 @@ class MultiscaleVeeringTriangulation:
     def __eq__(self, other):
         if type(self) != type(other):
             raise TypeError
-        return (self._veering_triangulations == other._veering_triangulations) and (self._horizontal_nodes == other._horizontal_nodes) and (self._prong_matching == other._prong_matching)
+        return (self._veering_triangulations == other._veering_triangulations) and (self._horizontal_nodes == other._horizontal_nodes) and (self._prong_matchings == other._prong_matchings)
 
     def __ne__(self, other):
         if type(self) != type(other):
@@ -486,9 +486,7 @@ class MultiscaleVeeringTriangulation:
         tuple(tuple(tuple(node) for node in group) for group in level
         ) for level in self._horizontal_nodes
         )
-        prong_matching_hashable = tuple(
-            tuple(tuple(prong) for prong in match) for match in self._prong_matching
-        )
+        prong_matching_hashable = hash(self._prong_matchings)
         return hash((veering_triangulations_hashable, horizontal_nodes_hashable, prong_matching_hashable))
 
     def num_levels(self):
@@ -515,15 +513,15 @@ class MultiscaleVeeringTriangulation:
         perm_on_list(self._horizontal_nodes[level], p, n)
 
         # prong matchings
-        for i, (pm0, pm1) in enumerate(self._prong_matchings):
+        for i, (pm0, pm1) in enumerate(self._prong_matchingss):
             (level0, comp0), h0, a0 = pm0
             (level1, comp1), h1, a1 = pm1
             if level0 == level:
                 pm0 = ((level0, p[comp0]), h0, a0)
-                self._prong_matchings[i] = (pm0, pm1)
+                self._prong_matchingss[i] = (pm0, pm1)
             elif level1 == level:
                 pm1 = ((level1, p[comp1]), h1, a1)
-                self._prong_matchings[i] = (pm0, pm1)
+                self._prong_matchingss[i] = (pm0, pm1)
 
         self._check()
 
@@ -725,7 +723,7 @@ class MultiscaleVeeringTriangulation:
 
         lv = [] #the list of component adjusted so far, where the component is labeled by (level, index of the component in this level)
 
-        for pm in self._prong_matching:
+        for pm in self._prong_matchings:
             m1, h1, ang1 = pm[0]
             m2, h2, ang2 = pm[1]
             level1, s1 = m1
@@ -913,7 +911,7 @@ class MultiscaleVeeringTriangulation:
         #build the vertical nodes
         l_pm = []
         #existing vertical nodes
-        original_pm = copy.deepcopy(self._prong_matching)
+        original_pm = copy.deepcopy(self._prong_matchings)
         for pm in original_pm:
             prong1, prong2 = pm
             if prong1[0] == (level, component):
@@ -1046,7 +1044,7 @@ class MultiscaleVeeringTriangulation:
 
         #new vertical nodes
         l2 = []
-        l_vert = copy.deepcopy(self._prong_matching)
+        l_vert = copy.deepcopy(self._prong_matchings)
         for pm in l_vert:
             p1, p2 = pm
             m1, h1, ang1 = p1
@@ -1138,7 +1136,7 @@ class MultiscaleVeeringTriangulation:
 
         #new vertical nodes
         l2 = []
-        l_vert = copy.deepcopy(self._prong_matching)
+        l_vert = copy.deepcopy(self._prong_matchings)
         for pm in l_vert:
             p1, p2 = pm
             m1, h1, ang1 = p1
@@ -1227,7 +1225,7 @@ class MultiscaleVeeringTriangulation:
 
             #new vertical nodes
             l2 = []
-            l_vert = copy.deepcopy(self._prong_matching)
+            l_vert = copy.deepcopy(self._prong_matchings)
             for pm in l_vert:
                 p1, p2 = pm
                 m1, h1, ang1 = p1
@@ -1303,7 +1301,7 @@ class MultiscaleVeeringTriangulation:
                     new_horiz_nodes[i][g[j]] = level_horiz[j]
 
             #new prong-matchings
-            orig_pms = copy.deepcopy(self._prong_matching)
+            orig_pms = copy.deepcopy(self._prong_matchings)
             new_pms = []
             for p1, p2 in orig_pms:
                 m1, h1, ang1 = p1
