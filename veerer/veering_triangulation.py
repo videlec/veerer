@@ -193,14 +193,14 @@ class VeeringTriangulation(Triangulation):
         angle = int(angle)
         num_seps =  self.half_edge_num_separatrices(half_edge)
         if angle < 0 or angle >= num_seps:
-            raise ValueError(f"angle (={angle}) out of range for separatrix at half_edge={half_edge}; must be >= 0 and <= {num_seps}")
+            raise ValueError(f"angle (={angle}) out of range for separatrix at half_edge={half_edge}; must be >= 0 and < {num_seps}")
         return (half_edge, angle)
 
-    def _normalization_face_separatrix(self, half_edge, angle):
+    def _normalize_face_separatrix(self, half_edge, angle):
         if self.face_angle(half_edge) == 0:
             return (min(perm_orbit(self._fp, half_edge)), angle)
 
-        last_angle = self.half_edge_num_separatrices(half_edge) - 1 #the valid range is between 1 and the number of separatrices
+        last_angle = self.half_edge_num_separatrices(half_edge) - 1 # the valid range is between 1 and the number of separatrices
         while angle == last_angle:
             half_edge = self.previous_in_face(half_edge)
             angle = 0
@@ -233,7 +233,7 @@ class VeeringTriangulation(Triangulation):
             raise ValueError("not a face separatrix")
         if angle < 0 or angle >= num_seps:
             raise ValueError(f"angle (={angle}) out of range for separatrix at half_edge={half_edge}; must be >= 0 and <= {num_seps}")
-        return self._normalization_face_separatrix(half_edge, angle)
+        return self._normalize_face_separatrix(half_edge, angle)
 
     def _check(self, error=RuntimeError):
         """
@@ -923,11 +923,13 @@ class VeeringTriangulation(Triangulation):
         else:
             raise ValueError("invalid slope argument")
 
-    def vertex_separatrices(self, flat=True, slope=VERTICAL):
+    def vertex_separatrices(self, h=None, a=None, flat=True, slope=VERTICAL):
         r"""
         Return the pairs ``(h, a)`` encoding vertex separatrices on this veering triangulation.
 
         INPUT:
+
+        - ``h`` (optional half-edge) -- return only the prongs adjacent to the vertex at ``h``
 
         - ``flat`` (boolean, default ``False``) -- whether to return the result
           as a plain list or as a list of cycles corresponding to each vertex
@@ -954,9 +956,16 @@ class VeeringTriangulation(Triangulation):
             sage: vt.vertex_separatrices(flat=False)
             [[(0, 0), (9, 0), (10, 0), (1, 0), (2, 0), (5, 0), (6, 0), (11, 0)],
              [(3, 0), (4, 0), (7, 0), (8, 0)]]
+            sage: vt.vertex_separatrices(0)
+            [(0, 0), (9, 0), (10, 0), (1, 0), (2, 0), (5, 0), (6, 0), (11, 0)]
+            sage: vt.vertex_separatrices(7)
+            [(7, 0), (8, 0), (3, 0), (4, 0)]
 
-            sage: VeeringTriangulation("(0,1,2)(~0,~1,3)(~2:1,~4:2)(~3:3,4:1)", "BRRRR").vertex_separatrices()
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2:1,~4:2)(~3:3,4:1)", "BRRRR")
+            sage: vt.vertex_separatrices()
             [(5, 0), (8, 0), (2, 0), (7, 0), (7, 1), (7, 2), (9, 0), (9, 1), (3, 0)]
+            sage: vt.vertex_separatrices(9, 1)
+            [(9, 1), (3, 0), (5, 0), (8, 0), (2, 0), (7, 0), (7, 1), (7, 2), (9, 0)]
             sage: VeeringTriangulation("(0,1,2)(~0,~1,3)(~2:1,~4:2)(~3:3,4:1)", "BRRRR").vertex_separatrices(flat=False)
             [[(5, 0), (8, 0), (2, 0), (7, 0), (7, 1), (7, 2), (9, 0), (9, 1), (3, 0)]]
         """
@@ -970,26 +979,38 @@ class VeeringTriangulation(Triangulation):
         if any(col == GREEN or col == PURPLE for col in self._colouring):
             raise NotImplementedError
 
-        separatrices = []
-        for cycle in self.vertices():
-            orbit = []
-            for h in cycle:
-                for a in range(self.half_edge_num_separatrices(h, slope, check=False)):
-                    orbit.append((h, a))
-            if flat:
-                separatrices.extend(orbit)
-            else:
-                separatrices.append(orbit)
-        return separatrices
+        if h is not None:
+            if a is None:
+                a = 0
+            orbit = [(h, b) for b in range(a, self.half_edge_num_separatrices(h, slope, check=False))]
+            for hh in perm_orbit(self._vp, h)[1:]:
+                orbit.extend((hh, b) for b in range(self.half_edge_num_separatrices(hh, slope, check=False)))
+            orbit.extend((h, b) for b in range(a))
+            return orbit if flat else [orbit]
+        else:
+            separatrices = []
+            for cycle in self.vertices():
+                orbit = []
+                for h in cycle:
+                    for a in range(self.half_edge_num_separatrices(h, slope, check=False)):
+                        orbit.append((h, a))
+                if flat:
+                    separatrices.extend(orbit)
+                else:
+                    separatrices.append(orbit)
 
-    # TODO: (for Kai) should we go clockwise or counter-clockwise around the face
-    # TODO: (for Kai) what should we do for angle=0 (ie infinite cylinder) faces
-    # which have no associated separatrix?
-    def face_separatrices(self, flat=True, slope=VERTICAL):
+            return separatrices
+
+    def face_separatrices(self, h=None, a=None, flat=True, slope=VERTICAL):
         r"""
         Return the pairs ``(h, a)`` encoding face separatrices on this veering triangulation.
 
         INPUT:
+
+        - ``h`` (optional half-edge) -- if provided, only return separatrix adjacent to the face
+          at ``h``
+
+        - ``a`` (optional angle)
 
         - ``flat`` (boolean, default ``False``) -- whether to return the result
           as a plain list or as a list of cycles corresponding to each vertex
@@ -1005,8 +1026,17 @@ class VeeringTriangulation(Triangulation):
             sage: seps = vt.face_separatrices(flat=False)
             sage: seps
             [[(1, 0), (9, 0)], [(5, 1), (5, 0), (7, 0)]]
+            sage: vt.face_separatrices(5, 1)
+            [(5, 1), (5, 0), (7, 0)]
+            sage: vt.face_separatrices(5, 0)
+            [(5, 0), (7, 0), (5, 1)]
             sage: all(vt.face_angle(h) == -len(sep) for sep in seps for h, a in sep)
             True
+
+            sage: vt.face_separatrices(9)
+            [(9, 0), (1, 0)]
+            sage: vt.face_separatrices(7)
+            [(7, 0), (5, 1), (5, 0)]
 
         An example in H(1^2, -1^2) where the two faces have no separatrices::
 
@@ -1026,19 +1056,29 @@ class VeeringTriangulation(Triangulation):
         if any(col == GREEN or col == PURPLE for col in self._colouring):
             raise NotImplementedError
 
-        separatrices = []
-        for cycle in self.boundary_faces():
-            orbit = []
-            for h in cycle:
-                for a in range(self.half_edge_num_separatrices(h, slope, check=False) - 2, -1, -1):
-                    orbit.append((h, a))
-            if orbit:
-                if flat:
-                    separatrices.extend(orbit)
-                else:
-                    separatrices.append(orbit)
+        if h is not None:
+            if a is None:
+                a = 0
+            h, a = self._check_face_separatrix(h, a)
+            orbit = [(h, b) for b in range(a, -1, -1)]
+            for hh in perm_orbit(self._fp, h)[1:]:
+                orbit.extend((hh, b) for b in range(self.half_edge_num_separatrices(hh, slope, check=False) - 2, -1, -1))
+            orbit.extend((h, b) for b in range(self.half_edge_num_separatrices(h, slope, check=False) - 2, a, -1))
+            return orbit if flat else [orbit]
+        else:
+            separatrices = []
+            for cycle in self.boundary_faces():
+                orbit = []
+                for h in cycle:
+                    for a in range(self.half_edge_num_separatrices(h, slope, check=False) - 2, -1, -1):
+                        orbit.append((h, a))
+                if orbit:
+                    if flat:
+                        separatrices.extend(orbit)
+                    else:
+                        separatrices.append(orbit)
 
-        return separatrices
+            return separatrices
 
     def vertex_angle(self, h):
         r"""
