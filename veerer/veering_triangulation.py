@@ -185,7 +185,7 @@ class VeeringTriangulation(Triangulation):
             sage: vt._check_vertex_separatrix(1, 2)
             Traceback (most recent call last):
             ...
-            ValueError: angle (=2) out of range for separatrix at half_edge=1; must be >= 0 and <= 1
+            ValueError: angle (=2) out of range for separatrix at half_edge=1; must be >= 0 and < 1
         """
         half_edge = self._check_half_edge(half_edge)
         if not isinstance(angle, numbers.Integral):
