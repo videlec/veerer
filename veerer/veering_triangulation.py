@@ -1005,6 +1005,10 @@ class VeeringTriangulation(Triangulation):
         r"""
         Return the pairs ``(h, a)`` encoding face separatrices on this veering triangulation.
 
+        The separatrices are listed in clockwise order around the poles, so that the order
+        match the identification of separatrices in prong matchings of multiscale veering
+        triangulations.
+
         INPUT:
 
         - ``h`` (optional half-edge) -- if provided, only return separatrix adjacent to the face
@@ -1022,21 +1026,21 @@ class VeeringTriangulation(Triangulation):
             sage: from veerer import Triangulation, VeeringTriangulation
             sage: vt = VeeringTriangulation("(0,1,2)(~1,3,4)(~0:1,~4:2)(~3:2,~2:3)", "RBRRB")
             sage: vt.face_separatrices()
-            [(1, 0), (9, 0), (5, 1), (5, 0), (7, 0)]
+            [(1, 0), (9, 0), (5, 0), (5, 1), (7, 0)]
             sage: seps = vt.face_separatrices(flat=False)
             sage: seps
-            [[(1, 0), (9, 0)], [(5, 1), (5, 0), (7, 0)]]
+            [[(1, 0), (9, 0)], [(5, 0), (5, 1), (7, 0)]]
             sage: vt.face_separatrices(5, 1)
-            [(5, 1), (5, 0), (7, 0)]
+            [(5, 1), (7, 0), (5, 0)]
             sage: vt.face_separatrices(5, 0)
-            [(5, 0), (7, 0), (5, 1)]
+            [(5, 0), (5, 1), (7, 0)]
             sage: all(vt.face_angle(h) == -len(sep) for sep in seps for h, a in sep)
             True
 
             sage: vt.face_separatrices(9)
             [(9, 0), (1, 0)]
             sage: vt.face_separatrices(7)
-            [(7, 0), (5, 1), (5, 0)]
+            [(7, 0), (5, 0), (5, 1)]
 
         An example in H(1^2, -1^2) where the two faces have no separatrices::
 
@@ -1060,17 +1064,17 @@ class VeeringTriangulation(Triangulation):
             if a is None:
                 a = 0
             h, a = self._check_face_separatrix(h, a)
-            orbit = [(h, b) for b in range(a, -1, -1)]
+            orbit = [(h, b) for b in range(a, self.half_edge_num_separatrices(h, slope, check=False) - 1)]
             for hh in perm_orbit(self._fp, h)[1:]:
-                orbit.extend((hh, b) for b in range(self.half_edge_num_separatrices(hh, slope, check=False) - 2, -1, -1))
-            orbit.extend((h, b) for b in range(self.half_edge_num_separatrices(h, slope, check=False) - 2, a, -1))
+                orbit.extend((hh, b) for b in range(self.half_edge_num_separatrices(hh, slope, check=False) - 1))
+            orbit.extend((h, b) for b in range(a))
             return orbit if flat else [orbit]
         else:
             separatrices = []
             for cycle in self.boundary_faces():
                 orbit = []
                 for h in cycle:
-                    for a in range(self.half_edge_num_separatrices(h, slope, check=False) - 2, -1, -1):
+                    for a in range(self.half_edge_num_separatrices(h, slope, check=False) - 1):
                         orbit.append((h, a))
                 if orbit:
                     if flat:
