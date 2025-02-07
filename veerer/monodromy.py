@@ -42,7 +42,7 @@ class SeparatrixMonodromy:
 
     EXAMPLES::
 
-        sage: from veerer import VeeringTriangulation
+        sage: from veerer import VeeringTriangulation, VeeringTriangulationLinearFamilies
         sage: from veerer.monodromy import SeparatrixMonodromy
         sage: vt = VeeringTriangulation("(0,8,~7)(~0,~6,7)(1,11,~10)(~1,~11,4)(2,10,~9)(~2,~4,5)(3,9,~8)(~3,~5,6)", "RRRRBBBBBBBB")
         sage: ds_graph = vt.delaunay_strebel_graph()  # long time
@@ -55,6 +55,22 @@ class SeparatrixMonodromy:
         sage: separatrices_image = [monodromy.vertex_separatrix_transport(path, h, a) for (h, a) in separatrices]  # long time
         sage: separatrices_target = end.vertex_separatrices()  # long time
         sage: assert set(separatrices_image) == set(separatrices_target)  # long time
+
+        sage: f = VeeringTriangulationLinearFamilies.prototype_H2(0, 1, 1, -1)
+        sage: ds_graph = f.delaunay_strebel_graph()
+        sage: monodromy = SeparatrixMonodromy(ds_graph)
+        sage: path = ds_graph.path(0)
+        sage: path.random_append(10, reverse=False)
+        sage: start = ds_graph.vertex_label(path.start())
+        sage: end = ds_graph.vertex_label(path.end())
+        sage: separatrices = start.vertex_separatrices()
+        sage: separatrices_image = [monodromy.vertex_separatrix_transport(path, h, a) for (h, a) in separatrices]
+        sage: separatrices_target = end.vertex_separatrices()
+        sage: assert set(separatrices_image) == set(separatrices_target)
+        sage: folded_edges = list(start.folded_edges())
+        sage: folded_edges_image = [monodromy.folded_edge_transport(path, e) for e in folded_edges]
+        sage: folded_edges_target = list(end.folded_edges())
+        sage: assert set(folded_edges_image) == set(folded_edges_target)
     """
     def __init__(self, graph):
         self._graph = graph
@@ -75,10 +91,19 @@ class SeparatrixMonodromy:
         a, b, c, d = state.square_about_half_edge(2 * e, check=False)
         if half_edge == b:
             assert angle == 0
-            return (2 * e + 1, 0) if col == RED else (half_edge, angle)
+            if col == RED:
+                if state._vp[2 * e + 1] == -1:
+                    return (2 * e, 0)
+                else:
+                    return (2 * e + 1, 0)
+            else:
+                return (half_edge, angle)
         elif half_edge == d:
             assert angle == 0
-            return (2 * e, 0) if col == RED else (half_edge, angle)
+            if col == RED:
+                return (2 * e, 0)
+            else:
+                return (half_edge, angle)
 
         return (half_edge, angle)
 
@@ -286,7 +311,7 @@ class SeparatrixMonodromy:
                 mapping = transition[1]
                 if reverse:
                     # NOTE: for Strebel operation the argument is always the veering triangulation
-                    half_edge, angle = source._normalization_face_separatrix(half_edge, angle)
+                    half_edge, angle = source._normalize_face_separatrix(half_edge, angle)
                     half_edge, angle = self._strebel_back(target, mapping, half_edge, angle)
                 else:
                     half_edge, angle = self._strebel(source, mapping, half_edge, angle)
@@ -294,7 +319,7 @@ class SeparatrixMonodromy:
             # too expensive!!
             target._check_face_separatrix(half_edge, angle)
 
-        return self._graph.vertex_label(path.end())._normalization_face_separatrix(half_edge, angle)
+        return self._graph.vertex_label(path.end())._normalize_face_separatrix(half_edge, angle)
 
     def infinite_cylinder_transport(self, path, half_edge):
         r"""
@@ -349,8 +374,44 @@ class SeparatrixMonodromy:
 
         return min(perm_orbit(self._graph.vertex_label(path.end())._fp, half_edge))
 
+    def folded_edge_transport(self, path, half_edge):
+        if path._graph is not self._graph:
+            raise ValueError("invalid path for infinite cylinder monodromy")
 
-def framing_group_element(state, G, vseps0, vseps1, fseps0, fseps1, cseps0, cseps1):
+        for i in path:
+            source = self._graph.vertex_label(self._graph.edge_source(i))
+            target = self._graph.vertex_label(self._graph.edge_target(i))
+            transition = self._graph.edge_label(i)
+
+            reverse = i < 0
+
+            # TODO: remove check
+            assert half_edge % 2 == 0 and source._fp[half_edge + 1] == -1
+
+            kind = transition[0]
+            if kind == "flip" or kind == "rotate":
+                relabelling = transition[4 if kind == "flip" else 1]
+                if reverse:
+                    half_edge = perm_preimage(relabelling, half_edge)
+                else:
+                    half_edge = relabelling[half_edge]
+
+            elif kind == "strebel":
+                mapping = transition[1]
+                mapping_back = transition[2]
+                if reverse:
+                    half_edge = next(k for k, h in enumerate(mapping) if h == half_edge)
+                else:
+                    assert mapping[half_edge] != -1
+                    half_edge = mapping[half_edge]
+
+            # TODO: remove check
+            assert half_edge % 2 == 0 and target._fp[half_edge + 1] == -1
+
+        return half_edge
+
+
+def framing_group_element(state, G, vseps0, vseps1, fseps0, fseps1, cseps0, cseps1, fedges0, fedges1):
     r"""
     Return the group element corresponding to the element mapping the separatrices 0
     onto the separatrices 1 in the coordinates of separatrices 0.
@@ -366,8 +427,12 @@ def framing_group_element(state, G, vseps0, vseps1, fseps0, fseps1, cseps0, csep
     - ``fseps0``, ``fseps`` - batches of face separatrices
 
     - ``cseps0``, ``cseps1`` - batches of infinite cylinder separatrices
+
+    - ``fedges0``, ``fedges1`` - batches of folded edges
     """
     # we choose a non-canonical numbering of separatrices and conjugate at the end
+
+    # vertex separatrices
     seps = [(len(sep), sep) for sep in state.vertex_separatrices(flat=False)]
     seps.sort()
     seps_indices = {}
@@ -383,6 +448,7 @@ def framing_group_element(state, G, vseps0, vseps1, fseps0, fseps1, cseps0, csep
     r1 = [seps_angles[s] for s in vseps1]
     assert len(p0) == len(r0) == len(p1) == len(r1) == nv
 
+    # face separatrices
     seps = [(len(sep), sep) for sep in state.face_separatrices(flat=False)]
     seps.sort()
     seps_indices = {}
@@ -398,6 +464,7 @@ def framing_group_element(state, G, vseps0, vseps1, fseps0, fseps1, cseps0, csep
     r1.extend(seps_angles[s] for s in fseps1)
     assert len(p0) == len(p1) == len(r0) == len(r1) == nv + nf
 
+    # infinite cylinders
     seps_indices = {}
     nc = len(cseps1)
     for i, s in enumerate(cseps1):
@@ -406,7 +473,18 @@ def framing_group_element(state, G, vseps0, vseps1, fseps0, fseps1, cseps0, csep
     r0.extend([0] * nc)
     p1.extend(seps_indices[s] for s in cseps1)
     r1.extend([0] * nc)
-    assert len(p0) == len(r0) == len(p1) == len(r1) == nv + nf + nc
+
+    # folded edges
+    seps_indices = {}
+    nfe = len(fedges0)
+    for i, s in enumerate(fedges1):
+        seps_indices[s] = nv + nf + nc + i
+    p0.extend(seps_indices[s] for s in fedges0)
+    r0.extend([0] * nfe)
+    p1.extend(seps_indices[s] for s in fedges1)
+    r1.extend([0] * nfe)
+
+    assert len(p0) == len(r0) == len(p1) == len(r1) == nv + nf + nc + nfe
 
     g0 = G(array('i', p0), array('i', r0))
     g1 = G(array('i', p1), array('i', r1))
