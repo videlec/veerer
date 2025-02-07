@@ -502,3 +502,293 @@ class DelaunayStrebelGraph(LabelledDiGraph):
             if b:
                 G.add_edge(self._edge_sources[i], self._edge_targets[i], i)
         return G
+
+
+# # the only useful thing
+# class MultiscaleDelaunayStrebelGraph:
+#     r"""
+#     A product of Delaunay-Strebel graphs endowed with a level structure.
+#
+#     TESTS::
+#
+#         sage: from veerer import *
+#         sage: vt0 = VeeringTriangulation("(0,2,~1)(~0,~2,1)", "RBB")
+#         sage: vt1 = VeeringTriangulation("(1,2,3)(~1,~2,~3)(0:1)(~0:1)", "BRBB")
+#         sage: vt2 = VeeringTriangulation("(0,1,2)(~2:2,~1:1,~0:1)", "BRB")
+#         sage: m = MultiscaleDelaunayStrebelGraph([{vt0: 1, vt1: 2}, {vt0: 2, vt2: 1}])
+#         sage: m
+#         MultiscaleDelaunayStrebelGraph({
+#           {DelaunayStrebelGraph(VeeringTriangulation("(0:1,1:1,2:1,3:1)(~0:1,~1:1,~2:1,~3:1)", "RRRB")): 1, DelaunayStrebelGraph(VeeringTriangulation("(1,2,3)(~1,~2,~3)(0:1)(~0:1)", "BRRB")): 2},
+#           {DelaunayStrebelGraph(VeeringTriangulation("(0:1,1:1,2:1,3:1)(~0:1,~1:1,~2:1,~3:1)", "RRRB")): 1}
+#         })
+#
+#     The list of Delaunay-Strebel graphs at a given level is accessed using square brackets
+#     as follows::
+#
+#         sage: m[0]
+#         [DelaunayStrebelGraph(VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")),
+#          DelaunayStrebelGraph(VeeringTriangulation("(1,2,3)(~1,~2,~3)(0:1)(~0:1)", "BRRB")),
+#          DelaunayStrebelGraph(VeeringTriangulation("(1,2,3)(~1,~2,~3)(0:1)(~0:1)", "BRRB"))]
+#         sage: m[1]
+#         [DelaunayStrebelGraph(VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")),
+#          DelaunayStrebelGraph(VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")),
+#          DelaunayStrebelGraph(VeeringTriangulation("(0:1,~0:2,1:1,~1:2)", "RR"))]
+#     """
+#     def __init__(self, ds_graphs, check=True):
+#         if not ds_graphs:
+#             raise ValueError("empty input")
+#
+#     def __repr__(self):
+#         return "MultiscaleDelaunayStrebelGraph({\n  " + ",\n  ".join(map(str, self._levels)) + "\n})"
+#
+#     def __len__(self):
+#         r"""
+#         EXAMPLES::
+#
+#             sage: from veerer import *
+#             sage: vt0 = VeeringTriangulation("(0,2,~1)(~0,~2,1)", "RBB")
+#             sage: vt1 = VeeringTriangulation("(1,2,3)(~1,~2,~3)(0:1)(~0:1)", "BRBB")
+#             sage: vt2 = VeeringTriangulation("(0,1,2)(~2:2,~1:1,~0:1)", "BRB")
+#             sage: len(MultiscaleDelaunayStrebelGraph([{vt0: 1}]))
+#             1
+#             sage: len(MultiscaleDelaunayStrebelGraph([{vt0: 1}, {vt0: 2}]))
+#             2
+#         """
+#         return len(self._levels)
+#
+#     def __getitem__(self, level):
+#         try:
+#             level = level.__index__()
+#         except AttributeError:
+#             raise TypeError("MultiscaleDelaunayStrebelGraph indices must be integers, not {}".format(type(i)))
+#         return sum(([ds_graph] * multiplicity for ds_graph, multiplicity in self._levels[level].items()), [])
+#
+#     def __hash__(self):
+#         raise NotImplementedError
+#
+#     def __eq__(self, other):
+#         r"""
+#         TESTS::
+#
+#             sage: from veerer import *
+#             sage: vt0 = VeeringTriangulation("(0,2,~1)(~0,~2,1)", "RBB")
+#             sage: vt1 = VeeringTriangulation("(1,2,3)(~1,~2,~3)(0:1)(~0:1)", "BRBB")
+#             sage: vt2 = VeeringTriangulation("(0,1,2)(~2:2,~1:1,~0:1)", "BRB")
+#             sage: m0 = MultiscaleDelaunayStrebelGraph([{vt0: 1}]))
+#             sage: m1  = MultiscaleDelaunayStrebelGraph([{vt0: 1}]))
+#             sage: m2 = MultiscaleDelaunayStrebelGraph([{vt0: 2}]))
+#             sage: m3 = MultiscaleDelaunayStrebelGraph([{vt1: 1}]))
+#             sage: m4 = MultiscaleDelaunayStrebelGraph([{vt0: 1}, {vt0: 1}]))
+#             sage: assert m0 == m1
+#             sage: assert not (m0 == m2) and not (m0 == m3) and not (m3 == m4)
+#             sage: assert not (m2 == m3) and not (m2 == m4)
+#             sage: assert not (m3 == m4)
+#         """
+#         if type(self) is not type(other):
+#             raise TypeError
+#         return self._levels == other._levels
+#
+#     def __ne__(self, other):
+#         r"""
+#         TESTS::
+#
+#             sage: from veerer import *
+#             sage: vt0 = VeeringTriangulation("(0,2,~1)(~0,~2,1)", "RBB")
+#             sage: vt1 = VeeringTriangulation("(1,2,3)(~1,~2,~3)(0:1)(~0:1)", "BRBB")
+#             sage: vt2 = VeeringTriangulation("(0,1,2)(~2:2,~1:1,~0:1)", "BRB")
+#             sage: m0 = MultiscaleDelaunayStrebelGraph([{vt0: 1}]))
+#             sage: m1  = MultiscaleDelaunayStrebelGraph([{vt0: 1}]))
+#             sage: m2 = MultiscaleDelaunayStrebelGraph([{vt0: 2}]))
+#             sage: m3 = MultiscaleDelaunayStrebelGraph([{vt1: 1}]))
+#             sage: m4 = MultiscaleDelaunayStrebelGraph([{vt0: 1}, {vt0: 1}]))
+#             sage: assert not (m0 != m1)
+#             sage: assert m0 != m2 and m0 != m3 and m3 != m4
+#             sage: assert m2 != m3 and m2 != m4
+#             sage: assert m3 != m4
+#         """
+#         if type(self) is not type(other):
+#             raise TypeError
+#         return self._levels != other._levels
+#
+#     def _cmp_(self, other):
+#         if type(self) is not type(other):
+#             raise TypeError("can not compare {} with {}".format(type(self).__name__, type(other).__name__))
+#
+#         data0 = len(self._levels)
+#         data1 = len(other._levels)
+#         c = (data0 > data1) - (data0 < data1)
+#         if c:
+#             return c
+#
+#         data0 = sorted(level.items() for level in self._levels)
+#         data1 = sorted(level.items() for level in other._levels)
+#         c = (data0 > data1) - (data0 < data1)
+#         return c
+#
+#     def _richcmp_(self, other, op):
+#         if type(self) is not type(other):
+#             raise TypeError("can not compare {} with {}".format(type(self).__name__, type(other).__name__))
+#
+#         return rich_to_bool(op, self._cmp_(other))
+#
+#     def __lt__(self, other):
+#         return self._richcmp_(other, op_LT)
+#
+#     def __le__(self, other):
+#         return self._richcmp_(other, op_LE)
+#
+#     def __gt__(self, other):
+#         return self._richcmp_(other, op_GT)
+#
+#     def __ge__(self, other):
+#         return self._richcmp_(other, op_GE)
+#
+#     def _check_level(self, level):
+#         if not isinstance(level, numbers.Integral):
+#             raise TypeError("level must be integral")
+#         level = int(level)
+#         if level < 0:
+#             level = -level
+#         if not 0 <= level < len(self._levels):
+#             raise ValueError("level out of range")
+#         return level
+#
+#     def _ambient_framing_group_data(self, level):
+#         r"""
+#         EXAMPLES::
+#
+#             sage: from veerer import *
+#             sage: vt0 = VeeringTriangulation("(0,2,~1)(~0,~2,1)", "RBB")
+#             sage: vt1 = VeeringTriangulation("(1,2,3)(~1,~2,~3)(0:1)(~0:1)", "BRBB")
+#             sage: vt2 = VeeringTriangulation("(0,1,2)(~2:2,~1:1,~0:1)", "BRB")
+#             sage: MultiscaleDelaunayStrebelGraph([{vt0: 2, vt1: 1}, {vt2: 3}])._ambient_framing_group()
+#             (FramingGroup(2^2, 2^2, 1^2, 2^9, 2^3), [[0, 2], [6]])
+#         """
+#         from .framing_group import FramingGroup
+#
+#         vertex_angles = []
+#         vertex_multiplicities = []
+#         face_angles = []
+#         face_multiplicities = []
+#         ncyls = nfedges = 0
+#         ds_graphs = self._levels[level]
+#         for comp, (ds_graph, multiplicity) in enumerate(ds_graphs.items()):
+#             local_vertex_angles, local_vertex_multiplicities, local_face_angles, local_face_multiplicities, local_ncyls, local_nfedges = ds_graph._ambient_framing_group_data()
+#
+#             vertex_angles.extend(local_vertex_angles)
+#             vertex_multiplicities.extend(x * multiplicity for x in local_vertex_multiplicities)
+#
+#             face_angles.extend(local_face_angles)
+#             face_multiplicities.extend(x * multiplicity for x in local_face_multiplicities)
+#
+#             ncyls += local_ncyls * multiplicity
+#             nfedges += local_nfedges * multiplicity
+#
+#         return (vertex_angles, vertex_multiplicities, face_angles, face_multiplicities, ncyls, nfedges)
+#
+#     def _ambient_framing_group(self, level):
+#         r"""
+#         Return the ambient framing group.
+#
+#         The framing group is the group of permutation of singularities and
+#         separatrices. Any such permutation should respect the degree of
+#         singularties and the cyclic ordering of separatrices.
+#         """
+#         from .framing_group import FramingGroup
+#         vertex_angles, vertex_multiplicities, face_angles, face_multiplicities, ncyls, nfedges = self._ambient_framing_group_data(level)
+#         angles = vertex_angles + face_angles
+#         multiplicities = vertex_multiplicities + face_multiplicities
+#         if ncyls:
+#             angles.append(1)
+#             multiplicities.append(ncyls)
+#         if nfedges:
+#             angles.append(1)
+#             multiplicities.append(nfedges)
+#
+#         return FramingGroup(angles, multiplicities)
+#
+#     def framing_group_element_permutation(self, level, g, v=None):
+#         level = self._check_level(level)
+#
+#         if v is None:
+#             v = [0] * len(self[level])
+#
+#         all_seps = []
+#         nv = []
+#         nf = []
+#         nc = []
+#         nfc = []
+#         ds_graphs = self[levels]
+#         for comp, ds_graph in enumerate(self[level]):
+#             local_v = v[level][comp]
+#             local_state = ds_graph._vertices[local_v]
+#             vseps, fseps, cseps, fedges = ds_graph.separatrix_trivialization()
+#
+#             # vertex separatrices at (level, comp)
+#             for h, a in vseps[local_v]:
+#                 orbit = [(level, comp, h, b) for b in range(a, local_state.half_edge_num_separatrices(h, check=False))]
+#                 for hh in perm_orbit(local_state._vp, h)[1:]:
+#                     orbit.extend((level, comp, hh, b) for b in range(state.half_edge_num_separatrices(hh, check=False)))
+#                 orbit.extend((level, comp, h, b) for b in range(a))
+#                 all_seps.append(orbit)
+#
+#             # face separatrices at (level, comp)
+#             for h, a in fseps[local_v]:
+#                 orbit = [(level, comp, h, b) for b in range(a, -1, -1)]
+#                 for hh in perm_orbit(local_state._fp, h)[1:]:
+#                     orbit.extend((level, comp, hh, b) for b in range(local_state.half_edge_num_separatrices(hh, check=False) -2, -1, -1))
+#                 orbit.extend((level, comp, h, b) for b in range(state.half_edge_num_separatrices(h, check=False) - 2, a, -1))
+#
+#             # infinite cylinders
+#             all_seps.extend((level, comp, h) for h in cseps[local_v])
+#
+#             # folded edges
+#             all_seps.extend((level, comp, h) for h in fedges[local_v])
+#
+#
+#     # TODO
+#     @cached_method
+#     def framing_group(self):
+#         r"""
+#         Return the monodromy of framing obtained by parallel transport in each
+#         prime component and exchange of isomorphic components in the same
+#         level.
+#         """
+#         G = self._ambient_framing_group()
+#         H = G.subgroup(mutable=True)
+#
+#         # TODO: use multiplicities
+#         # add generators for monodromies in each component
+#         for level, ds_graphs in enumerate(self._levels):
+#             for comp, ds_graph in enumerate(ds_graphs):
+#                 Gloc = ds_graph.framing_group()
+#
+#         # add generator for exchange of isomorphic components in a given level
+#
+#         H.set_immutable()
+#         return H
+#
+#     def framing_group_element_permutation(self, g, v=None):
+#         r"""
+#         Given an element of the framing group ``g`` return a quadruple of
+#         dictionaries ``(d_vseps, d_fseps, d_cseps, d_fedges)`` encoding
+#         permutations of vertex separatrices, face separatrices, infinite
+#         cylinders and folded edges.
+#
+#         The keys and values
+#         - for ``d_vseps`` are quadruples ``(level, component, half_edge, angle)``
+#         - for ``d_fseps`` are quadruples ``(level, component, half_edge, angle)``
+#         - for ``d_cseps`` are triples ``(level, component, half_edge)``
+#         - for ``d_fedges`` are triples ``(level, component, half_edge)
+#
+#         The argument ``v`` is an optional vertex
+#
+#         EXAMPLES::
+#
+#             sage: from veerer import VeeringTriangulation
+#             sage: vt = VeeringTriangulation("(0:4,~0:2)","R")
+#             sage: ds_graph = vt.delaunay_strebel_graph()
+#             sage: G = ds_graph.ambient_framing_group()
+#             sage: G.rotation()
+#         """
+#         raise NotImplementedError
