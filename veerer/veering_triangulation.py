@@ -1049,6 +1049,12 @@ class VeeringTriangulation(Triangulation):
             []
             sage: vt.face_separatrices(flat=False)
             []
+
+
+            sage: VeeringTriangulation("(0:3,1:3,2:2,3:2)", "BBBR").face_separatrices()
+            [(0, 0), (0, 1), (6, 0), (6, 1), (4, 0), (2, 0), (2, 1)]
+            sage: VeeringTriangulation("(0:3,1:3,2:2,3:2)", "BBBR").face_separatrices(0, 1)
+            [(0, 1), (6, 0), (6, 1), (4, 0), (2, 0), (2, 1), (0, 0)]
         """
         if slope == VERTICAL:
             right = RED
@@ -1065,7 +1071,7 @@ class VeeringTriangulation(Triangulation):
                 a = 0
             h, a = self._check_face_separatrix(h, a)
             orbit = [(h, b) for b in range(a, self.half_edge_num_separatrices(h, slope, check=False) - 1)]
-            for hh in perm_orbit(self._fp, h)[1:]:
+            for hh in perm_orbit(self._fp, h)[:0:-1]:
                 orbit.extend((hh, b) for b in range(self.half_edge_num_separatrices(hh, slope, check=False) - 1))
             orbit.extend((h, b) for b in range(a))
             return orbit if flat else [orbit]
@@ -1073,7 +1079,7 @@ class VeeringTriangulation(Triangulation):
             separatrices = []
             for cycle in self.boundary_faces():
                 orbit = []
-                for h in cycle:
+                for h in [cycle[0]] + cycle[:0:-1]:
                     for a in range(self.half_edge_num_separatrices(h, slope, check=False) - 1):
                         orbit.append((h, a))
                 if orbit:
