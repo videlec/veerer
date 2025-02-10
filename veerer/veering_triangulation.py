@@ -3968,7 +3968,10 @@ class VeeringTriangulation(Triangulation):
 
             sage: from veerer import VeeringTriangulation
             sage: vt = VeeringTriangulation("(0,2,1)(~0,3,~1)(~2:2,~3:2)", "RBRR")
-            sage: vt.delaunay_strebel_graph()
+            sage: ds = vt.delaunay_strebel_graph()
+            sage: ds
+            DelaunayStrebelGraph(VeeringTriangulation("(0:1,1:1,~0:1,~1:1)", "RB"))
+            sage: print(ds.info())
             Delaunay-Strebel graph of VeeringTriangulation("(0:1,1:1,~0:1,~1:1)", "RB") made of
               9 veering Delaunay states
               1 Strebel states
@@ -5981,6 +5984,212 @@ class VeeringTriangulation(Triangulation):
             return (sg, index_strebel, strebel_to_veering_boundary)
 
         return sg
+
+    def framing(self):
+        r"""
+        Return the quadruple ``(vertex_separatrices, face_separatrices,
+        infinite_cylinders, folded_half_edges)`` that defines a framing on
+        the underlying surface induced by this veering triangulation.
+
+        A *framing* for an Abelian or a quadratic differential is an ordered
+        list containing
+        - a vertical separatrix for each singularity of positive angle
+          (equivalently, degree greater or equal than -1)
+        - a vertical separatrix for each singularity of negative angle
+          (equivalently, degree less or equal than -3)
+        - the infinite cylinders (equivalently, degree equal to -2)
+
+        As in a veering triangulation, folded edges are allowed (in which case
+        the middle of the edge is a singularity of degree -1), the folded edges
+        form a fourth category.
+
+        Note that two isomorphic veering triangulation might give rise to two
+        different framing.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+
+        A genus two Abelian differential in H(1,1) has two singularities of
+        angle 6 pi. The associated framing is made of two vertex separatrices
+        each represented by a pair ``(half_edge, angle)``::
+
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,6,~5)(~4,7,8)(~6,~7,9)(~8,10,11)(~9,~10,~11)", "RRBBBRBRRRBR")
+            sage: vt.framing()
+            ([(0, 0), (1, 0)], [], [], [])
+
+        A genus one Abelian differential in H_1(4^2, -4^2) has two singularities
+        of angle 8 pi and two of angle -6 pi. The associated framing is made of
+        two vertex separatrices and two face separatrices::
+
+            sage: vt = VeeringTriangulation("(0:2,1:2,2:2,3:2)(~0:2,~1:2,~2:2,~3:2)", "RBRB")
+            sage: vt.framing()
+            ([(0, 0), (1, 0)], [(0, 0), (1, 0)], [], [])
+
+        A genus one Abelian differential in H_1(2, -1^2) has a singularity of
+        angle 6 pi and two singularities of angle 0 (ie infinite cylinders).
+
+            sage: vt = VeeringTriangulation("(0:1,1:1,2:1)(~0:1,~1:1,~2:1)", "RRR")
+            sage: vt.framing()
+            ([(0, 0)], [], [0, 1], [])
+
+        A quadratic differential in Q_0(2, -1^6) can be obtained with a veering triangulation
+        with a single vertex and six folded edges::
+
+            sage: vt = VeeringTriangulation("(0,1,2)(~2,3,4)(~3,5,6)(~6,7,8)", "RRBBRRRBR")
+            sage: vt.framing()
+            ([(0, 0)], [], [], [0, 2, 8, 10, 14, 16])
+        """
+        vertex_separatrices = [(len(sep), sep[0]) for sep in self.vertex_separatrices(flat=False)]
+        vertex_separatrices.sort()
+        vertex_separatrices = [sep for a, sep in vertex_separatrices]
+
+        face_separatrices = [(len(sep), sep[0]) for sep in self.face_separatrices(flat=False)]
+        face_separatrices.sort()
+        face_separatrices = [sep for a, sep in face_separatrices]
+
+        infinite_cylinders = [min(f) for f in self.boundary_faces() if self.face_angle(f[0]) == 0]
+
+        folded_half_edges = [2 * e for e in range(self._ne) if self._vp[2 * e + 1] == -1]
+
+        return vertex_separatrices, face_separatrices, infinite_cylinders, folded_half_edges
+
+    def framing_group(self):
+        r"""
+        Return the abstract framing group associated to the permutation of
+        singularities and separatrices on the underlying surface.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+
+            sage: vt = VeeringTriangulation("(0,1,2)(~0:2,~2:3,~1:1)", "RRB")
+            sage: vt.stratum()  # optional - surface_dynamics
+            H_0(1, 0^2, -3)
+            sage: vt.framing_group()
+            FramingGroup(2^2, 4, 4)
+
+            sage: vt = VeeringTriangulation("(0:4,~0:2)","R")
+            sage: vt.stratum()  # optional - surface_dynamics
+            H_0(1, 0, -3)
+            sage: vt.framing_group()
+            FramingGroup(2, 4, 4)
+
+            sage: vt = VeeringTriangulation("(0,1,2)", "RRB")
+            sage: vt.stratum()  # optional - surface_dynamics
+            Q_0(-1^4)
+            sage: vt.framing_group()
+            FramingGroup(1, 1^3)
+        """
+        from .framing_group import runs, FramingGroup
+
+        vseps, fseps, cseps, fhedges = self.framing()
+
+        vertex_angles_and_multiplicities = [self.vertex_angle(h) for h, a in vseps]
+        vertex_angles = []
+        vertex_multiplicities = []
+        for a, m in runs(vertex_angles_and_multiplicities):
+            vertex_angles.append(a)
+            vertex_multiplicities.append(m)
+
+        face_angles_and_multiplicities = [-self.face_angle(h) for h, a in fseps]
+        face_angles = []
+        face_multiplicities = []
+        for a, m in runs(face_angles_and_multiplicities):
+            face_angles.append(a)
+            face_multiplicities.append(m)
+
+        ncyls = len(cseps)
+        nfhedges = len(fhedges)
+
+        angles = vertex_angles + face_angles
+        multiplicities = vertex_multiplicities + face_multiplicities
+        if ncyls:
+            angles.append(1)
+            multiplicities.append(ncyls)
+        if nfhedges:
+            angles.append(1)
+            multiplicities.append(nfhedges)
+
+        return FramingGroup(angles, multiplicities)
+
+    def framing_group_element_permutation(self, g, framing=None):
+        r"""
+        EXAMPLES::
+
+            sage: from veerer import *
+            sage: vt = VeeringTriangulation("(0:1)(~0:1,1:1,2:1,~1:1)(~2:1)", "RBR")
+            sage: G = vt.framing_group()
+
+            sage: g = G("(0:1)(1:1)(2:1)")
+            sage: d_vseps, d_fseps, d_cseps, d_fhedges = vt.framing_group_element_permutation(g)
+            sage: print(", ".join(f"{sep} -> {d_vseps[sep]}" for sep in sorted(d_vseps)))
+            (0, 0) -> (1, 0), (1, 0) -> (1, 1), (1, 1) -> (2, 0), (2, 0) -> (0, 0), (3, 0) -> (5, 0), (4, 0) -> (4, 1), (4, 1) -> (3, 0), (5, 0) -> (4, 0)
+            sage: print(", ".join(f"{sep} -> {d_fseps[sep]}" for sep in sorted(d_fseps)))
+            (1, 0) -> (4, 0), (4, 0) -> (1, 0)
+            sage: print(", ".join(f"{sep} -> {d_cseps[sep]}" for sep in sorted(d_cseps)))
+            0 -> 0, 5 -> 5
+
+            sage: g = G("(0:0, 1:2)")
+            sage: d_vseps, d_fseps, d_cseps, d_fhedges = vt.framing_group_element_permutation(g)
+            sage: print(", ".join(f"{sep} -> {d_vseps[sep]}" for sep in sorted(d_vseps)))
+            (0, 0) -> (3, 0), (1, 0) -> (5, 0), (1, 1) -> (4, 0), (2, 0) -> (4, 1), (3, 0) -> (1, 1), (4, 0) -> (0, 0), (4, 1) -> (1, 0), (5, 0) -> (2, 0)
+            sage: print(", ".join(f"{sep} -> {d_fseps[sep]}" for sep in sorted(d_fseps)))
+            (1, 0) -> (1, 0), (4, 0) -> (4, 0)
+            sage: print(", ".join(f"{sep} -> {d_cseps[sep]}" for sep in sorted(d_cseps)))
+            0 -> 0, 5 -> 5
+        """
+        if framing is None:
+            framing = self.framing()
+
+        vseps, fseps, cseps, fhedges = framing
+
+        all_seps = []
+
+        # vertex separatrices
+        for h, a in vseps:
+            all_seps.append(self.vertex_separatrices(h, a))
+
+        # face separatrices
+        for h, a in fseps:
+            all_seps.append(self.face_separatrices(h, a))
+
+        # infinite cylinders
+        all_seps.extend(cseps)
+
+        # folded edges
+        all_seps.extend(fhedges)
+
+        nv = len(vseps)
+        nf = len(fseps)
+        nc = len(cseps)
+        nfe = len(fhedges)
+
+        d_vseps = {}
+        d_fseps = {}
+        d_cseps = {}
+        d_fhedges = {}
+
+        for i in range(nv):
+            seps = all_seps[i]
+            for a, sep in enumerate(seps):
+                j, b = g(i, a)
+                d_vseps[sep] = all_seps[j][b]
+        for i in range(nv, nv + nf):
+            seps = all_seps[i]
+            for a, sep in enumerate(seps):
+                j, b = g(i, a)
+                d_fseps[sep] = all_seps[j][b]
+        for i in range(nv + nf, nv + nf + nc):
+            sep = all_seps[i]
+            j = g(i)
+            d_cseps[sep] = all_seps[j]
+        for i in range(nv + nf + nc, nv + nf + nc + nfe):
+            sep = all_seps[i]
+            j = g(i)
+            d_fhedges[sep] = all_seps[j]
+
+        return (d_vseps, d_fseps, d_cseps, d_fhedges)
 
 
 class VeeringTriangulations:

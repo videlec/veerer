@@ -390,7 +390,7 @@ class FramingGroup(Parent, UniqueRepresentation):
 
     @cached_method
     def symmetric_group(self):
-        return SymmetricGroup(sum(a ** m for a, m in zip(self._angles, self._multiplicities)))
+        return SymmetricGroup(sum(m * a for a, m in zip(self._angles, self._multiplicities)))
 
     def gens(self):
         r"""

@@ -170,6 +170,7 @@ class DelaunayStrebelGraph(LabelledDiGraph):
     def root(self):
         return self._vertices[0]
 
+    # TODO: rename as framing_trivialization
     @cached_method
     def separatrix_trivialization(self):
         r"""
@@ -181,23 +182,11 @@ class DelaunayStrebelGraph(LabelledDiGraph):
         vertex_separatrices = [None] * len(self)
         face_separatrices = [None] * len(self)
         infinite_cylinders = [None] * len(self)
-        folded_edges = [None] * len(self)
+        folded_half_edges = [None] * len(self)
 
         root = self._vertices[0]
 
-        seps = [(len(sep), sep[0]) for sep in root.vertex_separatrices(flat=False)]
-        seps.sort()
-        seps = [sep for a, sep in seps]
-        vertex_separatrices[0] = seps
-
-        seps = [(len(sep), sep[0]) for sep in root.face_separatrices(flat=False)]
-        seps.sort()
-        seps = [sep for a, sep in seps]
-        face_separatrices[0] = seps
-
-        infinite_cylinders[0] = [min(f) for f in root.boundary_faces() if root.face_angle(f[0]) == 0]
-
-        folded_edges[0] = [2 * e for e in range(root._ne) if root._vp[2 * e + 1] == -1]
+        vertex_separatrices[0], face_separatrices[0], infinite_cylinders[0], folded_half_edges[0] = root.framing()
 
         todo = self._spanning_tree_from[0][:]
         while todo:
@@ -208,12 +197,12 @@ class DelaunayStrebelGraph(LabelledDiGraph):
             assert vertex_separatrices[u] is not None
             assert face_separatrices[u] is not None
             assert infinite_cylinders[u] is not None
-            assert folded_edges[u] is not None
+            assert folded_half_edges[u] is not None
 
             assert vertex_separatrices[v] is None
             assert face_separatrices[v] is None
             assert infinite_cylinders[v] is None
-            assert folded_edges[v] is None
+            assert folded_half_edges[v] is None
 
             # TODO: we might want to avoid building a path if we just do parallel transport
             # along a single edge
@@ -222,36 +211,45 @@ class DelaunayStrebelGraph(LabelledDiGraph):
             vertex_separatrices[v] = [monodromy.vertex_separatrix_transport(edge, h, a) for h, a in vertex_separatrices[u]]
             face_separatrices[v] = [monodromy.face_separatrix_transport(edge, h, a) for h, a in face_separatrices[u]]
             infinite_cylinders[v] = [monodromy.infinite_cylinder_transport(edge, h) for h in infinite_cylinders[u]]
-            folded_edges[v] = [monodromy.folded_edge_transport(edge, h) for h in folded_edges[u]]
+            folded_half_edges[v] = [monodromy.folded_half_edge_transport(edge, h) for h in folded_half_edges[u]]
 
             todo.extend(self._spanning_tree_from[v])
 
-        return tuple(vertex_separatrices), tuple(face_separatrices), tuple(infinite_cylinders), tuple(folded_edges)
+        return tuple(vertex_separatrices), tuple(face_separatrices), tuple(infinite_cylinders), tuple(folded_half_edges)
 
+    def framing(self, v=0):
+        r"""
+        Return the framing of the root or the vertex ``v`` if provided as argument.
+        """
+        vertex_separatrices, face_separatrices, infinite_cylinders, folded_half_edges = self.separatrix_trivialization()
+        return (vertex_separatrices[v], face_separatrices[v], infinite_cylinders[v], folded_half_edges[v])
+
+    # TODO: remove
     def _ambient_framing_group_data(self):
         from .framing_group import runs
         root = self._vertices[0]
-        vseps, fseps, cseps, fedges = self.separatrix_trivialization()
+        vseps, fseps, cseps, fhedges = self.framing(0)
 
-        vertex_angles_and_multiplicities = [root.vertex_angle(h) for h, a in vseps[0]]
+        vertex_angles_and_multiplicities = [root.vertex_angle(h) for h, a in vseps]
         vertex_angles = []
         vertex_multiplicities = []
         for a, m in runs(vertex_angles_and_multiplicities):
             vertex_angles.append(a)
             vertex_multiplicities.append(m)
 
-        face_angles_and_multiplicities = [-root.face_angle(h) for h, a in fseps[0]]
+        face_angles_and_multiplicities = [-root.face_angle(h) for h, a in fseps]
         face_angles = []
         face_multiplicities = []
         for a, m in runs(face_angles_and_multiplicities):
             face_angles.append(a)
             face_multiplicities.append(m)
 
-        ncyls = len(cseps[0])
-        nfedges = len(fedges[0])
+        ncyls = len(cseps)
+        nfhedges = len(fhedges)
 
-        return (vertex_angles, vertex_multiplicities, face_angles, face_multiplicities, ncyls, nfedges)
+        return (vertex_angles, vertex_multiplicities, face_angles, face_multiplicities, ncyls, nfhedges)
 
+    # TODO: remove
     def _ambient_framing_group(self):
         r"""
         Return the ambient framing group.
@@ -259,126 +257,15 @@ class DelaunayStrebelGraph(LabelledDiGraph):
         The framing group is the group of permutation of singularities and
         separatrices. Any such permutation should respect the degree of
         singularties and the cyclic ordering of separatrices.
-
-        EXAMPLES::
-
-            sage: from veerer import VeeringTriangulation
-
-            sage: vt = VeeringTriangulation("(0,1,2)(~0:2,~2:3,~1:1)", "RRB")
-            sage: vt.stratum()  # optional - surface_dynamics
-            H_0(1, 0^2, -3)
-            sage: vt.delaunay_strebel_graph()._ambient_framing_group()
-            FramingGroup(2^2, 4, 4)
-
-            sage: vt = VeeringTriangulation("(0:4,~0:2)","R")
-            sage: vt.stratum()  # optional - surface_dynamics
-            H_0(1, 0, -3)
-            sage: vt.delaunay_strebel_graph()._ambient_framing_group()
-            FramingGroup(2, 4, 4)
-
-            sage: vt = VeeringTriangulation("(0,1,2)", "RRB")
-            sage: vt.stratum()  # optional - surface_dynamics
-            Q_0(-1^4)
-            sage: vt.delaunay_strebel_graph()._ambient_framing_group()
-            FramingGroup(1, 1^3)
         """
-        from .framing_group import FramingGroup
-        vertex_angles, vertex_multiplicities, face_angles, face_multiplicities, ncyls, nfedges = self._ambient_framing_group_data()
-        angles = vertex_angles + face_angles
-        multiplicities = vertex_multiplicities + face_multiplicities
-        if ncyls:
-            angles.append(1)
-            multiplicities.append(ncyls)
-        if nfedges:
-            angles.append(1)
-            multiplicities.append(nfedges)
+        return self.root().framing_group()
 
-        return FramingGroup(angles, multiplicities)
-
+    # TODO: remove
     def framing_group_element_permutation(self, g, v=0):
-        r"""
-        Given an element of the framing group ``g`` return a quadruple of
-        dictionaries ``(d_vseps, d_fseps, d_cseps, d_fedges)`` encoding permutations of
-        vertices, poles and separatrices.
-
-        EXAMPLES::
-
-            sage: from veerer import *
-            sage: f = VeeringTriangulationLinearFamily("(0:1)(~0:1,1:1,2:1,~1:1)(~2:1)", "RBR", [(1, 0, 1), (0, 1, 0)])
-            sage: ds_graph = f.delaunay_strebel_graph()
-            sage: G = ds_graph.framing_group()
-
-            sage: g = G("(0:1)(1:1)(2:1)")
-            sage: d_vseps, d_fseps, d_cseps, d_fedges = ds_graph.framing_group_element_permutation(g)
-            sage: print(", ".join(f"{sep} -> {d_vseps[sep]}" for sep in sorted(d_vseps)))
-            (0, 0) -> (1, 0), (1, 0) -> (1, 1), (1, 1) -> (2, 0), (2, 0) -> (0, 0), (3, 0) -> (5, 0), (4, 0) -> (4, 1), (4, 1) -> (3, 0), (5, 0) -> (4, 0)
-            sage: print(", ".join(f"{sep} -> {d_fseps[sep]}" for sep in sorted(d_fseps)))
-            (1, 0) -> (4, 0), (4, 0) -> (1, 0)
-            sage: print(", ".join(f"{sep} -> {d_cseps[sep]}" for sep in sorted(d_cseps)))
-            0 -> 0, 5 -> 5
-
-            sage: g = G("(0:0, 1:2)")
-            sage: d_vseps, d_fseps, d_cseps, d_fedges = ds_graph.framing_group_element_permutation(g)
-            sage: print(", ".join(f"{sep} -> {d_vseps[sep]}" for sep in sorted(d_vseps)))
-            (0, 0) -> (3, 0), (1, 0) -> (5, 0), (1, 1) -> (4, 0), (2, 0) -> (4, 1), (3, 0) -> (1, 1), (4, 0) -> (0, 0), (4, 1) -> (1, 0), (5, 0) -> (2, 0)
-            sage: print(", ".join(f"{sep} -> {d_fseps[sep]}" for sep in sorted(d_fseps)))
-            (1, 0) -> (1, 0), (4, 0) -> (4, 0)
-            sage: print(", ".join(f"{sep} -> {d_cseps[sep]}" for sep in sorted(d_cseps)))
-            0 -> 0, 5 -> 5
-        """
         state = self._vertices[v]
-        vseps, fseps, cseps, fedges = self.separatrix_trivialization()
+        return state.framing_group_element_permutation(g, self.framing(v))
 
-        all_seps = []
-
-        # vertex separatrices
-        for h, a in vseps[v]:
-            all_seps.append(state.vertex_separatrices(h, a))
-
-        # face separatrices
-        for h, a in fseps[v]:
-            all_seps.append(state.face_separatrices(h, a))
-
-        # infinite cylinders
-        all_seps.extend(cseps[v])
-
-        # folded edges
-        all_seps.extend(fedges)
-
-        nv = len(vseps[v])
-        nf = len(fseps[v])
-        nc = len(cseps[v])
-        nfe = len(fedges[v])
-
-        d_vseps = {}
-        d_fseps = {}
-        d_cseps = {}
-        d_fedges = {}
-
-        for i in range(nv):
-            seps = all_seps[i]
-            for a, sep in enumerate(seps):
-                j, b = g(i, a)
-                d_vseps[sep] = all_seps[j][b]
-        for i in range(nv, nv + nf):
-            seps = all_seps[i]
-            for a, sep in enumerate(seps):
-                j, b = g(i, a)
-                d_fseps[sep] = all_seps[j][b]
-        for i in range(nv + nf, nv + nf + nc):
-            sep = all_seps[i]
-            j = g(i)
-            d_cseps[sep] = all_seps[j]
-        for i in range(nv + nf + nc, nv + nf + nc + nfe):
-            sep = all_seps[i]
-            j = g(i)
-            d_fedges[sep] = all_seps[j]
-
-        return (d_vseps, d_fseps, d_cseps, d_fedges)
-
-    # TODO: if we have isomorphic connected components as in the diagonal in H(0) x H(0) x H(0)
-    # then we should include generators for the exchange
-    def framing_monodromy(self, path):
+    def framing_monodromy(self, path, monodromy=None, ambient_framing_group=None):
         r"""
         Return the framing monodromy of a (not necessarily closed) path.
 
@@ -420,31 +307,29 @@ class DelaunayStrebelGraph(LabelledDiGraph):
             ....:     g2 = ds_graph.framing_monodromy(path2)
             ....:     assert g0 == g2, (path0, path2, g0, g2, g0._p, g0._r, g2._p, g2._r)
         """
+        from .monodromy import framing_group_element
+
         if path._graph is not self:
             raise ValueError
 
-        from .monodromy import SeparatrixMonodromy, framing_group_element
-
-        monodromy = SeparatrixMonodromy(self)
+        if monodromy is None:
+            from .monodromy import SeparatrixMonodromy, framing_group_element
+            monodromy = SeparatrixMonodromy(self)
+        if ambient_framing_group is None:
+            ambient_framing_group = self._ambient_framing_group()
 
         u = path.start()
         v = path.end()
 
-        vseps, fseps, cseps, fedges = self.separatrix_trivialization()
+        vseps0, fseps0, cseps0, fhedges0 = self.framing(v)
+        vseps1, fseps1, cseps1, fhedges1 = self.framing(u)
 
-        vseps0 = vseps[v]
-        vseps1 = [monodromy.vertex_separatrix_transport(path, h, a) for h, a in vseps[u]]
+        vseps1 = [monodromy.vertex_separatrix_transport(path, h, a) for h, a in vseps1]
+        fseps1 = [monodromy.face_separatrix_transport(path, h, a) for h, a in fseps1]
+        cseps1 = [monodromy.infinite_cylinder_transport(path, h) for h in cseps1]
+        fhedges1 = [monodromy.folded_half_edge_transport(path, h) for h in fhedges1]
 
-        fseps0 = fseps[v]
-        fseps1 = [monodromy.face_separatrix_transport(path, h, a) for h, a in fseps[u]]
-
-        cseps0 = cseps[v]
-        cseps1 = [monodromy.infinite_cylinder_transport(path, h) for h in cseps[u]]
-
-        fedges0 = fedges[v]
-        fedges1 = [monodromy.folded_edge_transport(path, h) for h in fedges[u]]
-
-        return framing_group_element(self._vertices[v], self._ambient_framing_group(), vseps0, vseps1, fseps0, fseps1, cseps0, cseps1, fedges0, fedges1)
+        return framing_group_element(self._vertices[v], ambient_framing_group, vseps0, vseps1, fseps0, fseps1, cseps0, cseps1, fhedges0, fhedges1)
 
     @cached_method
     def framing_group(self):
@@ -486,17 +371,36 @@ class DelaunayStrebelGraph(LabelledDiGraph):
             sage: G.structure_description()  # long time
             'C10 x C2'
 
-        Teichm\"uller curves in Q(1, -1^5)::
+        In the following examples, we consider the permutation of Weierstrass points
+        induced by the monodromy along Teichm\"uller curves in Q(1, -1^5) studied
+        in [GuPa24]. The monodromy, only depends on the congruence modulo 8 of the
+        discriminant::
 
-            sage: for D, spin in [(5, None), (8, None), (9, None), (12, None), (13, None), (16, None), (17, 0), (17, 1)]:
-            ....:     args = next(VeeringTriangulationLinearFamilies.H2_prototype_parameters(5))
+            sage: for D, spin in [(5, None), (8, None), (9, None), (12, None), (13, None), (16, None), (17, 0), (17, 1)]:  # long time
+            ....:     args = next(VeeringTriangulationLinearFamilies.H2_prototype_parameters(D, spin))
             ....:     f = VeeringTriangulationLinearFamilies.prototype_H2(*args)
             ....:     ds_graph = f.delaunay_strebel_graph()
-            ....:     print(D, ds_graph.framing_group().structure_description())
+            ....:     print("D={:2}  D%8={} {}".format(D, D % 8, ds_graph.framing_group().structure_description()))
+            D= 5  D%8=5 C3 x D5
+            D= 8  D%8=0 C3 x D4
+            D= 9  D%8=1 C6 x S3
+            D=12  D%8=4 C3 x D4
+            D=13  D%8=5 C3 x D5
+            D=16  D%8=0 C3 x D4
+            D=17  D%8=1 C6 x S3
+            D=17  D%8=1 C6 x S3
+
+        The diagonal in H(0) x H(0) x H(0)::
+
+            sage: from veerer import *
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)(3,4,5)(~3,~4,~5)(6,7,8)(~6,~7,~8)", "RRBRRBRRB")
+            sage: f = VeeringTriangulationLinearFamily(vt, [[1, 1, 0, 1, 1, 0, 1, 1, 0], [0, 1, 1, 0, 1, 1, 0, 1, 1]])
+            sage: f.delaunay_strebel_graph().framing_group().structure_description()
+            'C2 x S4'
         """
         from .monodromy import SeparatrixMonodromy, framing_group_element
 
-        vseps, fseps, cseps, fedges = self.separatrix_trivialization()
+        vseps, fseps, cseps, fhedges = self.separatrix_trivialization()
 
         G = self._ambient_framing_group()
         H = G.subgroup(mutable=True)
@@ -508,105 +412,113 @@ class DelaunayStrebelGraph(LabelledDiGraph):
             u = self.edge_source(edge)
             v = self.edge_target(edge)
             path = self.path(u, [edge])
+            g = self.framing_monodromy(path, monodromy, G)
+            H.add_generator(g)
 
-            vseps0 = vseps[v]
-            vseps1 = [monodromy.vertex_separatrix_transport(path, h, a) for h, a in vseps[u]]
+        # NOTE: when the underlying differential lies on a disconnected surface with isomorphic
+        # components, we need to include the permutation of the components
+        # TODO: only use generators of the automorphism group
+        v = 0
+        root = self._vertices[0]
+        for aut in root.automorphisms():
+            vseps0 = vseps[0]
+            vseps1 = [(aut[h], a) for h, a in vseps[0]]
 
-            fseps0 = fseps[v]
-            fseps1 = [monodromy.face_separatrix_transport(path, h, a) for h, a in fseps[u]]
+            fseps0 = fseps[0]
+            fseps1 = [root._normalize_face_separatrix(aut[h], a) for h, a in fseps[0]]
 
-            cseps0 = cseps[v]
-            cseps1 = [monodromy.infinite_cylinder_transport(path, h) for h in cseps[u]]
+            cseps0 = cseps[0]
+            cseps1 = [min(perm_orbit(root._fp, aut[h])) for h in cseps[0]]
 
-            fedges0 = fedges[v]
-            fedges1 = [monodromy.folded_edge_transport(path, h) for h in fedges[u]]
+            fhedges0 = fhedges[0]
+            fhedges1 = [aut[h] for h in fhedges[0]]
 
-            g = framing_group_element(self._vertices[v], G, vseps0, vseps1, fseps0, fseps1, cseps0, cseps1, fedges0, fedges1)
-
+            g = framing_group_element(self._vertices[v], G, vseps0, vseps1, fseps0, fseps1, cseps0, cseps1, fhedges0, fhedges1)
             H.add_generator(g)
 
         H.set_immutable()
         return H
 
-    # The following is clearly not the optimal strategy. We could have a self-loop
-    # that commutes with many other flips. We could delete all such loops but one
-    # and still generate.
-    # For a self-loop with flip "e" one can look at the connected component of the
-    # graph where "e" is not flipped and remove all but one "e loop".
-    def commuting_loops_and_squares(self, v):
-        r"""
-        Return loops and squares at ``v``.
-
-        EXAMPLES::
-
-            sage: from veerer import VeeringTriangulation
-            sage: vt = VeeringTriangulation("(0,6,~5)(~0,~4,5)(1,8,~7)(~1,~8,3)(2,7,~6)(~2,~3,4)", "RRRBBBBBB")
-        """
-        distance2 = {}
-        for i0 in self.outgoing_edges(v, reverse=False):
-            label0 = self._edge_labels[i0]
-            if label0[0] != "flip":
-                continue
-            edges0 = tuple(label0[1])
-            col0 = label0[3]
-            relabel = label0[4]
-            v1 = self._edge_targets[i0]
-            for i1 in self.outgoing_edges(v1, reverse=False):
-                label1 = self._edge_labels[i1]
-                if label1[0] != "flip":
-                    continue
-                edges1 = tuple(sorted(perm_preimage(relabel, 2 * e) // 2 for e in label1[1]))
-                col1 = label1[3]
-                distance2[(edges0, col0, edges1, col1)] = (i0, i1)
-
-        loops = []
-        squares = []
-        for (edges0, col0, edges1, col1), (i0, i1) in distance2.items():
-            key = distance2.get((edges1, col1, edges0, col0))
-            if key is None:
-                continue
-            j0, j1 = key
-            assert i0 != j0 and i1 != j1
-            if i0 == j1:
-                loops.append((j0, j1, i1))
-            elif i0 < j0:
-                squares.append((i0, i1, j0, j1))
-
-        return (loops, squares)
-
-    def reduced(self):
-        r"""
-        Return a graph whose fundamental group also generates the fundamental
-        group of the underlying stratum.
-        """
-        kept = [True] * self.num_edges()
-        for v in range(self.num_verts()):
-            loops, squares = self.commuting_loops_and_squares(v)
-            for (i, _, j) in loops:
-                if kept[i] and kept[j]:
-                    r = randrange(2)
-                    if r == 0:
-                        kept[i] = False
-                    else:
-                        kept[j] = False
-
-            for (i0, i1, j0, j1) in squares:
-                if kept[i0] and kept[i1] and kept[j0] and kept[j1]:
-                    r = randrange(4)
-                    if r == 0:
-                        kept[i0] = False
-                    elif r == 1:
-                        kept[i1] = False
-                    elif r == 2:
-                        kept[j0] = False
-                    else:
-                        kept[j1] = False
-
-        G = DiGraph(self.num_verts(), loops=self._digraph.allows_loops(), multiedges=self._digraph.allows_multiple_edges())
-        for i, b in enumerate(kept):
-            if b:
-                G.add_edge(self._edge_sources[i], self._edge_targets[i], i)
-        return G
+#     # TODO:
+#     # The following is clearly not the optimal strategy. We could have a self-loop
+#     # that commutes with many other flips. We could delete all such loops but one
+#     # and still generate.
+#     # For a self-loop with flip "e" one can look at the connected component of the
+#     # graph where "e" is not flipped and remove all but one "e loop".
+#     def commuting_loops_and_squares(self, v):
+#         r"""
+#         Return loops and squares at ``v``.
+#
+#         EXAMPLES::
+#
+#             sage: from veerer import VeeringTriangulation
+#             sage: vt = VeeringTriangulation("(0,6,~5)(~0,~4,5)(1,8,~7)(~1,~8,3)(2,7,~6)(~2,~3,4)", "RRRBBBBBB")
+#         """
+#         distance2 = {}
+#         for i0 in self.outgoing_edges(v, reverse=False):
+#             label0 = self._edge_labels[i0]
+#             if label0[0] != "flip":
+#                 continue
+#             edges0 = tuple(label0[1])
+#             col0 = label0[3]
+#             relabel = label0[4]
+#             v1 = self._edge_targets[i0]
+#             for i1 in self.outgoing_edges(v1, reverse=False):
+#                 label1 = self._edge_labels[i1]
+#                 if label1[0] != "flip":
+#                     continue
+#                 edges1 = tuple(sorted(perm_preimage(relabel, 2 * e) // 2 for e in label1[1]))
+#                 col1 = label1[3]
+#                 distance2[(edges0, col0, edges1, col1)] = (i0, i1)
+#
+#         loops = []
+#         squares = []
+#         for (edges0, col0, edges1, col1), (i0, i1) in distance2.items():
+#             key = distance2.get((edges1, col1, edges0, col0))
+#             if key is None:
+#                 continue
+#             j0, j1 = key
+#             assert i0 != j0 and i1 != j1
+#             if i0 == j1:
+#                 loops.append((j0, j1, i1))
+#             elif i0 < j0:
+#                 squares.append((i0, i1, j0, j1))
+#
+#         return (loops, squares)
+#
+#     def reduced(self):
+#         r"""
+#         Return a graph whose fundamental group also generates the fundamental
+#         group of the underlying stratum.
+#         """
+#         kept = [True] * self.num_edges()
+#         for v in range(self.num_verts()):
+#             loops, squares = self.commuting_loops_and_squares(v)
+#             for (i, _, j) in loops:
+#                 if kept[i] and kept[j]:
+#                     r = randrange(2)
+#                     if r == 0:
+#                         kept[i] = False
+#                     else:
+#                         kept[j] = False
+#
+#             for (i0, i1, j0, j1) in squares:
+#                 if kept[i0] and kept[i1] and kept[j0] and kept[j1]:
+#                     r = randrange(4)
+#                     if r == 0:
+#                         kept[i0] = False
+#                     elif r == 1:
+#                         kept[i1] = False
+#                     elif r == 2:
+#                         kept[j0] = False
+#                     else:
+#                         kept[j1] = False
+#
+#         G = DiGraph(self.num_verts(), loops=self._digraph.allows_loops(), multiedges=self._digraph.allows_multiple_edges())
+#         for i, b in enumerate(kept):
+#             if b:
+#                 G.add_edge(self._edge_sources[i], self._edge_targets[i], i)
+#         return G
 
 
 # # the only useful thing

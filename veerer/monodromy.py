@@ -67,10 +67,10 @@ class SeparatrixMonodromy:
         sage: separatrices_image = [monodromy.vertex_separatrix_transport(path, h, a) for (h, a) in separatrices]
         sage: separatrices_target = end.vertex_separatrices()
         sage: assert set(separatrices_image) == set(separatrices_target)
-        sage: folded_edges = list(start.folded_edges())
-        sage: folded_edges_image = [monodromy.folded_edge_transport(path, e) for e in folded_edges]
-        sage: folded_edges_target = list(end.folded_edges())
-        sage: assert set(folded_edges_image) == set(folded_edges_target)
+        sage: folded_half_edges = [2 * e for e in start.folded_edges()]
+        sage: folded_half_edges_image = [monodromy.folded_half_edge_transport(path, h) for h in folded_half_edges]
+        sage: folded_half_edges_target = [2 * e for e in end.folded_edges()]
+        sage: assert set(folded_half_edges_image) == set(folded_half_edges_target)
     """
     def __init__(self, graph):
         self._graph = graph
@@ -374,7 +374,7 @@ class SeparatrixMonodromy:
 
         return min(perm_orbit(self._graph.vertex_label(path.end())._fp, half_edge))
 
-    def folded_edge_transport(self, path, half_edge):
+    def folded_half_edge_transport(self, path, half_edge):
         if path._graph is not self._graph:
             raise ValueError("invalid path for infinite cylinder monodromy")
 
@@ -411,7 +411,7 @@ class SeparatrixMonodromy:
         return half_edge
 
 
-def framing_group_element(state, G, vseps0, vseps1, fseps0, fseps1, cseps0, cseps1, fedges0, fedges1):
+def framing_group_element(state, G, vseps0, vseps1, fseps0, fseps1, cseps0, cseps1, fhedges0, fhedges1):
     r"""
     Return the group element corresponding to the element mapping the separatrices 0
     onto the separatrices 1 in the coordinates of separatrices 0.
@@ -428,64 +428,51 @@ def framing_group_element(state, G, vseps0, vseps1, fseps0, fseps1, cseps0, csep
 
     - ``cseps0``, ``cseps1`` - batches of infinite cylinder separatrices
 
-    - ``fedges0``, ``fedges1`` - batches of folded edges
+    - ``fhedges0``, ``fhedges1`` - batches of folded edges
     """
     # we choose a non-canonical numbering of separatrices and conjugate at the end
 
     # vertex separatrices
-    seps = [(len(sep), sep) for sep in state.vertex_separatrices(flat=False)]
-    seps.sort()
     seps_indices = {}
     seps_angles = {}
-    nv = len(seps)
-    for i, (_, sep) in enumerate(seps):
-        for a, s in enumerate(sep):
+    nv = len(vseps0)
+    for i, (h, a) in enumerate(vseps0):
+        for b, s in enumerate(state.vertex_separatrices(h, a)):
             seps_indices[s] = i
-            seps_angles[s] = a
-    p0 = [seps_indices[s] for s in vseps0]
-    r0 = [seps_angles[s] for s in vseps0]
+            seps_angles[s] = b
     p1 = [seps_indices[s] for s in vseps1]
     r1 = [seps_angles[s] for s in vseps1]
-    assert len(p0) == len(r0) == len(p1) == len(r1) == nv
+    assert len(p1) == len(r1) == nv
 
     # face separatrices
-    seps = [(len(sep), sep) for sep in state.face_separatrices(flat=False)]
-    seps.sort()
-    seps_indices = {}
-    seps_angles = {}
-    nf = len(seps)
-    for i, (_, sep) in enumerate(seps):
-        for a, s in enumerate(sep):
+    seps_indices.clear()
+    seps_angles.clear()
+    nf = len(fseps0)
+    for i, (h, a) in enumerate(fseps0):
+        for b, s in enumerate(state.face_separatrices(h, a)):
             seps_indices[s] = nv + i
-            seps_angles[s] = a
-    p0.extend(seps_indices[s] for s in fseps0)
-    r0.extend(seps_angles[s] for s in fseps0)
+            seps_angles[s] = b
     p1.extend(seps_indices[s] for s in fseps1)
     r1.extend(seps_angles[s] for s in fseps1)
-    assert len(p0) == len(p1) == len(r0) == len(r1) == nv + nf
+    assert len(p1) == len(r1) == nv + nf
 
     # infinite cylinders
-    seps_indices = {}
-    nc = len(cseps1)
-    for i, s in enumerate(cseps1):
+    seps_indices.clear()
+    nc = len(cseps0)
+    for i, s in enumerate(cseps0):
         seps_indices[s] = nv + nf + i
-    p0.extend(seps_indices[s] for s in cseps0)
-    r0.extend([0] * nc)
     p1.extend(seps_indices[s] for s in cseps1)
     r1.extend([0] * nc)
 
     # folded edges
-    seps_indices = {}
-    nfe = len(fedges0)
-    for i, s in enumerate(fedges1):
+    seps_indices.clear()
+    nfe = len(fhedges0)
+    for i, s in enumerate(fhedges0):
         seps_indices[s] = nv + nf + nc + i
-    p0.extend(seps_indices[s] for s in fedges0)
-    r0.extend([0] * nfe)
-    p1.extend(seps_indices[s] for s in fedges1)
+    p1.extend(seps_indices[s] for s in fhedges1)
     r1.extend([0] * nfe)
 
-    assert len(p0) == len(r0) == len(p1) == len(r1) == nv + nf + nc + nfe
+    assert len(p1) == len(r1) == nv + nf + nc + nfe
 
-    g0 = G(array('i', p0), array('i', r0))
     g1 = G(array('i', p1), array('i', r1))
-    return g1 * ~g0
+    return g1

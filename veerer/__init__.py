@@ -33,5 +33,5 @@ from .automaton import Automaton, FlipGraph, CoreAutomaton, ReducedCoreAutomaton
 from .flip_sequence import VeeringFlipSequence
 from .flat_structure import FlatVeeringTriangulation
 from .labelled_digraph import LabelledDiGraph
-from .delaunay_strebel_graph import DelaunayStrebelGraph, MultiscaleDelaunayStrebelGraph
+from .delaunay_strebel_graph import DelaunayStrebelGraph
 from .multiscale_veering_triangulation import MultiscaleVeeringTriangulation
