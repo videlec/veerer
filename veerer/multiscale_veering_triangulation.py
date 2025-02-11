@@ -482,6 +482,38 @@ class MultiscaleVeeringTriangulation:
 
     def __repr__(self):
         return str(self)
+    
+    def __lt__(self, mvt):
+        r"""
+        EXAMPLES::
+            sage: from veerer import *
+            
+            sage: vt0 = VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)(3,4,5)(~3,~4,~5)", "RBBRBR", [(1, 0, -1, 0, 0, 0), (0, 1, 1, 0, 0, 0), (0, 0, 0, 1, 0, 1), (0, 0, 0, 0, 1, -1)])
+            sage: vt1 = VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])
+            sage: mvt0 = MultiscaleVeeringTriangulation(veering_triangulations=[[vt0],[vt1]], horizontal_nodes=[[[]], [[]]],prong_matchings=[((0, 0, 1, 0), (1, 0, 0, 1)), ((0, 0, 10, 0), (1, 0, 4, 0))])
+            sage: mvt1 = MultiscaleVeeringTriangulation(veering_triangulations=[[vt0], [vt1]], horizontal_nodes=[[[]], [[]]],prong_matchings=[((0, 0, 0, 0), (1, 0, 0, 0)), ((0, 0, 10, 0), (1, 0, 4, 0))])
+            sage: mvt0 < mvt1
+            False
+            sage: mvt1 < mvt0
+            False
+        """
+        if not isinstance(mvt, type(self)):
+            return NotImplemented
+
+        if self._veering_triangulations != mvt._veering_triangulations:
+            return NotImplemented
+
+        h_nodes0 = self._horizontal_nodes
+        h_nodes1 = mvt._horizontal_nodes
+        if h_nodes0 != h_nodes1:
+            return h_nodes0 < h_nodes1
+
+        pms0 = self._prong_matchings
+        pms1 = mvt._prong_matchings
+        if pms0 != pms1:
+            return pms0 < pms1
+
+        return False
 
     def __eq__(self, other):
         if type(self) != type(other):
