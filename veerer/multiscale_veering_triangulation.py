@@ -22,7 +22,6 @@ from .linear_subvariety import *
 
 
 # TODO: Store the data of horizontal and vertical nodes in terms of LabeleddDiGraph
-# TODO: find the best multiscale veering triangulations in a connected component
 
 def str_to_label(h):
     r"""
@@ -179,7 +178,7 @@ class MultiscaleVeeringTriangulation:
         sage: vt.is_delaunay()
         True
         sage: edges_low = [4,5,7,8,14]
-        sage: mvt = MultiscaleVeeringTriangulation([vt], [[""]], [])
+        sage: mvt = MultiscaleVeeringTriangulation([vt])
         sage: mvt1 = mvt.degeneration(0, 0, edges_low=edges_low)
         sage: mvt1
         MultiscaleVeeringTriangulation(
@@ -311,6 +310,8 @@ class MultiscaleVeeringTriangulation:
                 self._prong_matchings.append(pm)
 
             self._prong_matchings.sort()
+        elif prong_matchings is None:
+            self._prong_matchings = []
         else:
             raise ValueError("The 'prong_matching' must be a list.")
 
