@@ -140,6 +140,38 @@ def tree_with_target(self, root=0, target_vertices=[]):
             paths[i] = path_dic.get(target)
     return paths
 
+class NodalLabelledDiGraph(LabelledDiGraph):
+    
+    def __init__(self, vertex_labels, horizontal_nodes, vertical_nodes):
+        
+        nv = len(vertex_labels)
+        digraph = DiGraph(nv, loops=True, multiedges=True)
+        
+        # Compute vertex labels
+        self._vertex_labels = sorted(vertex_labels)
+        labels = {triple: v for v, triple in enumerate(self._vertex_labels)}
+
+        # Add horizontal edges
+        for l, pc, cc1, h1, cc2, h2 in horizontal_nodes:
+            (cc1, h1), (cc2, h2) = sorted([(cc1, h1), (cc2, h2)], key=lambda x: (x[1])) #The edge is oriented accoding to `h`
+            v1, v2 = labels[(l, pc, cc1)], labels[(l, pc, cc2)]
+            digraph.add_edge(v1, v2, (h1, h2)) #h1 < h2, which coincides with the normalization of horizontal nodes
+
+        # Add vertical edges
+        for p1, p2 in vertical_nodes:
+            l1, pc1, cc1, h1, ang1 = p1
+            l2, pc2, cc2, h2, ang2 = p2
+            v1, v2 = labels[(l1, pc1, cc1)], labels[(l2, pc2, cc2)]
+            digraph.add_edge(v1, v2, (h1, ang1, h2, ang2))
+
+        super().__init__(digraph)
+
+    def adjacent_edges(self, vertex):
+        r"""
+        Return the list of the edges adjacent to the vertex.
+        """
+        return [e for e in range(self.num_edges()) if self.edge_source(e) == vertex or self.edge_target(e) == vertex]
+
 class MultiscaleVeeringTriangulation:
     r"""
     Multi-scale Veering Triangulations.
@@ -203,14 +235,23 @@ class MultiscaleVeeringTriangulation:
     def __init__(self, veering_triangulations=None, horizontal_nodes=None, prong_matchings=None, mutable=False, check=True):
         if isinstance(veering_triangulations, list):
             self._veering_triangulations = []
+            vertex_labels = [] # data for building nodal digraph
             for level, vts in enumerate(veering_triangulations):
                 if isinstance(vts, VeeringTriangulation):
                     self._veering_triangulations.append([vts])
+                
+                    for cc in range(len(vts.connected_components())): # data for building nodal digraph
+                        vertex_labels.append((level, 0, cc))
+                
                 elif isinstance(vts, list):
-                    for vt in vts:
+                    for comp, vt in enumerate(vts):
                         if not isinstance(vt, VeeringTriangulation):
                             raise TypeError(f"'vt' (value: {vt}) is not an instance of the VeeringTriangulation.")
-                    self._veering_triangulations.append(list(vts))
+
+                        for cc in range(len(vt.connected_components())): # data for building nodal digraph
+                            vertex_labels.append((level, comp, cc))
+
+                    self._veering_triangulations.append(list(vts))                
                 else:
                     raise ValueError(f"The input of veering triangulations {vts} at level-{level} is bad.")
         else:
@@ -220,7 +261,7 @@ class MultiscaleVeeringTriangulation:
             if len(horizontal_nodes) != len(self._veering_triangulations):
                 raise ValueError("Miss information for horizontal nodes at some levels")
             self._horizontal_nodes = []
-            data_horiz_nodes =[] #the data used to build the digraph
+            data_horiz_nodes =[] # data for building nodal digraph
             for level in range(len(horizontal_nodes)):
                 self._horizontal_nodes.append([])
                 nodes = horizontal_nodes[level]
@@ -257,22 +298,24 @@ class MultiscaleVeeringTriangulation:
                     for node in nodes_at_c:
                         h1, h2 = node
                         h1 = min(perm_orbit(fp, h1))
-                        cc1 = in_connected_component(vt,h1)
+                        cc1 = in_connected_component(vt,h1) # data for building nodal digraph
                         h2 = min(perm_orbit(fp, h2))
-                        cc2= in_connected_component(vt, h2)
+                        cc2= in_connected_component(vt, h2) # data for building nodal digraph
                         node = tuple(sorted((h1, h2)))
                         if check:
                             self._check_horizontal_node(level, c, node)
                         self._horizontal_nodes[level][c].append(node)
-                        data_horiz_nodes.append((level, c, cc1, h1, cc2, h2))
+                        data_horiz_nodes.append((level, c, cc1, h1, cc2, h2)) # data for building nodal digraph
                     self._horizontal_nodes[level][c] = sorted(self._horizontal_nodes[level][c], key=lambda x: x[0])
         elif horizontal_nodes is None:
             self._horizontal_nodes = [[[] for _ in range(len(vts))] for vts in self._veering_triangulations]
+            data_horiz_nodes = []
         else:
             raise TypeError("The 'horizontal_nodes' must be a list; got {}".format(type(horizontal_nodes)))
 
         if isinstance(prong_matchings, list):
             self._prong_matchings = []
+            data_vert_nodes = [] # data for building nodal digraph
             for pm in prong_matchings:
                 prong1, prong2 = pm
                 (l1, c1, h1, a1) = prong1
@@ -308,12 +351,19 @@ class MultiscaleVeeringTriangulation:
                 if check:
                     self._check_local_prong_matching(pm)
                 self._prong_matchings.append(pm)
-
+                
+                cc1 = in_connected_component(vt1,h1) # data for building nodal digraph
+                cc2 = in_connected_component(vt2,h2) # data for building nodal digraph
+                data_vert_nodes.append(((l1, c1, cc1, h1, a1), (l2, c2, cc2, h2, a2))) # data for building nodal digraph
+            
             self._prong_matchings.sort()
         elif prong_matchings is None:
             self._prong_matchings = []
+            data_vert_nodes = []
         else:
-            raise ValueError("The 'prong_matching' must be a list.")
+            raise ValueError("The 'prong_matchings' must be a list.")
+
+        self._nodal_digraph = NodalLabelledDiGraph(vertex_labels, data_horiz_nodes,data_vert_nodes) # build the nodal digraph
 
         self._mutable = True
         if not mutable:
@@ -756,148 +806,88 @@ class MultiscaleVeeringTriangulation:
             sage: print(mvt1.is_abelian(certificate=True))
             (True, [[[True, False, True, False, False, True, False, True, False, True]], [[False, True, False, True, False, True, False, True, False, True, True, False, True, False, True, False, True, False, True, False]]])
         """
-        N = self.num_levels()
-
-        # Step1: compute orientations of components
+        # compute orientations of each vertex
         oris = []
-        for i, vts in enumerate(self._veering_triangulations):
-            oris.append([])
+        for vts in self._veering_triangulations:
+            cur_oris = []
             for vt in vts:
-                abelian, l = vt.is_abelian(certificate=True)
-                if abelian:
-                    oris[-1].append(l)
-                else:
+                abelian, orient = vt.is_abelian(certificate=True)
+                if not abelian:
                     return (False, None) if certificate else False
+                cur_oris.append(orient)
+            oris.append(cur_oris)
 
-        # Step2: propagate through horizontal nodes
-        for i, vts in enumerate(self._veering_triangulations):
-            l_component = []
-            for vt in vts:
-                l_component.append(vt.connected_components())
-
-            l_nodes = self.horizontal_nodes_at_level(i)
-            lc = [] # the list of components in the i-th level adjusted so far
-            for level, s, f1, f2 in l_nodes:
-                # find out the connected components containing the matched poles
-                vt = self._veering_triangulations[level][s]
-
-                c1 = in_connected_component(vt, f1[0])
-                c2 = in_connected_component(vt, f2[0])
-
-                lo = oris[i][s]
-                ne = len(lo)
-
-                if lo[f1[0]] == lo[f2[0]]:
+        g = self._nodal_digraph
+        vertex_labels = g._vertex_labels
+        edge_labels = g._edge_labels
+        vertices = set(range(len(vertex_labels)))
+        
+        while vertices:
+            #propagete the orietation in the connected component containing the vertex v. 
+            v0 = vertices.pop()
+            l0 = g.adjacent_edges(v0)
+            lv = {v0} #the vertices visited so far
+            le = set() #the edges visited so far
+            while l0:
+                e = l0.pop()
+                le.add(e)
+                label_e = edge_labels[e]
+                v1, v2 = g.edge_source(e), g.edge_target(e)
+                level1, s1, c1 = vertex_labels[v1]
+                level2, s2, c2 = vertex_labels[v2]
+                vt1 = self._veering_triangulations[level1][s1]
+                vt2 = self._veering_triangulations[level2][s2]
+                
+                #horizontal node
+                if len(label_e) == 2:
+                    assert level1 == level2 and s1 == s2 and vt1 == vt2
+                    h1, h2 = label_e
+                    lo = oris[level1][s1]
+                    o1, o2 = lo[h1], lo[h2]
+                    
                     # check coherence
-                    if c1 == c2:
-                        return (False, None) if certificate else False
-
-                    if ((s,c1) in lc) and ((s,c2) in lc):
-                        return (False, None) if certificate else False
-
-                    if (s,c1) not in lc:
-                        # rotate the component c1 by pi
-                        for h in range(ne):
-                            if h // 2 in l_component[s][c1]:
-                                lo[h] = not lo[h]
-                        # add coherent components
-                        lc.append((s,c1))
-                        if (s, c2) not in lc:
-                            lc.append((s,c2))
-                    elif (s, c2) not in lc:
-                        # rotate the component c2 by pi
-                        for h in range(ne):
-                            if h // 2 in l_component[s][c2]:
-                                lo[h] = not lo[h]
-                        lc.append((s, c2))
+                    if o1 == o2:
+                        if v1 == v2 or ((v1 in lv) and (v2 in lv)):
+                            return (False, None) if certificate else False
+                        if v1 not in lv: # rotate the component v1 by pi
+                            for h in range(len(lo)):
+                                if h // 2 in vt1.connected_components()[c1]:
+                                    lo[h] = not lo[h]
+                        elif v2 not in lv: # rotate the component v2 by pi
+                            for h in range(len(lo)):
+                                if h // 2 in vt1.connected_components()[c2]:
+                                    lo[h] = not lo[h]
+                    oris[level1][s1] = lo
+                
+                #vertical node
                 else:
-                    # add coherent components
-                    if (s, c1) not in lc:
-                        lc.append((s, c1))
-                    if (s, c2) not in lc:
-                        lc.append((s, c2))
-
-                oris[i][s] = lo
-
-        #Step3: propagate through vertical nodes
-
-        lv = [] #the list of component adjusted so far, where the component is labeled by (level, index of the component in this level)
-
-        for pm in self._prong_matchings:
-
-            level1, s1, h1, ang1 = pm[0]
-            level2, s2, h2, ang2 = pm[1]
-            assert level1 >= 0 and level2 >= 0
-
-            vt1 = self._veering_triangulations[level1][s1]
-            vt2 = self._veering_triangulations[level2][s2]
-
-            o1 = oris[level1][s1][h1]
-            o2 = oris[level2][s2][h2]
-
-            # decide the orientation of the prong pm[0]
-            if ang1 % 2 == 1:
-                o1 = not o1
-
-            # decide the orientation of the prong pm[1]
-            if ang2 % 2 == 1:
-                o2 = not o2
-
-            # find the labels of the components where the prongs are.
-            # the labels are in the form: (level, index of the component in this level)
-            # moreover find out all the components that have horizontal nodes with the components containing the prongs
-            c1 = in_connected_component(vt1, h1)
-            l1 = self._components_have_horiztal_nodes_with(level1, s1, c1)
-            if (level1, s1, c1) not in l1:
-                l1.append((level1, s1, c1))
-
-            c2 = in_connected_component(vt2, h2)
-            l2 = self._components_have_horiztal_nodes_with(level2, s2, c2)
-            if (level2, s2, c2) not in l2:
-                l2.append((level2, s2, c2))
-
-            # adjust components
-            lo1 = oris[level1][s1]
-            n1 = len(lo1)
-            lo2 = oris[level2][s2]
-            n2 = len(lo2)
-            if o1 != o2: # incoherent orientations
-                if ((level1,s1, c1) in lv) and ((level2, s2, c2) in lv):
-                    return (False, None) if certificate else False
-
-                if (level1, s1, c1) not in lv:
-                    #rotate all the components in l1 by pi
-                    for h in range(n1):
-                        c = in_connected_component(vt1, h)
-                        if (level1, s1, c) in l1:
-                            lo1[h] = not lo1[h]
-
-                        for label in l1:
-                            lv.append(label)
-
-                        if (level2, s2, c2) not in lv:
-                            for label in l2:
-                                lv.append(label)
-
-                elif (level2,s2, c2) not in lv:
-                    #rotate all the components in l2 by pi
-                    for h in range(n2):
-                        c = in_connected_component(vt2, h)
-                        if (level2, s2, c) in l2:
-                            lo2[h] = not lo2[h]
-
-                        for label in l2:
-                            lv.append(label)
-            else: # coherent orientation
-                if (level1, s1, c1) not in lv:
-                    for label in l1:
-                        lv.append(label)
-                if (level2, s2, c2) not in lv:
-                    for label in l2:
-                        lv.append(label)
-
-            oris[level1][s1] = lo1
-            oris[level2][s2] = lo2
+                    h1, ang1, h2, ang2 = edge_labels[e]
+                    lo1 = oris[level1][s1]
+                    lo2 = oris[level2][s2]
+                    # Adjust the prong orientation based on the angle
+                    o1 = not lo1[h1] if (ang1 % 2 == 1) else lo1[h1]
+                    o2 = not lo2[h2] if (ang2 % 2 == 1) else lo2[h2]
+                    
+                    if o1 != o2:
+                        if (v1 in lv) and (v2 in lv):
+                            return (False, None) if certificate else False
+                        if v1 not in lv: # rotate the component v1 by pi
+                            for h in range(len(lo1)):
+                                if h // 2 in vt1.connected_components()[c1]:
+                                    lo1[h] = not lo1[h]
+                        elif v2 not in lv: # rotate the component v2 by pi
+                            for h in range(len(lo2)):
+                                if h // 2 in vt2.connected_components()[c2]:
+                                    lo2[h] = not lo2[h]
+                    oris[level1][s1] = lo1
+                    oris[level2][s2] = lo2
+                
+                lv.update([v1, v2])
+                v_next = v2 if v1 == v0 else v1 # determine the next vertex
+                if v_next in vertices:
+                    vertices.remove(v_next)
+                v0 = v_next
+                l0 = [e for e in g.adjacent_edges(v0) if e not in le]
 
         return (True, oris) if certificate else True
 
