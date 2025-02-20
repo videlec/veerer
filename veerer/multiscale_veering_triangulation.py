@@ -148,7 +148,7 @@ class NodalLabelledDiGraph(LabelledDiGraph):
         digraph = DiGraph(nv, loops=True, multiedges=True)
         
         # Compute vertex labels
-        self._vertex_labels = sorted(vertex_labels)
+        self._vertex_labels = vertex_labels
         labels = {triple: v for v, triple in enumerate(self._vertex_labels)}
 
         # Add horizontal edges
@@ -170,6 +170,30 @@ class NodalLabelledDiGraph(LabelledDiGraph):
         Return the list of the edges adjacent to the vertex.
         """
         return [e for e in range(self.num_edges()) if self.edge_source(e) == vertex or self.edge_target(e) == vertex]
+    
+    def vertex_level(self, vertex):
+        return self._vertex_labels[vertex][0]
+    
+    def subgraph_above_level(self, level):
+        nv = self.num_verts()
+        ne = self.num_edges()
+        vertices = [v for v in range(nv) if self.vertex_level(v) < level]
+        edges = []
+        for e in range(ne):
+            v1, v2 = self.edge_source(e), self.edge_target(e)
+            if (self.vertex_level(v1) < level) and (self.vertex_level(v2) < level):
+                edges.append((v1, v2, e))
+        return self._digraph.subgraph(vertices=vertices, edges=edges)
+    
+    def vertical_edges_for_GRC(self, level):
+        dg = self.subgraph_above_level(level)
+        components = dg.connected_components()
+        edges = []
+        ne = self.num_edges()
+        for comp in components:
+            l = [e for e in range(ne) if (self.edge_source(e) in comp) and (self.vertex_level(self.edge_target(e)) == level)] 
+            edges.append(l)
+        return edges
 
 class MultiscaleVeeringTriangulation:
     r"""
@@ -238,21 +262,18 @@ class MultiscaleVeeringTriangulation:
             for level, vts in enumerate(veering_triangulations):
                 if isinstance(vts, VeeringTriangulation):
                     self._veering_triangulations.append([vts])
-                
                     for cc in range(len(vts.connected_components())): # data for building nodal digraph
                         vertex_labels.append((level, 0, cc))
-                
                 elif isinstance(vts, list):
                     for comp, vt in enumerate(vts):
                         if not isinstance(vt, VeeringTriangulation):
                             raise TypeError(f"'vt' (value: {vt}) is not an instance of the VeeringTriangulation.")
-
                         for cc in range(len(vt.connected_components())): # data for building nodal digraph
                             vertex_labels.append((level, comp, cc))
-
                     self._veering_triangulations.append(list(vts))                
                 else:
                     raise ValueError(f"The input of veering triangulations {vts} at level-{level} is bad.")
+                vertex_labels = sorted(vertex_labels)
         else:
             raise ValueError("The 'veering_triangulations' must be a list.")
 
@@ -376,6 +397,7 @@ class MultiscaleVeeringTriangulation:
     def _check(self):
         self._check_horizontal_residue_conditions()
         self._check_prong_matching()
+        self._check_global_residue_conditions()
 
     def _check_level(self, level):
         r"""
@@ -507,17 +529,78 @@ class MultiscaleVeeringTriangulation:
         l2 = []
         for pm in pms:
             p1, p2 = pm
-            level1, c1, _, _ = p1
-            level2, c2, _, _ = p2
-            v, f = self.vertical_node(pm)
-            if (level1, c1, v) in l1:
+            level1, c1, h1, _ = p1
+            level2, c2, h2, _ = p2
+            vt1 = self._veering_triangulations[level1][c1]
+            vt2 = self._veering_triangulations[level2][c2]
+            h1 = min(perm_orbit(vt1._vp, h1))
+            h2 = min(perm_orbit(vt2._fp, h2))
+            if (level1, c1, h1) in l1:
                 raise ValueError(f"There are prongs at the same zero as {pm[0]}")
-            else:
-                l1.append((level1, c1, v))
-            if (level2, c2, f) in l2:
+            if (level2, c2, h2) in l2:
                 raise ValueError(f"There are prongs at the same pole as {pm[1]}")
-            else:
-                l2.append((level2, c2, f))
+            l1.append((level1, c1, h1))
+            l2.append((level2, c2, h2))
+
+    def _check_global_residue_conditions(self):
+        N = self.num_levels()
+        g = self._nodal_digraph
+        vertex_labels = g._vertex_labels
+        edge_labels = g._edge_labels
+        
+        for level in range(1, N):
+            components = g.subgraph_above_level(level).connected_components()
+            l = g.vertical_edges_for_GRC(level)
+            for i, comp in enumerate(components):
+                skip = False
+                for v in comp:
+                    lvl, c, _ = vertex_labels[v]
+                    if not self.without_prescribed_poles(lvl, c):
+                        skip = True
+                        break
+                if skip:
+                    continue
+                
+                edges = l[i]
+                
+                if not edges:
+                    continue
+                
+                c = vertex_labels[g.edge_target(edges[0])][1]
+                
+                for e in edges:
+                    if c != vertex_labels[g.edge_target(e)][1]:
+                        raise ValueError(f"The global residue conditions are not satisfied for the level-{level}")
+                
+                vt = self._veering_triangulations[level][c]
+                
+                if not vt.is_abelian():
+                    continue
+                
+                base_ring = vt.base_ring()
+                orig_constraints_matrix = vt.constraints_matrix()
+                orig_gens = orig_constraints_matrix.right_kernel_matrix()
+                n1 = orig_constraints_matrix.nrows()
+                constraints_matrix = matrix(base_ring, n1 + 1, vt.num_edges())
+                constraints_matrix[:n1, :] = orig_constraints_matrix
+                
+                bdry = vt.boundary_faces()
+                nf = len(bdry)
+                r1 = vt.residue_matrix()
+                rr1 = matrix(ZZ, 1, nf)
+                
+                for e in edges:
+                    _, _, h, _ = edge_labels[e]
+                    for j, f in enumerate(bdry):
+                        if h in f:
+                            rr1[0, j] = 1
+                            break
+            
+                constraints_matrix[n1:, :] = rr1 * r1
+                gens = constraints_matrix.right_kernel_matrix()
+                
+                if orig_gens != gens:
+                    raise ValueError(f"The global residue conditions are not satisfied for the level-{level}")
 
     def __str__(self):
         vt_strings = ",\n    ".join("[" + ", ".join(str(vt) for vt in l) + "]" for l in self._veering_triangulations)
@@ -684,96 +767,52 @@ class MultiscaleVeeringTriangulation:
 
         return (perm_orbit(vt._fp, h1), perm_orbit(vt._fp, h2))
 
-    def horizontal_nodes_at_level(self, level):
+    def without_prescribed_poles(self, level, comp):
         r"""
-        Return the list of horizontal nodes at the level of the input 'i'.
-
-        Each node is represented by a triple (level,comp,face0,face1).
-
+        Return True if every boundary face in the component is adjacent to either a horizontal or vertical node. 
+        Otherwise, return False.
+        
         EXAMPLES::
+            sage: from veerer import *
+            
+            sage: vt = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:3,3:1)", "RBRBB")
+            sage: mvt = MultiscaleVeeringTriangulation([vt])
+            sage: mvt1 = list(mvt.codimension_one_vertical_degenerations())[1]
+            sage: mvt1.without_prescribed_poles(0,0)
+            False
+            sage: mvt1.without_prescribed_poles(1,0)
+            True
         """
+        
         level = self._check_level(level)
-
-        l = self._horizontal_nodes[level]
-        list_horiz_nodes = []
-        for comp, nodes in enumerate(l):
-            for node in nodes:
-                f0, f1 = self.horizontal_faces(level, comp, node)
-                list_horiz_nodes.append((level, comp, f0, f1))
-
-        return list_horiz_nodes
-
-    def vertical_node(self, pm):
-        r"""
-        Return the underlying node of the prong matching, which is represented as a pair of zero and face
-        """
-        p1, p2 = pm
-        l1, c1, h1, _ = p1
-        l2, c2, h2, _ = p2
-        l1 = self._check_level(l1)
-        l2 = self._check_level(l2)
-        vt1 = self._veering_triangulations[l1][c1]
-        vt2 = self._veering_triangulations[l2][c2]
-        for v in vt1.vertices():
-            if h1 in v:
-                v1 = v
-        for f in vt2.boundary_faces():
-            if h2 in f:
-                f1 = f
-        return (v1, f1)
-
-    def _local_prong_matching(self, pm):
-        r"""
-        Returns the local prong matching at a vertical node.
-
-        The input vertical node is represented by a tube (l1,v,l2,f), where v is the vertex of level-l1 veering triangulation, and f is the boundary face of level-l2 veering triangulation
-
-        The output prong matching is represented as a list containing two sublists: [prongs1, prongs2].
-        Each sublist 'prongsi' is a list of prongs, where each prong is represented as a tuple: (level, half_edge, angle_data).
-        The angle_data specifies which prong within the corner of the half_edge is being referred to.
-        Prongs with the same index in the two sublists are matched.
-
-        EXAMPLES::
-
-            sage: from veerer import VeeringTriangulation, MultiscaleVeeringTriangulation
-            sage: vt00 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)","RBRBB")
-            sage: vt01 = VeeringTriangulation("(~0,1,2)(~1,~2,3)(~4,~6,~7)(6,7,~5)(0:5)(~3:1)(4:4,5:4)","BBRBBBRR")
-            sage: mvt0 = MultiscaleVeeringTriangulation([vt00,vt01],[[""],[""]],[[(0,0,"0",0),(-1,0,"0",1)],[(0,0,"2",0),(-1,0,"5",1)]])
-            sage: mvt0._local_prong_matching([(0,0,0,0),(-1,0,0,1)])
-            [[(0, 0), (0, 1), (0, 2), (0, 3)], [(0, 1), (0, 2), (0, 3), (0, 0)]]
-        """
-        ((l1, c1, h1, a1), (l2, c2, h2, a2)) = pm
-
-        vt1 = self._veering_triangulations[l1][c1]
-        vt2 = self._veering_triangulations[l2][c2]
-
-        prongs1 = vt1.vertex_separatrices(h1, a1)
-        prongs2 = vt2.face_separatrices(h2, a2)
-
-        assert len(prongs1) == len(prongs2)
-        return [prongs1, prongs2]
-
-    def _components_have_horiztal_nodes_with(self, level, label, comp_index):
-        r"""
-        Return the indices of the connected components that have horizontal nodes with the input component at `label`-th component at level-`level`.
-        """
-        level = self._check_level(level)
-        l_node = self.horizontal_nodes_at_level(level)
-
-        l = []
-        for level, s, f1, f2 in l_node:
-            assert level >= 0
-            #compute the connected component indices of the face f1 and f2
-            vt = self._veering_triangulations[level][s]
-            c1 = in_connected_component(vt, f1[0])
-            c2 = in_connected_component(vt, f2[0])
-
-            if (s, c1) == (label, comp_index):
-                l.append((level, s, c2))
-            if (s, c2) == (label, comp_index):
-                if (level,s,c1) not in l:
-                    l.append((level,s,c1))
-        return l
+        g = self._nodal_digraph
+        vertex_labels = g._vertex_labels
+        edge_labels = g._edge_labels
+        vt = self._veering_triangulations[level][comp]
+        
+        edges = set()
+        for c in range(len(vt.connected_components())):
+            v = vertex_labels.index((level, comp, c)) 
+            edges.update(g.adjacent_edges(v))    
+        
+        for f in vt.boundary_faces():
+            skip = False
+            for e in edges:
+                label_e = edge_labels[e]
+                if len(label_e) == 2:
+                    h1, h2 = label_e
+                    if (h1 in f) or (h2 in f):
+                        skip = True
+                        break
+                else:
+                    h1, _, h2, _ = label_e
+                    if (g.vertex_level(g.edge_target(e)) == level) and (h2 in f):
+                        skip = True
+                        break
+            if skip:
+                continue
+            return False
+        return True
 
     def is_abelian(self, certificate=False):
         r"""
