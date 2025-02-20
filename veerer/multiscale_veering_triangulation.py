@@ -153,7 +153,6 @@ class NodalLabelledDiGraph(LabelledDiGraph):
 
         # Add horizontal edges
         for l, pc, cc1, h1, cc2, h2 in horizontal_nodes:
-            (cc1, h1), (cc2, h2) = sorted([(cc1, h1), (cc2, h2)], key=lambda x: (x[1])) #The edge is oriented accoding to `h`
             v1, v2 = labels[(l, pc, cc1)], labels[(l, pc, cc2)]
             digraph.add_edge(v1, v2, (h1, h2)) #h1 < h2, which coincides with the normalization of horizontal nodes
 
@@ -301,12 +300,13 @@ class MultiscaleVeeringTriangulation:
                         cc1 = in_connected_component(vt,h1) # data for building nodal digraph
                         h2 = min(perm_orbit(fp, h2))
                         cc2= in_connected_component(vt, h2) # data for building nodal digraph
-                        node = tuple(sorted((h1, h2)))
+                        (cc1, h1), (cc2, h2) = sorted([(cc1, h1), (cc2, h2)], key=lambda x: x[1])
                         if check:
                             self._check_horizontal_node(level, c, node)
                         self._horizontal_nodes[level][c].append(node)
                         data_horiz_nodes.append((level, c, cc1, h1, cc2, h2)) # data for building nodal digraph
-                    self._horizontal_nodes[level][c] = sorted(self._horizontal_nodes[level][c], key=lambda x: x[0])
+                    self._horizontal_nodes[level][c] = sorted(self._horizontal_nodes[level][c])
+                    data_horiz_nodes = sorted(data_horiz_nodes, key=lambda x: (x[0], x[1], x[3], x[5])) # data for building nodal digraph
         elif horizontal_nodes is None:
             self._horizontal_nodes = [[[] for _ in range(len(vts))] for vts in self._veering_triangulations]
             data_horiz_nodes = []
@@ -357,6 +357,7 @@ class MultiscaleVeeringTriangulation:
                 data_vert_nodes.append(((l1, c1, cc1, h1, a1), (l2, c2, cc2, h2, a2))) # data for building nodal digraph
             
             self._prong_matchings.sort()
+            data_vert_nodes = sorted(data_vert_nodes, key=lambda x: x[0][:2] + x[0][3:5] + x[1][:2] + x[1][3:5]) # data for building nodal digraph
         elif prong_matchings is None:
             self._prong_matchings = []
             data_vert_nodes = []
@@ -370,8 +371,7 @@ class MultiscaleVeeringTriangulation:
             self.set_immutable()
 
         if check:
-            self._check_prong_matching()
-            self._check_horizontal_residue_conditions()
+            self._check()
 
     def _check(self):
         self._check_horizontal_residue_conditions()
@@ -541,8 +541,8 @@ class MultiscaleVeeringTriangulation:
             
             sage: vt0 = VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)(3,4,5)(~3,~4,~5)", "RBBRBR", [(1, 0, -1, 0, 0, 0), (0, 1, 1, 0, 0, 0), (0, 0, 0, 1, 0, 1), (0, 0, 0, 0, 1, -1)])
             sage: vt1 = VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])
-            sage: mvt0 = MultiscaleVeeringTriangulation(veering_triangulations=[[vt0],[vt1]], horizontal_nodes=[[[]], [[]]],prong_matchings=[((0, 0, 1, 0), (1, 0, 0, 1)), ((0, 0, 10, 0), (1, 0, 4, 0))])
-            sage: mvt1 = MultiscaleVeeringTriangulation(veering_triangulations=[[vt0], [vt1]], horizontal_nodes=[[[]], [[]]],prong_matchings=[((0, 0, 0, 0), (1, 0, 0, 0)), ((0, 0, 10, 0), (1, 0, 4, 0))])
+            sage: mvt0 = MultiscaleVeeringTriangulation(veering_triangulations=[[vt0],[vt1]],prong_matchings=[((0, 0, 1, 0), (1, 0, 0, 1)), ((0, 0, 10, 0), (1, 0, 4, 0))])
+            sage: mvt1 = MultiscaleVeeringTriangulation(veering_triangulations=[[vt0], [vt1]],prong_matchings=[((0, 0, 0, 0), (1, 0, 0, 0)), ((0, 0, 10, 0), (1, 0, 4, 0))])
             sage: mvt0 < mvt1
             False
             sage: mvt1 < mvt0
@@ -842,6 +842,7 @@ class MultiscaleVeeringTriangulation:
                 if len(label_e) == 2:
                     assert level1 == level2 and s1 == s2 and vt1 == vt2
                     h1, h2 = label_e
+                    assert h1 < h2
                     lo = oris[level1][s1]
                     o1, o2 = lo[h1], lo[h2]
                     
