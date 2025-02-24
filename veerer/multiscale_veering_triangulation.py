@@ -186,7 +186,7 @@ class NodalLabelledDiGraph(LabelledDiGraph):
     
     def vertical_edges_for_GRC(self, level):
         dg = self.subgraph_above_level(level)
-        components = dg.connected_components()
+        components = dg.connected_components(sort=False)
         edges = []
         ne = self.num_edges()
         for comp in components:
@@ -546,7 +546,7 @@ class MultiscaleVeeringTriangulation:
         edge_labels = g._edge_labels
         
         for level in range(1, N):
-            components = g.subgraph_above_level(level).connected_components()
+            components = g.subgraph_above_level(level).connected_components(sort=False)
             l = g.vertical_edges_for_GRC(level)
             for i, comp in enumerate(components):
                 skip = False
