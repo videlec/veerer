@@ -709,7 +709,6 @@ class MultiscaleVeeringTriangulation:
     def num_levels(self):
         return len(self._veering_triangulations)
 
-    # TODO: this does not modify the nodal digraph... but it should
     def permute_level(self, level, p):
         r"""
         Apply the permutation ``p`` on the components of level ``level``.
@@ -753,6 +752,9 @@ class MultiscaleVeeringTriangulation:
                 pm1 = (level1, p[comp1], h1, a1)
                 self._prong_matchings[i] = (pm0, pm1)
         self._prong_matchings.sort()
+
+        # TODO: this is not super clean
+        self._nodal_digraph.vertex_relabelling({(l, c, cc): (l, p[c], cc) for (l, c, cc) in self._nodal_digraph._vertices if l == level})
 
         self._check()
 
