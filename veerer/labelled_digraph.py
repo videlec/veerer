@@ -48,26 +48,38 @@ class LabelledDiGraph:
         [4, 44, -8, -7]
     """
     def __init__(self, digraph, root=None, sort=False):
-        self._digraph = DiGraph(len(digraph), loops=digraph.allows_loops(), multiedges=digraph.allows_multiple_edges())
+        if isinstance(digraph, LabelledDiGraph):
+            if root or sort:
+                raise NotImplementedError
+            self._digraph = digraph
+            self._vertices = digraph._vertices
+            self._vertex_index = digraph._vertex_index
+            self._edge_sources = digraph._edge_sources
+            self._edge_targets = digraph._edge_targets
+            self._edge_labels = digraph._edge_labels
+        elif isinstance(digraph, DiGraph):
+            self._digraph = DiGraph(len(digraph), loops=digraph.allows_loops(), multiedges=digraph.allows_multiple_edges())
 
-        self._vertices = list(digraph.vertices(sort=sort))
-        if root is not None:
-            i = self._vertices.index(root)
-            self._vertices[0], self._vertices[i] = self._vertices[i], self._vertices[0]
-        self._vertex_index = {v: i for i, v in enumerate(self._vertices)}
+            self._vertices = list(digraph.vertices(sort=sort))
+            if root is not None:
+                i = self._vertices.index(root)
+                self._vertices[0], self._vertices[i] = self._vertices[i], self._vertices[0]
+            self._vertex_index = {v: i for i, v in enumerate(self._vertices)}
 
-        self._edge_sources = []
-        self._edge_targets = []
-        self._edge_labels = []
+            self._edge_sources = []
+            self._edge_targets = []
+            self._edge_labels = []
 
-        edges = list(digraph.edges(sort=sort))
-        for k, (u, v, label) in enumerate(edges):
-            i = self._vertex_index[u]
-            j = self._vertex_index[v]
-            self._edge_sources.append(i)
-            self._edge_targets.append(j)
-            self._edge_labels.append(label)
-            self._digraph.add_edge(i, j, k)
+            edges = list(digraph.edges(sort=sort))
+            for k, (u, v, label) in enumerate(edges):
+                i = self._vertex_index[u]
+                j = self._vertex_index[v]
+                self._edge_sources.append(i)
+                self._edge_targets.append(j)
+                self._edge_labels.append(label)
+                self._digraph.add_edge(i, j, k)
+        else:
+            raise TypeError("invalid input")
 
     def __repr__(self):
         return "LabelledDiGraph on {} vert{} and {} edge{}".format(self.num_verts(), "ex" if self.num_verts() <= 1 else "ices",
