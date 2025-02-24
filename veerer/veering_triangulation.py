@@ -3867,8 +3867,10 @@ class VeeringTriangulation(Triangulation):
         components is computed.
         """
         from .linear_subvariety import IrreducibleRealLinearSubvariety
-        DS = [component.delaunay_strebel_automaton()._graph for atom, component in self.prime_decomposition()]
-        return IrreducibleRealLinearSubvariety(DS)
+        from .multiscale_veering_triangulation import MultiscaleVeeringTriangulation
+        DS = [[component.delaunay_strebel_graph() for atom, component in self.prime_decomposition()]]
+        mvt = MultiscaleVeeringTriangulation([[ds.root() for ds in level] for level in DS])
+        return IrreducibleRealLinearSubvariety(DS, mvt)
 
     def delaunay_automaton(self, run=True, backward=None, backend=None):
         r"""
