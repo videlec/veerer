@@ -144,22 +144,21 @@ class NodalLabelledDiGraph(LabelledDiGraph):
     def __init__(self, vertex_labels, horizontal_nodes, vertical_nodes):
         
         nv = len(vertex_labels)
-        digraph = DiGraph(nv, loops=True, multiedges=True)
-        
-        # Compute vertex labels
-        self._vertex_labels = vertex_labels
-        labels = {triple: v for v, triple in enumerate(self._vertex_labels)}
+        digraph = DiGraph(loops=True, multiedges=True)
+        digraph.add_vertices(vertex_labels)
 
         # Add horizontal edges
         for l, pc, cc1, h1, cc2, h2 in horizontal_nodes:
-            v1, v2 = labels[(l, pc, cc1)], labels[(l, pc, cc2)]
+            v1 = (l, pc, cc1)
+            v2 = (l, pc, cc2)
             digraph.add_edge(v1, v2, (h1, h2)) #h1 < h2, which coincides with the normalization of horizontal nodes
 
         # Add vertical edges
         for p1, p2 in vertical_nodes:
             l1, pc1, cc1, h1, ang1 = p1
             l2, pc2, cc2, h2, ang2 = p2
-            v1, v2 = labels[(l1, pc1, cc1)], labels[(l2, pc2, cc2)]
+            v1 = (l1, pc1, cc1)
+            v2 = (l2, pc2, cc2)
             digraph.add_edge(v1, v2, (h1, ang1, h2, ang2))
 
         super().__init__(digraph)
@@ -171,7 +170,7 @@ class NodalLabelledDiGraph(LabelledDiGraph):
         return [e for e in range(self.num_edges()) if self.edge_source(e) == vertex or self.edge_target(e) == vertex]
     
     def vertex_level(self, vertex):
-        return self._vertex_labels[vertex][0]
+        return self._vertices[vertex][0]
     
     def subgraph_above_level(self, level):
         nv = self.num_verts()
@@ -179,7 +178,8 @@ class NodalLabelledDiGraph(LabelledDiGraph):
         vertices = [v for v in range(nv) if self.vertex_level(v) < level]
         edges = []
         for e in range(ne):
-            v1, v2 = self.edge_source(e), self.edge_target(e)
+            v1 = self.edge_source(e)
+            v2 = self.edge_target(e)
             if (self.vertex_level(v1) < level) and (self.vertex_level(v2) < level):
                 edges.append((v1, v2, e))
         return self._digraph.subgraph(vertices=vertices, edges=edges)
@@ -403,7 +403,7 @@ class MultiscaleVeeringTriangulation:
         Return a level as a positive integer
         """
         if not isinstance(level, numbers.Integral):
-            raise TypeError("level must be integral")
+            raise TypeError("level must be integral; got {}".format(type(level).__name__))
         level = int(level)
         if level < 0:
             level = -level
@@ -447,7 +447,7 @@ class MultiscaleVeeringTriangulation:
                     gv1 = gens * v1
                     gv2 = gens * v2
                     if gv1 != gv2 and gv1 != -gv2:
-                        raise ValueError(f"distinct residues at horizontal node {(h1, h2)} at the {c}-th component at level-{level}")
+                        raise ValueError(f"distinct residues at horizontal node {(h1, h2)} at the {c}-th component at level {level}")
 
     def _check_local_prong_matching(self, pm):
         r"""
@@ -471,7 +471,7 @@ class MultiscaleVeeringTriangulation:
             sage: MultiscaleVeeringTriangulation([vt00,vt01],[[""],[""]],[pm])
             Traceback (most recent call last):
             ...
-            ValueError: The orders of the zero in (0, 0, 1, 0) and  the pole in (1, 0, 0, 1) are not matched
+            ValueError: The orders of the zero in (0, 0, 1, 0) and the pole in (1, 0, 0, 1) are not matched
         """
         N = len(self._veering_triangulations)
         prong1, prong2= pm
@@ -495,7 +495,7 @@ class MultiscaleVeeringTriangulation:
         if vt2.face_angle(h2) == 0:
             raise ValueError(f"The prong {prong2} is contained in a face of simple pole")
         if (vt1.vertex_angle(h1) + vt2.face_angle(h2) != 0):
-            raise ValueError(f"The orders of the zero in {prong1} and  the pole in {prong2} are not matched")
+            raise ValueError(f"The orders of the zero in {prong1} and the pole in {prong2} are not matched")
 
         alpha1 = vt1.boundary_vector()
         alpha2 = vt2.boundary_vector()
@@ -544,7 +544,7 @@ class MultiscaleVeeringTriangulation:
     def _check_global_residue_conditions(self):
         N = self.num_levels()
         g = self._nodal_digraph
-        vertex_labels = g._vertex_labels
+        vertex_labels = g._vertices
         edge_labels = g._edge_labels
         
         for level in range(1, N):
@@ -669,6 +669,7 @@ class MultiscaleVeeringTriangulation:
         ans._veering_triangulations = [[vt.copy(mutable) for vt in vts] for vts in self._veering_triangulations]
         ans._horizontal_nodes = [[nodes[:] for nodes in hnodes] for hnodes in self._horizontal_nodes]
         ans._prong_matchings = self._prong_matchings[:]
+        ans._nodal_digraph = self._nodal_digraph.copy()
         ans._mutable = mutable
 
         return ans
@@ -709,6 +710,7 @@ class MultiscaleVeeringTriangulation:
     def num_levels(self):
         return len(self._veering_triangulations)
 
+    # TODO: this does not modify the nodal digraph... but it should
     def permute_level(self, level, p):
         r"""
         Apply the permutation ``p`` on the components of level ``level``.
@@ -785,7 +787,7 @@ class MultiscaleVeeringTriangulation:
         
         level = self._check_level(level)
         g = self._nodal_digraph
-        vertex_labels = g._vertex_labels
+        vertex_labels = g._vertices
         edge_labels = g._edge_labels
         vt = self._veering_triangulations[level][comp]
         
@@ -856,7 +858,7 @@ class MultiscaleVeeringTriangulation:
             oris.append(cur_oris)
 
         g = self._nodal_digraph
-        vertex_labels = g._vertex_labels
+        vertex_labels = g._vertices
         edge_labels = g._edge_labels
         vertices = set(range(len(vertex_labels)))
         
