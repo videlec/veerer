@@ -18,7 +18,6 @@ from .constants import *
 from .polyhedron import *
 from .labelled_digraph import *
 from .monodromy import *
-from .linear_subvariety import *
 
 
 # TODO: Store the data of horizontal and vertical nodes in terms of LabeleddDiGraph
@@ -1567,6 +1566,7 @@ def codimension_one_horizontal_degenerations_representatives(L, mvt, level):
         prong_matchings=[]
         ))
     """
+    from .linear_subvariety import PrimeDegenerations
 
     level = mvt._check_level(level)
     
