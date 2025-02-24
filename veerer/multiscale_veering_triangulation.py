@@ -669,7 +669,8 @@ class MultiscaleVeeringTriangulation:
         ans._veering_triangulations = [[vt.copy(mutable) for vt in vts] for vts in self._veering_triangulations]
         ans._horizontal_nodes = [[nodes[:] for nodes in hnodes] for hnodes in self._horizontal_nodes]
         ans._prong_matchings = self._prong_matchings[:]
-        ans._nodal_digraph = self._nodal_digraph.copy()
+        # TODO: the labelled digraph is immutable...
+        ans._nodal_digraph = self._nodal_digraph
         ans._mutable = mutable
 
         return ans
