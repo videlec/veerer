@@ -293,13 +293,12 @@ class MultiscaleVeeringTriangulation:
                     vt = vts[c]
                     if isinstance(nodes[c], list):
                         if all(len(n) == 2 for n in nodes[c]):
-                            nodes_at_c = nodes[c]
+                            nodes_at_c = [tuple(n) for n in nodes[c]]
                         else:
                             raise ValueError(f"The input of horizontal nodes {nodes[c]} is bad.")
                     elif isinstance(nodes[c], str):
-                        n = str_to_cycles(nodes[c])
-                        for i in range(len(n)):
-                            node = n[i]
+                        nodes_at_c = str_to_cycles(nodes[c])
+                        for i, node in enumerate(nodes_at_c):
                             for j in range(2):
                                 h = node[j]
                                 if h < 0:
@@ -307,8 +306,7 @@ class MultiscaleVeeringTriangulation:
                                 else:
                                     h = 2 * h
                                 node[j] = vt._check_half_edge(h)
-                                n[i] = node
-                        nodes_at_c = n
+                            nodes_at_c[i] = tuple(node)
                     else:
                         raise ValueError(f"The input of horizontal nodes of the {c}-th component at level-{level} is bad")
 
@@ -322,8 +320,8 @@ class MultiscaleVeeringTriangulation:
                         cc2= in_connected_component(vt, h2) # data for building nodal digraph
                         (cc1, h1), (cc2, h2) = sorted([(cc1, h1), (cc2, h2)], key=lambda x: x[1])
                         if check:
-                            self._check_horizontal_node(level, c, node)
-                        self._horizontal_nodes[level][c].append(node)
+                            self._check_horizontal_node(level, c, (h1, h2))
+                        self._horizontal_nodes[level][c].append((h1, h2))
                         data_horiz_nodes.append((level, c, cc1, h1, cc2, h2)) # data for building nodal digraph
                     self._horizontal_nodes[level][c] = sorted(self._horizontal_nodes[level][c])
                     data_horiz_nodes = sorted(data_horiz_nodes, key=lambda x: (x[0], x[1], x[3], x[5])) # data for building nodal digraph
@@ -1522,6 +1520,7 @@ def codimension_one_vertical_degenerations_representatives(L, mvt, level):
             assert len(lmvt) == len(l_vt_edge)
 
             #make vertical degeneration
+            # TODO: move the degenerations of prime components inside PrimeDegenerations
             for i, oldmvt in enumerate(lmvt):
                 _, edges_up, edges_low = l_vt_edge[i]
                 newmvt = oldmvt.degeneration(level, component, edges_low=edges_low, edges_up=edges_up)
