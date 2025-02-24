@@ -29,6 +29,7 @@ import sys
 
 from .automaton import DelaunayStrebelAutomaton
 from .veering_triangulation import VeeringTriangulation
+from .multiscale_veering_triangulation import MultiscaleVeeringTriangulation
 from .strebel_graph import StrebelGraph
 from .delaunay_strebel_graph import DelaunayStrebelGraph
 from .polyhedron.linear_algebra import is_rank_one
@@ -38,6 +39,12 @@ from sage.misc.cachefunc import cached_method
 from sage.graphs.digraph import DiGraph
 
 # TODO: optimization: vertical/horizontal degenerations commute
+# TODO: for each horiz/vert degeneration, we should record the horiz/vert nodes appearing
+#       as well as the relabelling
+# horiz values: (vt, edges_low, edges_up, components_relabelled, horizontal_nodes)
+#               each horizontal node is encoded by (comp0, h0, comp1, h1)
+# vert values: (vt, edges_low, edges_up, components_up_relabelled, components_low_relabelled, vertical_nodes)
+#              each vertical node is encoded by (comp0, h0, a0, comp1, h1, a1)
 class PrimeDegenerations:
     r"""
     Helper class for computing successive degenerations of (prime) linear
@@ -48,8 +55,8 @@ class PrimeDegenerations:
     - ``_components``: list of ``DelaunayStrebelGraph``
 
     - ``_to_components``: dictionary whose keys are the union of veering
-      triangulations in the graphs in ``_components`` and the corresponding value
-      is the index in ``_components``.
+    triangulations in the graphs in ``_components`` and the corresponding value
+    is the index in ``_components``.
 
     - ``_horizontal_degenerations``: a list of lists of dictionaries, the list
     at index ``i`` encodes the horizontal degenerations of ``_components[i]``.
@@ -323,12 +330,12 @@ class PrimeDegenerations:
             sage: D = PrimeDegenerations()
             sage: ds_graph = vt.delaunay_strebel_graph()
             sage: D.codimension_one_vertical_degenerations(ds_graph)
-            [((Delaunay-Strebel graph ...), (Delaunay-Strebel graph ...)),
-             ((Delaunay-Strebel graph ...), (Delaunay-Strebel graph ...)),
-             ((Delaunay-Strebel graph ...), (Delaunay-Strebel graph ...)),
-             ((Delaunay-Strebel graph ...), (Delaunay-Strebel graph ...)),
-             ((Delaunay-Strebel graph ...), (Delaunay-Strebel graph ...)),
-             ((Delaunay-Strebel graph ...), (Delaunay-Strebel graph ...))]
+            [((DelaunayStrebelGraph(...),), (DelaunayStrebelGraph(...),)),
+             ((DelaunayStrebelGraph(...),), (DelaunayStrebelGraph(...),)),
+             ((DelaunayStrebelGraph(...),), (DelaunayStrebelGraph(...),)),
+             ((DelaunayStrebelGraph(...),), (DelaunayStrebelGraph(...),)),
+             ((DelaunayStrebelGraph(...), DelaunayStrebelGraph(...)), (DelaunayStrebelGraph(...),)),
+             ((DelaunayStrebelGraph(...),), (DelaunayStrebelGraph(...),))]
         """
         component_number = self.find(ds_graph)
         self.compute_vertical_degenerations(component_number)
@@ -352,12 +359,8 @@ class PrimeDegenerations:
             sage: D = PrimeDegenerations()
             sage: ds_graph = vt.delaunay_strebel_graph()
             sage: D.codimension_one_horizontal_degenerations(ds_graph)
-            [(Delaunay-Strebel graph of VeeringTriangulationLinearFamily("(0:1)(~0:1,1:1,2:1)(~1:1,~2:1,3:1)(~3:1)", "RRBR", [(1, 0, 0, 1), (0, 1, 0, 0), (0, 0, 1, 0)]) made of
-                200 veering Delaunay states
-                6 Strebel states
-                232 flip transitions
-                92 rotation transitions
-                92 Strebel transitions,)]
+            [(DelaunayStrebelGraph(...),)]
+
         """
         component_number = self.find(ds_graph)
         self.compute_horizontal_degenerations(component_number)
@@ -367,8 +370,10 @@ class PrimeDegenerations:
         return ans
 
 
-# TODO: change the name; we should reserve the name IrreducibleRealLinearSubvariety for
-# an element in BCGGM compactification
+def _convert(cls, x):
+    return x if isinstance(x, cls) else cls(x)
+
+
 class IrreducibleRealLinearSubvariety:
     r"""
     Irreducible real linear subvariety of the moduli space of multiscale
@@ -393,116 +398,102 @@ class IrreducibleRealLinearSubvariety:
         sage: M # optional - surface_dynamics
         MultiscaleCompactification Irreducible real linear subvariety of projective dimension 0 in [[H_0(1^2, -2^2)]]
     """
-    def __init__(self, ds_graphs):
-        if isinstance(ds_graphs, DelaunayStrebelGraph):
-            ds_graphs = [[ds_graphs]]
-        elif isinstance(ds_graphs, (tuple, list)):
+    # TODO: allow input to be a single multiscale veering triangulation
+    # TODO: ds_graphs would better be pointers in a PrimeDegenerations
+    def __init__(self, *args):
+        # list of dictionaries: self._levels[i] is a tuple representing the
+        # i-th level
+        if len(args) == 1:
+            if isinstance(args[0], VeeringTriangulation):
+                if not args[0].is_prime():
+                    raise ValueError("invalid input: veering triangulation must be prime")
+                multiscale_veering_triangulation = MultiscaleVeeringTriangulation([args[0]], mutable=True)
+            elif not isinstance(args[0], MultiscaleVeeringTriangulation):
+                raise ValueError("input must be a multiscale veering triangulation; got {}".format(type(args[0]).__name__))
+            else:
+                multiscale_veering_triangulation = args[0].copy(mutable=True)
+            ds_graphs = [[vt.delaunay_strebel_graph() for vt in vts] for vts in multiscale_veering_triangulation._veering_triangulations]
+        elif len(args) == 2:
+            ds_graphs, multiscale_veering_triangulation = args
+            multiscale_veering_triangulation = multiscale_veering_triangulation.copy(mutable=True)
+
+        if isinstance(ds_graphs, (tuple, list)):
             ds_graphs_new = []
             for elt in ds_graphs:
-                if isinstance(elt, DiGraph):
-                    ds_graphs_new.append([DelaunayStrebelGraph(elt)])
-                elif isinstance(elt, DelaunayStrebelGraph):
-                    ds_graphs_new.append([elt])
-                elif isinstance(elt, (tuple, list)):
-                    ds_graphs_new.append(list(elt))
+                if isinstance(elt, (tuple, list)):
+                    level = []
+                    for x in elt:
+                        x = _convert(DelaunayStrebelGraph, x)
+                        level.append(x)
                 else:
-                    raise ValueError("invalid input")
+                    level = [_convert(DelaunayStrebelGraph, elt)]
+                ds_graphs_new.append(level)
             ds_graphs = ds_graphs_new
+        else:
+            ds_graphs = [[_convert(DelaunayStrebelGraph, ds_graphs)]]
 
-        # NOTE: in order to normalize we sort the components
-        levels = list(map(list, ds_graphs))
-        mins = []
-        for j, level in enumerate(levels):
-            levels[j] = sorted(level)
-        self._levels = tuple(map(tuple, levels))
+        # Check that the mvt coincide with the roots of our ds_graphs
+        if multiscale_veering_triangulation is not None:
+            if len(multiscale_veering_triangulation._veering_triangulations) != len(ds_graphs):
+                raise ValueError("different number of levels")
+            for i, (vts, level_ds_graphs) in enumerate(zip(multiscale_veering_triangulation._veering_triangulations, ds_graphs)):
+                if len(vts) != len(level_ds_graphs):
+                    raise ValueError("different number of components at level {}".format(i))
+                for vt, ds_graph in zip(vts, level_ds_graphs):
+                    if vt != ds_graph.root():
+                        raise ValueError("invalid multiscale veering triangulation")
 
-    def _check(self, error=RuntimeError):
-        if not isinstance(self._levels, tuple) or not all(isinstance(level, tuple) for level in self._levels):
-            raise error
+        # Permute each level so that they are sorted
+        for level, (vts, level_ds_graphs) in enumerate(zip(multiscale_veering_triangulation._veering_triangulations, ds_graphs)):
+            new_ds_graphs = sorted((comp, i) for i, comp in enumerate(level_ds_graphs))
+            perm = [-1] * len(level_ds_graphs)
+            for j, (comp, i) in enumerate(new_ds_graphs):
+                perm[i] = j
+            ds_graphs[level] = [comp for comp, i in new_ds_graphs]
+            multiscale_veering_triangulation.permute_level(level, perm)
 
-    def __hash__(self):
-        return hash(tuple(comp.root() for level in self._levels for comp in level))
+        self._levels = tuple(map(tuple, ds_graphs))
+        self._mvt = multiscale_veering_triangulation
+        self._mvt.set_immutable()
 
-    def __eq__(self, other):
-        if type(self) is not type(other):
-            raise TypeError
-        return self._levels == other._levels
-
-    def __ne__(self, other):
-        if type(self) is not type(other):
-            raise TypeError
-        return self._levels != other._levels
-
-    def _cmp_(self, other):
-        if type(self) is not type(other):
-            raise TypeError("can not compare {} with {}".format(type(self).__name__, type(other).__name__))
-
-        data0 = len(self._levels)
-        data1 = len(other._levels)
-        c = (data0 > data1) - (data0 < data1)
-        if c:
-            return c
-
-        data0 = list(map(len, self._levels))
-        data1 = list(map(len, other._levels))
-        c = (data0 > data1) - (data0 < data1)
-        if c:
-            return c
-
-        data0 = self._levels
-        data1 = other._levels
-        c = (data0 > data1) - (data0 < data1)
-        return c
-
-    def _richcmp_(self, other, op):
-        if type(self) is not type(other):
-            raise TypeError("can not compare {} with {}".format(type(self).__name__, type(other).__name__))
-
-        return rich_to_bool(op, self._cmp_(other))
-
-    def __lt__(self, other):
-        return self._richcmp_(other, op_LT)
-
-    def __le__(self, other):
-        return self._richcmp_(other, op_LE)
-
-    def __gt__(self, other):
-        return self._richcmp_(other, op_GT)
-
-    def __ge__(self, other):
-        return self._richcmp_(other, op_GE)
+        self._check()
+        self._normalize_multiscale_structure()
+        self._check()
 
     def _check_level(self, level):
         if not isinstance(level, numbers.Integral):
-            raise TypeError("level must be integral")
+            raise ValueError("level must be an integer")
         level = int(level)
         if level < 0:
             level = -level
-        if not 0 <= level < len(self._levels):
-            raise ValueError("level out of range")
+        if not (0 <= level < len(self._levels)):
+            raise IndexError("level out of range")
         return level
 
-    def __repr__(self):
-        return "Irreducible real linear subvariety of projective dimension {} in {}".format(
-            self.projective_dimension(), self.ambient_stratum())
+    def _check(self, error=RuntimeError):
+        if not (isinstance(self._levels, tuple) and
+                all(isinstance(level, tuple) and
+                    level and
+                    all(isinstance(elt, DelaunayStrebelGraph) for elt in level)
+                    for level in self._levels)):
+            raise error
 
-    def num_levels(self):
+    def _normalize_multiscale_structure(self):
+        pass
+
+    def __len__(self):
         r"""
         Return the number of levels.
         """
         return len(self._levels)
+
+    num_levels = __len__
 
     def levels(self):
         r"""
         Return the set of levels
         """
         return range(len(self._levels))
-
-    def an_element(self):
-        r"""
-        Return a translation or half-translation surface in this subvariety.
-        """
-        raise NotImplementedError
 
     def signature(self, level=None):
         r"""
@@ -515,6 +506,7 @@ class IrreducibleRealLinearSubvariety:
             return tuple(self.signature(level) for level in self.levels())
         level = self._check_level(level)
         return tuple(sorted(sum((comp.root().stratum().signature() for comp in self._levels[level]), tuple())))
+
 
     def ambient_stratum(self, level=None):
         r"""
@@ -558,6 +550,7 @@ class IrreducibleRealLinearSubvariety:
         level = self._check_level(level)
         return sum(comp.root().dimension() for comp in self._levels[level])
 
+
     def projective_dimension(self, level=None):
         r"""
         Return the projective dimension.
@@ -583,9 +576,6 @@ class IrreducibleRealLinearSubvariety:
     def rank(self):
         raise NotImplementedError
 
-    def delaunay_strebel_graph(self, level):
-        level = self._check_level(level)
-        return self._levels[level]
 
     def codimension_one_horizontal_degenerations(self, level=None, degeneration_helper=None):
         r"""
@@ -633,7 +623,7 @@ class IrreducibleRealLinearSubvariety:
             degeneration_helper = PrimeDegenerations()
 
         ans = []
-        ds_graphs = self.delaunay_strebel_graph(level)
+        ds_graphs = self._levels[level]
         for ds_graph_num, ds_graph in enumerate(ds_graphs):
             for ds_degeneration in degeneration_helper.codimension_one_horizontal_degenerations(ds_graph):
                 new_level = ds_graphs[:ds_graph_num] + ds_degeneration + ds_graphs[ds_graph_num + 1:]
@@ -677,7 +667,7 @@ class IrreducibleRealLinearSubvariety:
         if degeneration_helper is None:
             degeneration_helper = PrimeDegenerations()
 
-        ds_graphs = self.delaunay_strebel_graph(level)
+        ds_graphs = self._levels[level]
         ans = []
         for ds_graph_num, ds_graph in enumerate(ds_graphs):
             for (ds_up, ds_low) in degeneration_helper.codimension_one_vertical_degenerations(ds_graph):
@@ -696,32 +686,7 @@ class IrreducibleRealLinearSubvariety:
         """
         return MultiscaleCompactification(self)
 
-    # TODO
-    @cached_method
-    def framing_group(self):
-        r"""
-        Return the monodromy of framing obtained by parallel transport in each
-        prime component and exchange of isomorphic components in the same
-        level.
-        """
-        raise NotImplementedError
 
-    def framing_group_element_permutation(self, g, v=None):
-        r"""
-        Given an element of the framing group ``g`` return a quadruple of
-        dictionaries ``(d_vseps, d_fseps, d_cseps, d_fedges)`` encoding
-        permutations of vertex separatrices, face separatrices, infinite
-        cylinders and folded edges.
-
-        The keys and values
-        - for ``d_vseps`` are quadruples ``(level, component, half_edge, angle)``
-        - for ``d_fseps`` are quadruples ``(level, component, half_edge, angle)``
-        - for ``d_cseps`` are triples ``(level, component, half_edge)``
-        - for ``d_fedges`` are triples ``(level, component, half_edge)
-
-        The argument ``v`` is an optional vertex
-        """
-        raise NotImplementedError
 
 
 # TODO: this class could also easily handle LinearSubvariety by not performing
