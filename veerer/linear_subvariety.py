@@ -481,6 +481,18 @@ class IrreducibleRealLinearSubvariety:
     def _normalize_multiscale_structure(self):
         pass
 
+    def __eq__(self, other):
+        if type(self) is not type(other):
+            return False
+
+        return self._levels == other._levels and self._mvt == other._mvt
+
+    def __ne__(self, other):
+        return not (self == other)
+
+    def __hash__(self):
+        return (2137573 * hash(self._levels)) ^ (13325 * hash(self._mvt))
+
     def __len__(self):
         r"""
         Return the number of levels.
