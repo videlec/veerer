@@ -39,35 +39,35 @@ from sage.misc.cachefunc import cached_method
 from sage.graphs.digraph import DiGraph
 
 # TODO: optimization: vertical/horizontal degenerations commute
-# TODO: for each horiz/vert degeneration, we should record the horiz/vert nodes appearing
-#       as well as the relabelling
-# horiz values: (vt, edges_low, edges_up, components_relabelled, horizontal_nodes)
-#               each horizontal node is encoded by (comp0, h0, comp1, h1)
-# vert values: (vt, edges_low, edges_up, components_up_relabelled, components_low_relabelled, vertical_nodes)
-#              each vertical node is encoded by (comp0, h0, a0, comp1, h1, a1)
+# TODO: for each horiz/vert degeneration, we should record the multiscale structure and
+#       the relabelling. In the dictionaries, keys would better be
+#       MultiscaleVeeringTriangulation (whose prime components are roots of
+#       elements in _components) and values some quadruple (vt, edges_low,
+#       edges_up, relabelling) giving the different ways to obtain this
+#       multiscale differential.
 class PrimeDegenerations:
     r"""
     Helper class for computing successive degenerations of (prime) linear
-    subvarieties and their decomposition in prime components.
+    subvarieties and their decompositions in prime components.
 
     This class maintains the following attributes:
 
     - ``_components``: list of ``DelaunayStrebelGraph``
 
     - ``_to_components``: dictionary whose keys are the union of veering
-    triangulations in the graphs in ``_components`` and the corresponding value
-    is the index in ``_components``.
+      triangulations in the graphs in ``_components`` and the corresponding value
+      is the index in ``_components``.
 
-    - ``_horizontal_degenerations``: a list of lists of dictionaries, the list
-    at index ``i`` encodes the horizontal degenerations of ``_components[i]``.
-    Each key is a tuple of ordered indices ``(i1, ..., ik)`` which corresponds
-    to the decomposition into prime components of a codimension one horizontal
-    degeneration. The corresponding values are the triples ``(vt, edges_up,
-    edges_low)`` where ``vt`` is a veering triangulation in ``_components[i]``
-    and whose degeneration along the given ``edges_up`` and ``edges_low`` gives
-    a WYYISWYG differential in the product of ``_components[i1]``,
-    ``_components[i2]``, ..., ``_components[ik]`` (possibly after applying
-    canonical relabelling).
+    - ``_horizontal_degenerations``: a list of dictionaries. The dictionary
+      at position ``i`` encodes the horizontal degenerations of ``_components[i]``.
+      Each key is a tuple of ordered indices ``(i1, ..., ik)`` which corresponds
+      to the decomposition into prime components of a codimension one horizontal
+      degeneration. The corresponding values are the triples ``(vt, edges_up,
+      edges_low)`` where ``vt`` is a veering triangulation in ``_components[i]``
+      and whose degeneration along the given ``edges_up`` and ``edges_low`` gives
+      a WYYISWYG differential in the product of ``_components[i1]``,
+      ``_components[i2]``, ..., ``_components[ik]`` (possibly after applying
+      canonical relabelling).
 
     - ``vertical_degenerations``: similar to ``_horizontal_degenerations`` but for
       vertical degenerations. In that case, the keys are pairs of ordered tuples
@@ -114,8 +114,8 @@ class PrimeDegenerations:
     def __init__(self):
         self._components = []     # list of Delaunay-Strebel graphs of prime veering triangulation
         self._to_components = {}  # mapping: veering triangulation -> position in self._components
-        self._horizontal_degenerations = []  # list of lists of dictionaries
-        self._vertical_degenerations = []    # list of lists of dictionaries
+        self._horizontal_degenerations = []  # list of dictionaries
+        self._vertical_degenerations = []    # list of dictionaries
 
     def __repr__(self):
         return "Degenerations of {} prime components ({} veering triangulations)".format(len(self._components), len(self._to_components))
@@ -479,6 +479,11 @@ class IrreducibleRealLinearSubvariety:
             raise error
 
     def _normalize_multiscale_structure(self):
+        # TODO: compute the list of all mvts in the linear subvariety and pick the one we
+        # prefer. To compute the list, we need to apply
+        # * monodromy on each prime component
+        # * permute isomorphic connected components inside a prime component
+        # * permute isomorphic prime component at the same level
         pass
 
     def __eq__(self, other):
@@ -660,6 +665,9 @@ class IrreducibleRealLinearSubvariety:
                 # horizontal degenerations
                 for i, oldmvt in enumerate(lmvt):
                     _, edges_up, edges_low = l_vt_edge[i]
+                    # (possible) TODO (for later): we could avoid the call to
+                    # to degeneration here by moving all the relevant
+                    # information into PrimeDegenerations
                     newmvt = oldmvt.degeneration(level, ds_graph_num, edges_low=edges_low, edges_up=edges_up)
                     newmvt = newmvt.prime_decomposition(level, ds_graph_num)
                     new_subvariety = IrreducibleRealLinearSubvariety(new_levels, newmvt)
