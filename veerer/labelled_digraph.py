@@ -92,6 +92,29 @@ class LabelledDiGraph:
     def num_edges(self):
         return len(self._edge_sources)
 
+    def vertex_relabelling(self, relabelling):
+        r"""
+        Given a dictionary ``relabelling`` on vertex labels, perform the associated relabelling.
+
+        EXAMPLES::
+
+            sage: from veerer.labelled_digraph import LabelledDiGraph, LabelledDiGraphPath
+            sage: G = LabelledDiGraph(digraphs.ButterflyGraph(5), sort=True)
+            sage: G.vertex_label(3)
+            ('00000', 3)
+            sage: G.vertex_relabelling({G.vertex_label(3): 'hello', G.vertex_label(7): (1, 2, 3)})
+            sage: G.vertex_label(3)
+            'hello'
+            sage: G.vertex_index('hello')
+            3
+            sage: G.vertex_index(('00000', 3))
+            Traceback (most recent call last):
+            ...
+            KeyError: ('00000', 3)
+        """
+        self._vertices = [relabelling.get(v, v) for v in self._vertices]
+        self._vertex_index = {relabelling.get(v, v): i for v, i in self._vertex_index.items()}
+
     def vertex_label(self, i):
         return self._vertices[i]
 
