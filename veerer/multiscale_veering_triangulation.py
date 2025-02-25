@@ -41,35 +41,45 @@ def in_connected_component(vt, h):
         if (h // 2) in comp:
             return l_comp.index(comp)
 
-def track_prong(vt, r_up, r_low, prong):
+def track_prong(vt, r_up, r_low, prong, vertex=False, face=False):
     r"""
-    Return the prong after vertival degeneration.
+    Return the prong after the vertival degeneration.
 
     Note that r_up and r_low are from the method VeeringTriangulation.degeneration by setting `collapsed_half_edge_relabelling=True` 
     """
     l, c, h, ang = prong
     l = abs(l)
 
-    vertex = perm_orbit(vt._vp, h)
-    vh = [r_up[h] for h in vertex]
-
-    if min(vh) >= 0: #The case that the vertex vh is in f_up
-        h = r_up[h]
-        return (l, c, h, ang)
-
-    if max(r_up) == -1: #The case that the vertex vh is in f_low
-        return (l, c, r_low[h],ang)
+    if vertex:
+        vh = [r_up[e] for e in perm_orbit(vt._vp, h)]
+        if min(vh) >= 0: # The vertex of h is contaiend in f_up
+            return (l, c, r_up[h], ang)
+        
+        # Otherwise the vertex prong must be contained in f_low        
+        a = 0
+        while r_up[h] >= 0:
+            h = vt.previous_at_vertex(h)
+            b = vt.half_edge_num_separatrices(h)
+            a = a + b
+        ang = ang + a
+        assert r_low[h] >= 0
+        return (l + 1, 0, r_low[h], ang) if max(r_up) >=0 else (l, c, r_low[h], ang) # Note that the degeneration might be horizontal
     
-    a = 0
-    while r_up[h] >= 0:
-        c1 = vt._colouring[h // 2]
-        h = vt.previous_at_vertex(h)
-        c2 = vt._colouring[h // 2]
-        if (c2 == RED) and (c1 == BLUE):
-            a = a + 1
-    ang = ang + a
-    assert r_low[h] >= 0
-    return (l + 1, 0, r_low[h], ang)
+    if face:
+        assert vt.boundary_vector()[h] > 0
+        fh = [r_low[e] for e in perm_orbit(vt._fp, h)]
+        if min(fh) >= 0: #The pole of h is contaiend in f_low
+            return (l + 1, 0, r_low[h], ang) if max(r_up) >=0 else (l, c, r_low[h], ang)
+        
+        # Otherwise the face prong must be contained in f_up
+        a = 0
+        while r_low[h] >= 0:
+            h = vt.previous_in_face(h)
+            b = vt.half_edge_num_separatrices(h)
+            a = a + b - 1
+        ang = ang + a
+        assert r_up[h] >= 0
+        return (l, c, r_up[h], ang)
 
 def _vaninshing_red_blue_corner(vt, r_up, r_low, h):
     hh = vt.next_at_vertex(h)
@@ -78,14 +88,14 @@ def _vaninshing_red_blue_corner(vt, r_up, r_low, h):
     else:
         return False
 
-def _new_prong_matching(vt, f_low, r_up, r_low, level, comp):
+def new_prong_matching(vt, f_low, r_up, r_low, level, comp):
     level = abs(level)
     nh = 2 * vt.num_edges()
     newpm = []
     lpoles = [] #the poles at nodes in f_low considered so far
     for h in range(nh):
         hh = vt.next_at_vertex(h)
-        if r_up[h] >= 0 and r_low[hh] >= 0:
+        if (r_up[h] >= 0) and (r_low[hh] >= 0):
             #find the boundary face in f_low containing hh
             for f in f_low.boundary_faces():
                 if f_low.next_in_edge(r_low[hh]) in f:
@@ -97,7 +107,7 @@ def _new_prong_matching(vt, f_low, r_up, r_low, level, comp):
                 if (vt.half_edge_num_separatrices(h) > 0) and (r_up[h] >= 0):
                     vert_sep = (level, comp, h, 0)
                     prong1 = (level,comp, r_up[h], 0)
-                    prong2 = track_prong(vt, r_up, r_low, vert_sep)
+                    prong2 = track_prong(vt, r_up, r_low, vert_sep, vertex=True) # This prong is obtained by tracing the vertex prong after the vertical degeneration.
                     assert prong2[0] == level + 1
                     pm = [prong1, prong2]
                     newpm.append(pm)
@@ -637,11 +647,13 @@ class MultiscaleVeeringTriangulation:
             l2.append((level2, c2, h2))
 
     def _check_global_residue_conditions(self):
+        # Note that there are cases where some levels are Abelian and the other levels are quadratic. The method does not apply to this case yet.
+
         N = self.num_levels()
         g = self._nodal_digraph
         vertex_labels = g._vertices
         edge_labels = g._edge_labels
-        
+
         for level in range(1, N):
             components = g.subgraph_above_level(level).connected_components(sort=False)
             l = g.vertical_edges_for_GRC(level)
@@ -654,22 +666,23 @@ class MultiscaleVeeringTriangulation:
                         break
                 if skip:
                     continue
-                
+
                 edges = l[i]
-                
+
                 if not edges:
                     continue
-                
+
                 c = vertex_labels[g.edge_target(edges[0])][1]
-                
+
                 for e in edges:
                     if c != vertex_labels[g.edge_target(e)][1]:
                         raise ValueError(f"The global residue conditions are not satisfied for the level-{level}")
-                
+
                 vt = self._veering_triangulations[level][c]
-                
-                if not vt.is_abelian():
+                is_abelian, oris_vt = vt.is_abelian(certificate=True)
+                if not is_abelian:
                     continue
+                
                 
                 base_ring = vt.base_ring()
                 orig_constraints_matrix = vt.constraints_matrix()
@@ -677,22 +690,30 @@ class MultiscaleVeeringTriangulation:
                 n1 = orig_constraints_matrix.nrows()
                 constraints_matrix = matrix(base_ring, n1 + 1, vt.num_edges())
                 constraints_matrix[:n1, :] = orig_constraints_matrix
-                
+
                 bdry = vt.boundary_faces()
                 nf = len(bdry)
                 r1 = vt.residue_matrix()
-                rr1 = matrix(ZZ, 1, nf)
                 
+                _, global_oris = self.is_abelian(certificate=True)
+                global_oris_vt = global_oris[level][c]
+                ne = vt._ne
+                modify_oris = matrix.identity(ne)
+                for edge in range(ne):
+                    if oris_vt[2 * edge] != global_oris_vt[2 * edge]:
+                        modify_oris[edge, edge] = - 1
+                
+                rr1 = matrix(ZZ, 1, nf)
                 for e in edges:
                     _, _, h, _ = edge_labels[e]
                     for j, f in enumerate(bdry):
                         if h in f:
                             rr1[0, j] = 1
                             break
-            
-                constraints_matrix[n1:, :] = rr1 * r1
+
+                constraints_matrix[n1:, :] = rr1 * r1 * modify_oris
                 gens = constraints_matrix.right_kernel_matrix()
-                
+
                 if orig_gens != gens:
                     raise ValueError(f"The global residue conditions are not satisfied for the level-{level}")
 
@@ -1139,24 +1160,25 @@ class MultiscaleVeeringTriangulation:
         l_pm = []
         #existing vertical nodes
         original_pm = copy.deepcopy(self._prong_matchings)
-        for pm in original_pm:
-            prong1, prong2 = pm
+        for prong1, prong2 in original_pm:
             if prong1[0] == level and prong1[1] == component:
-                prong1 = track_prong(vt, r_up, r_low, prong1)
-                if f_up is None:
-                    l_pm.append([prong1, prong2])
-                else:
-                    assert prong2[0] >= 0
+                prong1 = track_prong(vt, r_up, r_low, prong1, vertex=True)
+                if f_up is not None:
                     prong2 = (prong2[0] + 1,prong2[1], prong2[2], prong2[3])
-                    l_pm.append([prong1,prong2])
             elif prong2[0] == level and prong2[1] == component:
-                prong2 = track_prong(vt, r_up, r_low, prong2)
-                l_pm.append([prong1,prong2])
-            else:
-                l_pm.append(pm)
+                prong2 = track_prong(vt, r_up, r_low, prong2, face=True)
+            elif prong1[0] < level and prong2[0] > level:
+                if f_up is not None:
+                    prong2 = (prong2[0] + 1,prong2[1], prong2[2], prong2[3])
+            elif prong1[0] > level:
+                assert prong2[0] > level
+                if f_up is not None:
+                    prong1 = (prong1[0] + 1,prong1[1], prong1[2], prong1[3])
+                    prong2 = (prong2[0] + 1,prong2[1], prong2[2], prong2[3])
+            l_pm.append([prong1,prong2])
         #new vertical nodes
         if f_up is not None:
-            l_pm  = l_pm + _new_prong_matching(vt, f_low, r_up, r_low, level, component)
+            l_pm  = l_pm + new_prong_matching(vt, f_low, r_up, r_low, level, component)
 
         #build the degeneration
         return MultiscaleVeeringTriangulation(vts, l_horiz, l_pm)
@@ -1555,155 +1577,3 @@ class MultiscaleVeeringTriangulation:
             mvts.append(MultiscaleVeeringTriangulation(new_vts, new_horiz_nodes, new_pms))
 
         return mvts
-
-def codimension_one_vertical_degenerations_representatives(L, mvt, level):
-    r"""
-    Return a list of pairs (linear subvariety, multiscale veering triangulation representative) that are 
-    the level-`level` vertical degenerations of (L, mvt).
-    
-    Input:
-    - L: a linear subvariety.
-    
-    EXAMPLES::
-        sage: from veerer import VeeringTriangulation, MultiscaleVeeringTriangulation
-        sage: from veerer.linear_subvariety import *
-        sage: from veerer.labelled_digraph import *
-        sage: from veerer.monodromy import *
-
-        sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,9)(~8,10,11)(~9,~10,~11)", "RRBBRRRRBBRR")
-        sage: L = vt.linear_subvariety() # not tested
-        sage: mvt = MultiscaleVeeringTriangulation([vt], [[""]], [])
-        sage: l = codimension_one_vertical_degenerations_representatives(L, mvt, 0) # not tested
-        sage: len(l) # not tested
-        17
-        sage: l[3] # not tested
-        (Irreducible real linear subvariety of projective dimension 3 in [[H_2(2)], [H_0(1^2, -4)]],
-         MultiscaleVeeringTriangulation(
-           veering_triangulations=[
-             VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "RRBBRRRRB", [(1, 0, -1, -1, 0, -1, -1, 0, 1), (0, 1, 1, 1, 0, 1, 1, 0, -1), (0, 0, 0, 0, 1, 1, 1, 0, -1), (0, 0, 0, 0, 0, 0, 0, 1, 1)]),
-             VeeringTriangulationLinearFamily("(0:4,~0:4)", "R", [(1)])
-           ],
-           horizontal_nodes=[[[]], [[]]],
-           prong_matchings=[((0, 0, 0, 0), (1, 0, 0, 1))]
-         ))
-    """
-
-    level = mvt._check_level(level)
-
-    D = PrimeDegenerations()
-    list_subvarities = L.codimension_one_vertical_degenerations(level=level, degeneration_helper=D)
-    
-    representatives = []
-    for component, vt in enumerate(mvt._veering_triangulations[level]):
-        vt = mvt._veering_triangulations[level][component]
-        ds_graph = L.delaunay_strebel_graph(level)[component]
-
-        assert vt.is_prime()
-        assert vt == ds_graph.root() #vt is expected to be the root of the Delaunay-Strebel graph
-
-        ind = D.find(ds_graph)
-        l = D._vertical_degenerations[ind]
-        list_comps_after_degen = list(l.keys())
-
-        for index, comps in enumerate(list_comps_after_degen):
-            list_comp_up, list_comp_low = comps
-            l_vt_edge = l[(list_comp_up, list_comp_low)]#the list of (vt, edges_up, edges_low) such that vt degenerates to prime components in list_com_yp and list_comp_low respectively.
-
-            #construct paths
-            target_vertices = [ds_graph.vertex_index(a[0]) for a in l_vt_edge]
-            paths = tree_with_target(ds_graph, root=0, target_vertices=target_vertices)
-            assert len(paths) == len(l_vt_edge)
-
-            #transport mvt
-            lmvt = [mvt.transport_along_path(level, component, path) for path in paths]
-            assert len(lmvt) == len(l_vt_edge)
-
-            #make vertical degeneration
-            # TODO: move the degenerations of prime components inside PrimeDegenerations
-            for i, oldmvt in enumerate(lmvt):
-                _, edges_up, edges_low = l_vt_edge[i]
-                newmvt = oldmvt.degeneration(level, component, edges_low=edges_low, edges_up=edges_up)
-                newmvt = newmvt.prime_decomposition(level, component)
-                newmvt = newmvt.prime_decomposition(level + 1, 0)
-                representatives.append((list_subvarities[index + component], newmvt))#Different `i` corresponds to the same linear subvarieties (possibly different connected components)
-            
-    #This method is not completed yet. We will apply monodromy group to the elements in the `representatives` later.
-
-    return representatives
-    
-def codimension_one_horizontal_degenerations_representatives(L, mvt, level):
-    r"""
-    Return a list of lists of multi-scale veering triangulations obtained
-    by codimension-one horizontal degenerations of the component.
-
-    The returned list is organized as `l = [l0, l1, ...]`, where each Each sublist li satisfies that:
-    - li contains multi-scale veering triangulations with the same enhanced level graph.
-    - The corresponding components of the triangulations in li belong to the same cell of veering triangulations.
-    - The triangulations in li are in the same connected component of the linear subvariety.
-
-    Input:
-    - `ds_graph`: The index of the Delaunay-Strebel graph of the prime component (which is the `component`-th component at the `level`).
-    - `D`: An instance of the `PrimeDegeneration` class, responsible for computing the codimension-one horizontal degenerations
-    of the `component` in `ds_graph`.
-
-    EXAMPLES::
-
-        sage: from veerer import VeeringTriangulation, MultiscaleVeeringTriangulation
-        sage: from veerer.linear_subvariety import *
-        sage: from veerer.labelled_digraph import *
-        sage: from veerer.monodromy import *
-
-        sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,9)(~8,10,11)(~9,~10,~11)", "RRBBRRRRBBRR")
-        sage: L = vt.linear_subvariety() # not tested
-        sage: mvt = MultiscaleVeeringTriangulation([vt], [[""]], [])
-        sage: l = codimension_one_horizontal_degenerations_representatives(L, mvt, 0) # not tested
-        sage: l[8] # not tested
-        (Irreducible real linear subvariety of projective dimension 3 in [[H_1(1^2, -1^2)]],
-        MultiscaleVeeringTriangulation(
-        veering_triangulations=[
-        [VeeringTriangulationLinearFamily("(0:1,1:1,2:1,3:1)(~0:1,~1:1,~2:1,~3:1)", "RRRR", [(1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)])]
-        ],
-        horizontal_nodes=[[[(0, 1)]]],
-        prong_matchings=[]
-        ))
-    """
-    from .linear_subvariety import PrimeDegenerations
-
-    level = mvt._check_level(level)
-    
-    D = PrimeDegenerations()
-    list_subvarities = L.codimension_one_horizontal_degenerations(level=level, degeneration_helper=D)
-    
-    representatives = []
-    for component, vt in enumerate(mvt._veering_triangulations[level]):
-        vt = mvt._veering_triangulations[level][component]
-        ds_graph = L.delaunay_strebel_graph(level)[component]
-        
-        assert vt.is_prime()
-        assert vt == ds_graph.root() #vt is expected to be the root of the Delaunay-Strebel graph
-        
-        ind = D.find(ds_graph)
-        l = D._horizontal_degenerations[ind]
-        list_comps_after_degen = list(l.keys())
-
-        for index, list_comp in enumerate(list_comps_after_degen):
-            l_vt_edge = l[list_comp]
-            
-            #construct paths
-            target_vertices = [ds_graph.vertex_index(a[0]) for a in l_vt_edge]
-            paths = tree_with_target(ds_graph, root=0, target_vertices=target_vertices)
-            assert len(paths) == len(l_vt_edge)
-
-            #transport mvt
-            lmvt = [mvt.transport_along_path(level, component, path) for path in paths]
-            assert len(lmvt) == len(l_vt_edge)
-
-            #make vertical degeneration and compute all transitions under monodromy groups and level-wise permutations
-            for i, oldmvt in enumerate(lmvt):
-                _, edges_up, edges_low = l_vt_edge[i]
-                newmvt = oldmvt.degeneration(level, component, edges_low=edges_low, edges_up=edges_up)
-                newmvt = newmvt.prime_decomposition(level, component)
-                representatives.append((list_subvarities[index + component], newmvt))
-    #This method is not completed yet. We will apply monodromy group to the elements in the `representatives` later.
-
-    return representatives

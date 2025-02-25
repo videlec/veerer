@@ -29,7 +29,7 @@ import sys
 
 from .automaton import DelaunayStrebelAutomaton
 from .veering_triangulation import VeeringTriangulation
-from .multiscale_veering_triangulation import MultiscaleVeeringTriangulation
+from .multiscale_veering_triangulation import MultiscaleVeeringTriangulation, tree_with_target
 from .strebel_graph import StrebelGraph
 from .delaunay_strebel_graph import DelaunayStrebelGraph
 from .polyhedron.linear_algebra import is_rank_one
@@ -617,22 +617,45 @@ class IrreducibleRealLinearSubvariety:
         if level is None:
             return [degeneration for level in self.levels() for degeneration in self.codimension_one_horizontal_degenerations(level, degeneration_helper)]
 
+        mvt = self._mvt
+
         level = self._check_level(level)
 
         if degeneration_helper is None:
             degeneration_helper = PrimeDegenerations()
 
-        ans = []
         ds_graphs = self._levels[level]
+        ans = []
         for ds_graph_num, ds_graph in enumerate(ds_graphs):
-            for ds_degeneration in degeneration_helper.codimension_one_horizontal_degenerations(ds_graph):
+            list_subvarieties = degeneration_helper.codimension_one_horizontal_degenerations(ds_graph)
+            ind = degeneration_helper.find(ds_graph)
+            l = degeneration_helper._horizontal_degenerations[ind]
+            for index, ds_degeneration in enumerate(list_subvarieties):
+                #vt = mvt._veering_triangulations[level][ds_graph_num]
+                #assert vt.is_prime()
+                #assert vt == ds_graph.root() #vt is expected to be the root of the Delaunay-Strebel graph
+                l_vt_edge = l[list(l.keys())[index]]#the list of (vt, edges_up, edges_low) such that vt degenerates to prime components in list_com_yp and list_comp_low respectively.
+
+                # build the new linear subvarieties (with no nodes information)
                 new_level = ds_graphs[:ds_graph_num] + ds_degeneration + ds_graphs[ds_graph_num + 1:]
                 new_levels = self._levels[:level] + (new_level,) + self._levels[level + 1:]
-                new_subvariety = IrreducibleRealLinearSubvariety(new_levels)
-                assert new_subvariety.projective_dimension() == self.projective_dimension() - 1
-                assert new_subvariety.num_levels() == self.num_levels()
-                ans.append(new_subvariety)
-            return ans
+                
+                # buld the new representatives
+                # transport along the paths to the target Delaunay-Strebel graphs
+                target_vertices = [ds_graph.vertex_index(a[0]) for a in l_vt_edge]
+                paths = tree_with_target(ds_graph, root=0, target_vertices=target_vertices)
+                lmvt = [mvt.transport_along_path(level, ds_graph_num, path) for path in paths]
+                # horizontal degenerations
+                for i, oldmvt in enumerate(lmvt):
+                    _, edges_up, edges_low = l_vt_edge[i]
+                    newmvt = oldmvt.degeneration(level, ds_graph_num, edges_low=edges_low, edges_up=edges_up)
+                    newmvt = newmvt.prime_decomposition(level, ds_graph_num)
+                    new_subvariety = IrreducibleRealLinearSubvariety(new_levels, newmvt)
+                    assert new_subvariety.projective_dimension() == self.projective_dimension() - 1
+                    assert new_subvariety.num_levels() == self.num_levels()
+                    ans.append(new_subvariety)#Different `i` corresponds to the same linear subvarieties (possibly different connected components)
+                    #This step is not completed yet. We will apply monodromy group to the elements in the `representatives` later.
+        return ans
 
     def codimension_one_vertical_degenerations(self, level=None, degeneration_helper=None):
         r"""
@@ -640,7 +663,8 @@ class IrreducibleRealLinearSubvariety:
 
         EXAMPLES::
 
-            sage: from veerer import VeeringTriangulation
+            sage: from veerer import *
+
             sage: vt = VeeringTriangulation("(0,1,2)(~1,3,4)(~3,5,6)(~6,~2,~5)(~4,7,8)(~8,~0,~7)", "RBBBRRBBR")
             sage: L = vt.linear_subvariety()
             sage: L # optional - surface_dynamics
@@ -657,10 +681,12 @@ class IrreducibleRealLinearSubvariety:
             Irreducible real linear subvariety of projective dimension 2 in [[H_1(0)], [H_1(2, -2)]] [Irreducible real linear subvariety of projective dimension 1 in [[H_1(0)], [H_0(0^2, -2)], [H_0(2, -2^2)]]]
             Irreducible real linear subvariety of projective dimension 2 in [[H_1(0^2)], [H_0(2, -2^2)]] [Irreducible real linear subvariety of projective dimension 1 in [[H_1(0)], [H_0(0^2, -2)], [H_0(2, -2^2)]]]
             sage: for L2 in deg_second: # optional - surface_dynamics
-            ....:     assert not list(L2.codimension_one_vertical_degenerations())
+            ....:     assert not list(L2.codimension_one_vertical_degenerations())            
         """
         if level is None:
             return [degeneration for level in self.levels() for degeneration in self.codimension_one_vertical_degenerations(level, degeneration_helper)]
+
+        mvt = self._mvt
 
         level = self._check_level(level)
 
@@ -670,14 +696,36 @@ class IrreducibleRealLinearSubvariety:
         ds_graphs = self._levels[level]
         ans = []
         for ds_graph_num, ds_graph in enumerate(ds_graphs):
-            for (ds_up, ds_low) in degeneration_helper.codimension_one_vertical_degenerations(ds_graph):
+            list_subvarieties = degeneration_helper.codimension_one_vertical_degenerations(ds_graph)
+            ind = degeneration_helper.find(ds_graph)
+            l = degeneration_helper._vertical_degenerations[ind]
+            for index, (ds_up, ds_low) in enumerate(list_subvarieties):
+                #vt = mvt._veering_triangulations[level][ds_graph_num]
+                #assert vt.is_prime()
+                #assert vt == ds_graph.root() #vt is expected to be the root of the Delaunay-Strebel graph
+                l_vt_edge = l[list(l.keys())[index]]#the list of (vt, edges_up, edges_low) such that vt degenerates to prime components in list_com_yp and list_comp_low respectively.
+
+                # build the new linear subvarieties (with no nodes information)
                 new_level_up = (ds_graphs[:ds_graph_num] + ds_up + ds_graphs[ds_graph_num+1:],)
                 new_level_low = (ds_low,)
                 new_levels = self._levels[:level] + new_level_up + new_level_low + self._levels[level + 1:]
-                new_subvariety = IrreducibleRealLinearSubvariety(new_levels)
-                assert new_subvariety.num_levels() == self.num_levels() + 1, (new_subvariety.num_levels(), self.num_levels())
-                assert new_subvariety.projective_dimension() == self.projective_dimension() - 1
-                ans.append(new_subvariety)
+                
+                # buld the new representatives
+                # transport along the paths to the target Delaunay-Strebel graphs
+                target_vertices = [ds_graph.vertex_index(a[0]) for a in l_vt_edge]
+                paths = tree_with_target(ds_graph, root=0, target_vertices=target_vertices)
+                lmvt = [mvt.transport_along_path(level, ds_graph_num, path) for path in paths]
+                # vertical degenerations
+                for i, oldmvt in enumerate(lmvt):
+                    _, edges_up, edges_low = l_vt_edge[i]
+                    newmvt = oldmvt.degeneration(level, ds_graph_num, edges_low=edges_low, edges_up=edges_up)
+                    newmvt = newmvt.prime_decomposition(level, ds_graph_num)
+                    newmvt = newmvt.prime_decomposition(level + 1, 0)
+                    new_subvariety = IrreducibleRealLinearSubvariety(new_levels, newmvt)
+                    assert new_subvariety.num_levels() == self.num_levels() + 1, (new_subvariety.num_levels(), self.num_levels())
+                    assert new_subvariety.projective_dimension() == self.projective_dimension() - 1
+                    ans.append(new_subvariety)#Different `i` corresponds to the same linear subvarieties (possibly different connected components)
+                    #This step is not completed yet. We will apply monodromy group to the elements in the `representatives` later.
         return ans
 
     def multiscale_compactification(self):
