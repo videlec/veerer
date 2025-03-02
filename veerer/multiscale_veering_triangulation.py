@@ -21,6 +21,7 @@ from .monodromy import *
 
 
 # TODO: Store the data of horizontal and vertical nodes in terms of LabeleddDiGraph
+# TODO: Add the method ambient stratum
 
 def str_to_label(h):
     r"""
@@ -285,8 +286,6 @@ class NodalLabelledDiGraph(LabelledDiGraph):
         r"""
         Return the subgraph induced on vertices with level above ``level``.
         """
-        nv = self.num_verts()
-        ne = self.num_edges()
         vertices = []
         for l in range(level):
             vertices.extend(self.vertices(l))
@@ -361,6 +360,8 @@ class MultiscaleVeeringTriangulation:
         sage: vt1.residue_constraints()
         [1 0]
         [0 1]
+        sage: mvt1.ambient_stratum()
+        H_3(4)
     """
 
     def __init__(self, veering_triangulations=None, horizontal_nodes=None, prong_matchings=None, mutable=False, check=True):
@@ -386,16 +387,13 @@ class MultiscaleVeeringTriangulation:
         if isinstance(horizontal_nodes, list):
             if len(horizontal_nodes) != len(self._veering_triangulations):
                 raise ValueError("Miss information for horizontal nodes at some levels")
-            self._horizontal_nodes = []
             data_horiz_nodes =[] # data for building nodal digraph
             for level in range(len(horizontal_nodes)):
-                self._horizontal_nodes.append([])
                 nodes = horizontal_nodes[level]
                 vts = self._veering_triangulations[level]
                 if len(nodes) != len(vts):
                     raise ValueError(f"Miss information for horizontal nodes at some components at level-{level}")
                 for c in range(len(vts)):
-                    self._horizontal_nodes[level].append([])
                     nodes_at_c = []
                     vt = vts[c]
                     if isinstance(nodes[c], list):
@@ -428,18 +426,14 @@ class MultiscaleVeeringTriangulation:
                         (cc1, h1), (cc2, h2) = sorted([(cc1, h1), (cc2, h2)], key=lambda x: x[1])
                         if check:
                             self._check_horizontal_node(level, c, (h1, h2))
-                        self._horizontal_nodes[level][c].append((h1, h2))
                         data_horiz_nodes.append((level, c, cc1, h1, cc2, h2)) # data for building nodal digraph
-                    self._horizontal_nodes[level][c] = sorted(self._horizontal_nodes[level][c])
                     data_horiz_nodes = sorted(data_horiz_nodes, key=lambda x: (x[0], x[1], x[3], x[5])) # data for building nodal digraph
         elif horizontal_nodes is None:
-            self._horizontal_nodes = [[[] for _ in range(len(vts))] for vts in self._veering_triangulations]
             data_horiz_nodes = []
         else:
             raise TypeError("The 'horizontal_nodes' must be a list; got {}".format(type(horizontal_nodes)))
 
         if isinstance(prong_matchings, list):
-            self._prong_matchings = []
             data_vert_nodes = [] # data for building nodal digraph
             for pm in prong_matchings:
                 prong1, prong2 = pm
@@ -475,21 +469,18 @@ class MultiscaleVeeringTriangulation:
                 pm = ((l1, c1, h1, a1), (l2, c2, h2, a2))
                 if check:
                     self._check_local_prong_matching(pm)
-                self._prong_matchings.append(pm)
                 
                 cc1 = in_connected_component(vt1,h1) # data for building nodal digraph
                 cc2 = in_connected_component(vt2,h2) # data for building nodal digraph
                 data_vert_nodes.append(((l1, c1, cc1, h1, a1), (l2, c2, cc2, h2, a2))) # data for building nodal digraph
             
-            self._prong_matchings.sort()
             data_vert_nodes = sorted(data_vert_nodes, key=lambda x: x[0][:2] + x[0][3:5] + x[1][:2] + x[1][3:5]) # data for building nodal digraph
         elif prong_matchings is None:
-            self._prong_matchings = []
             data_vert_nodes = []
         else:
             raise ValueError("The 'prong_matchings' must be a list.")
 
-        self._nodal_digraph = NodalLabelledDiGraph(num_connected_components, data_horiz_nodes,data_vert_nodes) # build the nodal digraph
+        self._nodal_digraph = NodalLabelledDiGraph(num_connected_components, data_horiz_nodes,data_vert_nodes) # build the nodal digraph. Note that the order of the loops in the digraph are inverted?
 
         self._mutable = True
         if not mutable:
@@ -497,6 +488,33 @@ class MultiscaleVeeringTriangulation:
 
         if check:
             self._check()
+    
+    def _horizontal_nodes(self):
+        g = self._nodal_digraph
+        N = self.num_levels()
+        
+        l = [[[] for _ in range(len(self._veering_triangulations[level]))] for level in range(N)]
+        
+        for e, label in enumerate(g._edge_labels):
+            if len(label) == 2:
+                level, c, _ = g.vertex_label(g.edge_source(e))
+                l[level][c].append(label)
+        
+        for level in range(N):
+            for c in range(len(l[level])):
+                l[level][c].sort()
+        return l
+    
+    def _prong_matchings(self):
+        g = self._nodal_digraph
+        l = []
+        for e, label in enumerate(g._edge_labels):
+            if len(label) == 4:
+                h1, ang1, h2, ang2 = label
+                level1, c1, _ = g.vertex_label(g.edge_source(e))
+                level2, c2, _ = g.vertex_label(g.edge_target(e))
+                l.append(((level1, c1, h1, ang1), (level2, c2, h2, ang2)))
+        return sorted(l)
 
     def _check(self):
         self._check_horizontal_residue_conditions()
@@ -537,7 +555,7 @@ class MultiscaleVeeringTriangulation:
                     raise ValueError(f"The boundary edges in the face of {h1} and the face of {h2} have different colors")
 
     def _check_horizontal_residue_conditions(self):
-        for level, nodes in enumerate(self._horizontal_nodes):
+        for level, nodes in enumerate(self._horizontal_nodes()):
             for c, nodes_at_c in enumerate(nodes):
                 for h1, h2 in nodes_at_c:
                     vt = self._veering_triangulations[level][c]
@@ -628,7 +646,7 @@ class MultiscaleVeeringTriangulation:
                 raise ValueError(f"The angle label of {prong2} is out of the valid range [0, {num_p}].")
 
     def _check_prong_matching(self):
-        pms = self._prong_matchings
+        pms = self._prong_matchings()
         l1 = []
         l2 = []
         for pm in pms:
@@ -719,8 +737,8 @@ class MultiscaleVeeringTriangulation:
 
     def __str__(self):
         vt_strings = ",\n    ".join("[" + ", ".join(str(vt) for vt in l) + "]" for l in self._veering_triangulations)
-        horizontal_nodes_str = "[" + ", ".join(str(hn) for hn in self._horizontal_nodes) + "]"
-        prong_matching_str = "[" + ", ".join(str(pm) for pm in self._prong_matchings) + "]"
+        horizontal_nodes_str = "[" + ", ".join(str(hn) for hn in self._horizontal_nodes()) + "]"
+        prong_matching_str = "[" + ", ".join(str(pm) for pm in self._prong_matchings()) + "]"
         return (
             f"MultiscaleVeeringTriangulation(\n"
             f"  veering_triangulations=[\n    {vt_strings}\n  ],\n"
@@ -752,13 +770,13 @@ class MultiscaleVeeringTriangulation:
         if self._veering_triangulations != mvt._veering_triangulations:
             return NotImplemented
 
-        h_nodes0 = self._horizontal_nodes
-        h_nodes1 = mvt._horizontal_nodes
+        h_nodes0 = self._horizontal_nodes()
+        h_nodes1 = mvt._horizontal_nodes()
         if h_nodes0 != h_nodes1:
             return h_nodes0 < h_nodes1
 
-        pms0 = self._prong_matchings
-        pms1 = mvt._prong_matchings
+        pms0 = self._prong_matchings()
+        pms1 = mvt._prong_matchings()
         if pms0 != pms1:
             return pms0 < pms1
 
@@ -767,12 +785,12 @@ class MultiscaleVeeringTriangulation:
     def __eq__(self, other):
         if type(self) != type(other):
             raise TypeError
-        return (self._veering_triangulations == other._veering_triangulations) and (self._horizontal_nodes == other._horizontal_nodes) and (self._prong_matchings == other._prong_matchings)
+        return (self._veering_triangulations == other._veering_triangulations) and (self._horizontal_nodes() == other._horizontal_nodes()) and (self._prong_matchings() == other._prong_matchings)
 
     def __ne__(self, other):
         if type(self) != type(other):
             raise TypeError
-        return self._veering_triangulations != other._veering_triangulations and self._horizontal_nodes != other._horizontal_nodes and self._prong_matchings != other._prong_matchings
+        return self._veering_triangulations != other._veering_triangulations and self._horizontal_nodes() != other._horizontal_nodes() and self._prong_matchings() != other._prong_matchings
 
     def copy(self, mutable=None):
         if mutable is None:
@@ -783,8 +801,6 @@ class MultiscaleVeeringTriangulation:
 
         ans = MultiscaleVeeringTriangulation.__new__(MultiscaleVeeringTriangulation)
         ans._veering_triangulations = [[vt.copy(mutable) for vt in vts] for vts in self._veering_triangulations]
-        ans._horizontal_nodes = [[nodes[:] for nodes in hnodes] for hnodes in self._horizontal_nodes]
-        ans._prong_matchings = self._prong_matchings[:]
         # TODO: the labelled digraph is immutable...
         ans._nodal_digraph = self._nodal_digraph
         ans._mutable = mutable
@@ -820,8 +836,8 @@ class MultiscaleVeeringTriangulation:
         if self._mutable:
             raise ValueError("mutable veering triangulation are not hashable")
         veering_triangulations_hashable = tuple(tuple(vts) for vts in self._veering_triangulations)
-        horizontal_nodes_hashable = tuple(tuple(tuple(comp) for comp in level) for level in self._horizontal_nodes)
-        prong_matching_hashable = hash(tuple(self._prong_matchings))
+        horizontal_nodes_hashable = tuple(tuple(tuple(comp) for comp in level) for level in self._horizontal_nodes())
+        prong_matching_hashable = hash(tuple(self._prong_matchings()))
         return hash((veering_triangulations_hashable, horizontal_nodes_hashable, prong_matching_hashable))
 
     def num_levels(self):
@@ -857,19 +873,19 @@ class MultiscaleVeeringTriangulation:
         n = len(self._veering_triangulations[level])
         p = perm_init(p, n)
         perm_on_list(self._veering_triangulations[level], p, n)
-        perm_on_list(self._horizontal_nodes[level], p, n)
+        perm_on_list(self._horizontal_nodes()[level], p, n)
 
         # permute prong matchings
-        for i, (pm0, pm1) in enumerate(self._prong_matchings):
+        for i, (pm0, pm1) in enumerate(self._prong_matchings()):
             level0, comp0, h0, a0 = pm0
             level1, comp1, h1, a1 = pm1
             if level0 == level:
                 pm0 = (level0, p[comp0], h0, a0)
-                self._prong_matchings[i] = (pm0, pm1)
+                self._prong_matchings()[i] = (pm0, pm1)
             elif level1 == level:
                 pm1 = (level1, p[comp1], h1, a1)
-                self._prong_matchings[i] = (pm0, pm1)
-        self._prong_matchings.sort()
+                self._prong_matchings()[i] = (pm0, pm1)
+        self._prong_matchings().sort()
 
         # TODO: this is not super clean
         self._nodal_digraph.vertex_relabelling({(l, c, cc): (l, p[c], cc) for (l, c, cc) in self._nodal_digraph._vertices if l == level})
@@ -1051,6 +1067,66 @@ class MultiscaleVeeringTriangulation:
 
         return (True, oris) if certificate else True
 
+    def is_in_node(self, level, component, halfedge, vertex=None, face=None):
+        g = self._nodal_digraph
+        vt = self._veering_triangulations[level][component]
+        for e, label in enumerate(g._edge_labels):
+            if vertex:
+                if len(label) == 4:
+                    h1 = label[0]
+                    lvl, c, _ = g.vertex_label(g.edge_source(e))
+                    if ((lvl, c) == (level, component)) and (halfedge in perm_orbit(vt._vp, h1)):
+                        return True
+            elif face:
+                if len(label) == 2:
+                    h1, h2 = label
+                    lvl, c, _ = g.vertex_label(g.edge_source(e))
+                    if ((lvl, c) == (level, component)) and ((halfedge in perm_orbit(vt._fp, h1)) or (halfedge in perm_orbit(vt._fp, h2))):
+                        return True
+                elif len(label) == 4:
+                    h2 = label[2]
+                    lvl, c, _ = g.vertex_label(g.edge_target(e))
+                    if ((lvl, c) == (level, component)) and (halfedge in perm_orbit(vt._fp, h2)):
+                        return True
+        return False
+    
+    def ambient_stratum(self):
+        r"""
+        Return the ambient stratum of the multi-scale veering triangulation.
+
+        EXAMPLES::
+
+            sage: from veerer import *
+            
+            sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,~5)", "RRBBRR", [(1, 0, -1, -1, 0, -1), (0, 1, 1, 1, 0, 1), (0, 0, 0, 0, 1, 1)])],[VeeringTriangulationLinearFamily("(0:1)(~0:3)(1:1)(~1:3)", "RR", [(1, 1)])]], horizontal_nodes=[[[]], [[(0, 2)]]], prong_matchings=[((0, 0, 0, 0), (1, 0, 1, 0)), ((0, 0, 1, 0), (1, 0, 3, 0))])
+            sage: mvt.ambient_stratum()
+            H_2(1^2)
+        """
+        g = self._nodal_digraph
+        
+        if not g._digraph.is_connected():
+            return NotImplemented
+        
+        N = self.num_levels()
+        angles = []
+        for level in range(self.num_levels()):
+            for c, vt in enumerate(self._veering_triangulations[level]):
+                angs, reps = vt.angles(half_edge_representatives=True)
+                for i, ang in enumerate(angs):
+                    h = reps[i]
+                    if ((ang > 0) and (not self.is_in_node(level, c, h, vertex=True))) or ((ang <= 0) and (not self.is_in_node(level, c, h, face=True))):
+                        angles.append(ang)
+        
+        from .features import surface_dynamics_feature
+        surface_dynamics_feature.require()
+
+        from surface_dynamics.flat_surfaces.strata import Stratum
+
+        if any(a % 2 for a in angles) or not self.is_abelian():
+            return Stratum([(a - 2) for a in angles], 2)
+        else:
+            return Stratum([(a - 2) // 2 for a in angles], 1)
+
     def degeneration(self, level, component, edges_low=None, edges_up=None):
         r"""
         Return the multi-scale veering triangulation by blowing-up the given subset of edges.
@@ -1107,10 +1183,10 @@ class MultiscaleVeeringTriangulation:
         # build the horizontal nodes.
         l1 = [] #new horizontal nodes at (level, component)
         l2 = [] #new horizontal nodes at (level - 1, 0) if the degeneration has two levels
-        l_horiz = copy.deepcopy(self._horizontal_nodes)
+        l_horiz = copy.deepcopy(self._horizontal_nodes())
 
         # existing horizontal nodes
-        for h1, h2 in self._horizontal_nodes[level][component]:
+        for h1, h2 in self._horizontal_nodes()[level][component]:
             if r_up[h1] >= 0:
                 h1 = r_up[h1]
                 h2 = r_up[h2]
@@ -1159,7 +1235,7 @@ class MultiscaleVeeringTriangulation:
         #build the vertical nodes
         l_pm = []
         #existing vertical nodes
-        original_pm = copy.deepcopy(self._prong_matchings)
+        original_pm = copy.deepcopy(self._prong_matchings())
         for prong1, prong2 in original_pm:
             if prong1[0] == level and prong1[1] == component:
                 prong1 = track_prong(vt, r_up, r_low, prong1, vertex=True)
@@ -1285,7 +1361,7 @@ class MultiscaleVeeringTriangulation:
 
         #new horizontal nodes
         l1 = [] #new horizontal nodes at (level, component)
-        l_horiz = copy.deepcopy(self._horizontal_nodes)
+        l_horiz = copy.deepcopy(self._horizontal_nodes())
         for h1, h2 in l_horiz[level][component]:
             h1 = mono.infinite_cylinder_transport(path, h1)
             h2 = mono.infinite_cylinder_transport(path, h2)
@@ -1294,7 +1370,7 @@ class MultiscaleVeeringTriangulation:
         
         #new vertical nodes
         l2 = []
-        l_vert = copy.deepcopy(self._prong_matchings)
+        l_vert = copy.deepcopy(self._prong_matchings())
         for pm in l_vert:
             p1, p2 = pm
             level1, c1, h1, ang1 = p1
@@ -1378,7 +1454,7 @@ class MultiscaleVeeringTriangulation:
 
         #new horizontal nodes
         l1 = [[] for i in range(len(l))]
-        l_horiz = copy.deepcopy(self._horizontal_nodes)
+        l_horiz = copy.deepcopy(self._horizontal_nodes())
         for h1, h2 in l_horiz[level][component]:
             cp1, h1 = label_in_prime_comp(h1, l_comp, l_mapping)
             cp2, h2 = label_in_prime_comp(h2, l_comp, l_mapping)
@@ -1388,7 +1464,7 @@ class MultiscaleVeeringTriangulation:
 
         #new vertical nodes
         l2 = []
-        l_vert = copy.deepcopy(self._prong_matchings)
+        l_vert = copy.deepcopy(self._prong_matchings())
         for pm in l_vert:
             p1, p2 = pm
             level1, c1, h1, ang1 = p1
@@ -1471,7 +1547,7 @@ class MultiscaleVeeringTriangulation:
 
             #new vertical nodes
             l2 = []
-            l_vert = copy.deepcopy(self._prong_matchings)
+            l_vert = copy.deepcopy(self._prong_matchings())
             for pm in l_vert:
                 p1, p2 = pm
                 level1, c1, h1, ang1 = p1
@@ -1555,7 +1631,7 @@ class MultiscaleVeeringTriangulation:
             new_vts = copy.deepcopy(self._veering_triangulations)
 
             #new horizontal nodes
-            orig_horiz_nodes = copy.deepcopy(self._horizontal_nodes)
+            orig_horiz_nodes = copy.deepcopy(self._horizontal_nodes())
             new_horiz_nodes = [None] * N
             for i in range(N):
                 level_horiz = orig_horiz_nodes[i]
@@ -1566,7 +1642,7 @@ class MultiscaleVeeringTriangulation:
                     new_horiz_nodes[i][g[j]] = level_horiz[j]
 
             #new prong-matchings
-            orig_pms = copy.deepcopy(self._prong_matchings)
+            orig_pms = copy.deepcopy(self._prong_matchings())
             new_pms = []
             for p1, p2 in orig_pms:
                 l1, c1, h1, ang1 = p1
