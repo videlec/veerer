@@ -33,6 +33,7 @@ from .multiscale_veering_triangulation import MultiscaleVeeringTriangulation
 from .strebel_graph import StrebelGraph
 from .delaunay_strebel_graph import DelaunayStrebelGraph
 from .polyhedron.linear_algebra import is_rank_one
+from .permutation import perm_check
 
 from sage.structure.richcmp import op_LT, op_LE, op_EQ, op_NE, op_GT, op_GE, rich_to_bool
 from sage.misc.cachefunc import cached_method
@@ -390,7 +391,7 @@ class IrreducibleRealLinearSubvariety:
         Irreducible real linear subvariety of projective dimension 1 in [[H_0(0, -1^2)], [H_1(0)]]
         sage: L.codimension_one_horizontal_degenerations()  # optional - surface_dynamics
         [Irreducible real linear subvariety of projective dimension 0 in [[H_0(0, -1^2)], [H_0(0, -1^2)]]]
-        sage: L.codimension_one_vertical_degenerations()
+        sage: L.codimension_one_vertical_degenerations()  # optional - surface_dynamics
         []
 
         sage: vt = VeeringTriangulationLinearFamily("(0:2,1:2)(~0:2,~1:2)", "RR", [(1, 1)])
@@ -495,13 +496,184 @@ class IrreducibleRealLinearSubvariety:
                     if vt != stgraph.root():
                         raise error
 
+    # TODO: vertical nodes might not be properly noramlized. Namely when
+    # we apply a permutation the quadruple (h0, a0, h1, a1) has no reason
+    # to be in canonical form
+    # TODO: currently the code just be the orbit of nodal di-graphs under
+    # the three actions (monodromy, level-wise, component-wise). We need
+    # to select the "minimal" one with respect to a reasonable ordering
     def _normalize_multiscale_structure(self):
-        # TODO: compute the list of all mvts in the linear subvariety and pick the one we
-        # prefer. To compute the list, we need to apply
-        # * monodromy on each prime component
-        # * permute isomorphic connected components inside a prime component
-        # * permute isomorphic prime component at the same level
-        pass
+        r"""
+        Normalize the nodal structure by applying
+        """
+        DEBUG = False
+
+        if self._mvt is None:
+            return
+
+        from array import array
+        from collections import defaultdict
+
+        monodromy_gens = [] # monodromy on each prime component as triple (level, component, group_element)
+        level_perm_gens = []  # level-wise permutations as pairs (level, permutation)
+        prime_component_perm_gens = []  # prime-component relabelling as triples (level, component, permutation)
+
+        for level, ds_graphs in enumerate(self._levels):
+            by_prime_comp = defaultdict(list)
+            for component, ds_graph in enumerate(ds_graphs):
+                monodromy_gens.extend((level, component, gen) for gen in ds_graph.framing_group().gens())
+                by_prime_comp[ds_graph].append(component)
+
+            for ds_graph, components in by_prime_comp.items():
+                if len(components) >= 2:
+                    a = array('i', range(len(ds_graphs)))
+                    a[components[0]] = components[1]
+                    a[components[1]] = components[0]
+                    # TODO: remove check
+                    perm_check(a)
+                    level_perm_gens.append((level, a))
+                if len(components) >= 3:
+                    a = array('i', range(len(ds_graphs)))
+                    for i in range(len(components)):
+                        a[components[i]] = components[(i + 1) % len(ds_graphs)]
+                    # TODO: remove check
+                    perm_check(a)
+                    level_perm_gens.append((level, a))
+
+                by_conn_comp = defaultdict(list)
+                for (atom, cc) in ds_graph.root().connected_components_subgraphs():
+                    by_conn_comp[cc].append(atom)
+
+                root = ds_graph.root()
+                component = components[0]
+                for atoms in by_conn_comp.values():
+                    # permutation inside a prime component
+                    if len(atoms) >= 2:
+                        a = array('i', range(2 * root.num_edges()))
+                        for i, j in zip(atoms[0], atoms[1]):
+                            a[i] = j
+                            a[j] = i
+                        # TODO: remove check
+                        perm_check(a)
+                        prime_component_perm_gens.append((level, component, a))
+                    if len(atoms) >= 3:
+                        a = array('i', 2 * root.num_edges())
+                        for i in range(len(atoms)):
+                            for j in range(len(atoms[0])):
+                                a[atoms[i][j]] = atoms[(i + 1) % len(atoms)][j]
+                        # TODO: remove check
+                        perm_check(a)
+                        prime_component_perm_gens.append((level, component, a))
+
+        # * isomorphic connected components inside a prime component
+        if DEBUG:
+            print(f'[_normalize_multiscale_structure]: {len(monodromy_gens)} monodromy generators')
+            print(f'[_normalize_multiscale_structure]: {len(level_perm_gens)} level-wise permutation')
+            print(f'[_normalize_multiscale_structure]: {len(prime_component_perm_gens)} component-wise permutation')
+
+        # We operate directly on a modified version of the nodal_graph
+        mvt = self._mvt
+        NG = self._mvt._nodal_digraph
+        G = DiGraph(NG.num_verts(), loops=True, multiedges=True)
+        for e in range(NG.num_edges()):
+            G.add_edge(NG._edge_sources[e], NG._edge_targets[e], NG._edges[e])
+        if DEBUG:
+            print(f'[_normalize_multiscale_structure]: G.edges()={G.edges()}')
+        G = G.copy(immutable=True)
+        todo = [G]
+        orbit = set([G])
+        while todo:
+            G = todo.pop()
+
+            # monodromy
+            for (level, component, g) in monodromy_gens:
+                H = G.copy(immutable=False)
+                v = NG._vertex_index[level, component]
+                vt = mvt._veering_triangulations[level][component]
+                ds_graph = self._levels[level][component]
+                g_vseps, g_fseps, g_cyls, g_fhedges = vt.framing_group_element_permutation(g, ds_graph.framing(0))
+                for (_, v1, label) in G.outgoing_edges(v):
+                    if v == v1:
+                        # horizontal edge
+                        h0, h1 = label
+                        hh0 = g_cyls[h0]
+                        hh1 = g_cyls[h1]
+                        if hh0 > hh1:
+                            hh0, hh1 = hh1, hh0
+                        H.delete_edge(v, v1, label)
+                        H.add_edge(v, v1, (hh0, hh1))
+                    else:
+                        # vertical edge
+                        (h0, a0, h1, a1) = label
+                        hh0, aa0 = g_vseps[h0, a0]
+                        H.delete_edge(v, v1, label)
+                        H.add_edge(v, v1, (hh0, aa0, h1, a1))
+
+                for (v0, _, label) in G.incoming_edges(v):
+                    if v == v0:
+                        # horizontal edge (already treated in previous loop)
+                        continue
+                    else:
+                        (h0, a0, h1, a1) = label
+                        hh1, aa1 = g_fseps[h1, a1]
+                        H.delete_edge(v0, v, label)
+                        H.add_edge(v0, v, (h0, a0, hh1, aa1))
+
+                H = H.copy(immutable=True)
+                if H not in orbit:
+                    orbit.add(H)
+                    todo.add(H)
+
+            # level-wise permutation
+            for (level, p) in level_perm_gens:
+                H = G.copy(immutable=False)
+                relabelling = {i: i for i in G.vertices()}
+                for comp in range(len(self._levels[level])):
+                    relabelling[NG._vertex_index[level, comp]] = NG._vertex_index[level, p[comp]]
+                H.relabel(relabelling)
+                H = H.copy(immutable=True)
+                if H not in orbit:
+                    orbit.add(H)
+                    todo.add(H)
+
+            # component-wise permutation
+            for (level, component, p) in prime_component_perm_gens:
+                H = G.copy(immutable=False)
+                v = NG._vertex_index[level, component]
+                for (_, v1, label) in G.outgoing_edges(v):
+                    if v == v1:
+                        # horizontal edge
+                        h0, h1 = label
+                        hh0 = p[h0]
+                        hh1 = p[h1]
+                        if hh0 > hh1:
+                            hh0, hh1 = hh1, hh0
+                        H.delete_edge(v, v1, label)
+                        H.add_edge(v, v1, (hh0, hh1))
+                    else:
+                        # vertical edge
+                        (h0, a0, h1, a1) = label
+                        hh0 = p[h0]
+                        H.delete_edge(v, v1, label)
+                        H.add_edge(v, v1, (hh0, a0, h1, a1))
+
+                for (v0, _, label) in G.incoming_edges(v):
+                    if v0 == v:
+                        # horizontal edge (already treated in previous loop)
+                        continue
+                    else:
+                        (h0, a0, h1, a1) = label
+                        hh1 = p[h1]
+                        H.delete_edge(v0, v, label)
+                        H.add_edge(v0, v, (h0, a0, hh1, a1))
+
+                H = H.copy(immutable=True)
+                if H not in orbit:
+                    orbit.add(H)
+                    todo.append(H)
+
+        if DEBUG:
+            print(f"[_normalize_multiscale_structure]: len(orbit)={len(orbit)}")
 
     def __eq__(self, other):
         if type(self) is not type(other):
