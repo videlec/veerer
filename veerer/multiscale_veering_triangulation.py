@@ -740,8 +740,8 @@ class MultiscaleVeeringTriangulation:
 
     def __str__(self):
         vt_strings = ",\n    ".join("[" + ", ".join(str(vt) for vt in l) + "]" for l in self._veering_triangulations)
-        horizontal_nodes_str = "[" + ", ".join(str(hn) for hn in self._horizontal_nodes()) + "]"
-        prong_matching_str = "[" + ", ".join(str(pm) for pm in self._prong_matchings()) + "]"
+        horizontal_nodes_str = "[" + ", ".join(str(hn) for hn in self._horizontal_nodes(sort=True)) + "]"
+        prong_matching_str = "[" + ", ".join(str(pm) for pm in self._prong_matchings(sort=True)) + "]"
         return (
             f"MultiscaleVeeringTriangulation(\n"
             f"  veering_triangulations=[\n    {vt_strings}\n  ],\n"
