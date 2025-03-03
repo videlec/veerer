@@ -1483,6 +1483,53 @@ class MultiscaleVeeringTriangulation:
 
         return MultiscaleVeeringTriangulation(vts,l_horiz,l_vert)
 
+    def set_canonical_labels(self, level, comp):
+        r"""
+        Return the multi-scale veering triangulation with the veering triangulation at ``(level, comp)`` set the canonical label.
+        
+        EXAMPLES::
+            sage: from veerer import *
+            
+            sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RBB", [(1, 0, -1), (0, 1, 1)]), VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RBR", [(1, 0, 1), (0, 1, -1)])],[VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])]],horizontal_nodes=[[[], []], [[]]],prong_matchings=[((0, 0, 0, 0), (1, 0, 0, 0)), ((0, 1, 4, 0), (1, 0, 4, 0))])
+            sage: mvt.set_canonical_labels(0, 1)
+            MultiscaleVeeringTriangulation(
+            veering_triangulations=[
+                [VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RBB", [(1, 0, -1), (0, 1, 1)]), VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)])],
+                [VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])]
+            ],
+            horizontal_nodes=[[[], []], [[]]],
+            prong_matchings=[((0, 0, 0, 0), (1, 0, 0, 0)), ((0, 1, 0, 0), (1, 0, 4, 0))]
+            )
+        """
+        level = self._check_level(level)
+        vts = self._veering_triangulations
+        
+        vt = vts[level][comp]
+        vt = vt.copy(mutable=True)
+        mapping = vt.set_canonical_labels(mapping=True)
+        vt.set_immutable()
+        
+        vts[level][comp] = vt
+        
+        horiz_nodes = self._horizontal_nodes()
+        new = []
+        for (h1, h2) in horiz_nodes[level][comp]:
+            h1 = mapping[h1]
+            h2 = mapping[h2]
+            new.append((h1, h2))
+        horiz_nodes[level][comp] = new
+        
+        pms = self._prong_matchings()
+        for index, pm in enumerate(pms):
+            ((l1, c1, h1, ang1), (l2, c2, h2, ang2)) = pm
+            if (l1, c1) == (level, comp):
+                h1 = mapping[h1]
+            if (l2, c2) == (level, comp):
+                h2 = mapping[h2]
+            pms[index] = ((l1, c1, h1, ang1), (l2, c2, h2, ang2))
+
+        return MultiscaleVeeringTriangulation(vts, horiz_nodes, pms)
+
     def prime_decomposition(self, level, component):
         r"""
         Return a prime decomposition of a component at ``(level, component)`` of multi-scale veering triangulation.
@@ -1517,45 +1564,33 @@ class MultiscaleVeeringTriangulation:
         level = self._check_level(level)
         vts = copy.deepcopy(self._veering_triangulations)
         vt = vts[level][component]
-
-        l = copy.deepcopy(vt.prime_decomposition())
+        l = vt.prime_decomposition()
 
         #store the prime component and mapping to the canonical labels
         l_comp = []
-        l_vts_canonical = []
-        l_mapping = []
-
-        for prime in l:
-            l_comp.append(prime[0])
-
-            vt_prime = copy.deepcopy(prime[1])
-            vt_prime._mutable = True
-            mapping = vt_prime.set_canonical_labels(mapping=True)
-            vt_prime.set_immutable()
-
-            l_vts_canonical.append(vt_prime)
-            l_mapping.append(mapping)
+        l_vts = []
+        for edges, vt_prime in l:
+            l_comp.append(edges)
+            l_vts.append(vt_prime)
 
         #build veering triangulations
-        vts[level][component : component + 1] = l_vts_canonical
+        vts[level][component : component + 1] = l_vts
 
-        def label_in_prime_comp(h, l_comp, l_mapping):
-            for edges in l_comp:
+        def label_in_prime_comp(h, l_comp):
+            for c, edges in enumerate(l_comp):
                 if h // 2 in edges:
-                    c = l_comp.index(edges)
-                    mapping = l_mapping[c]
                     i = edges.index(h // 2)
                     if h%2 == 0:
-                        return (c, mapping[2 * i])
+                        return (c, 2 * i)
                     else:
-                        return (c, mapping[2 * i + 1])
+                        return (c, 2 * i + 1)
 
         #new horizontal nodes
         l1 = [[] for i in range(len(l))]
         l_horiz = self._horizontal_nodes()
         for h1, h2 in l_horiz[level][component]:
-            cp1, h1 = label_in_prime_comp(h1, l_comp, l_mapping)
-            cp2, h2 = label_in_prime_comp(h2, l_comp, l_mapping)
+            cp1, h1 = label_in_prime_comp(h1, l_comp)
+            cp2, h2 = label_in_prime_comp(h2, l_comp)
             assert cp1 == cp2
             l1[cp1].append((h1,h2))
         l_horiz[level][component:component + 1] = l1
@@ -1568,19 +1603,22 @@ class MultiscaleVeeringTriangulation:
             level1, c1, h1, ang1 = p1
             level2, c2, h2, ang2 = p2
             if (level1, c1) == (level, component):
-                cp1, h1 = label_in_prime_comp(h1, l_comp, l_mapping)
+                cp1, h1 = label_in_prime_comp(h1, l_comp)
                 p1 = (level, cp1 + component, h1, ang1)
             if (level2, c2) == (level, component):
-                cp2, h2 = label_in_prime_comp(h2, l_comp, l_mapping)
+                cp2, h2 = label_in_prime_comp(h2, l_comp)
                 p2 = (level, cp2 + component, h2, ang2)
             if level1 == level and c1 > component:
-                p1 = (level, c1 + len(l_vts_canonical) - 1, h1, ang1)
+                p1 = (level, c1 + len(l_vts) - 1, h1, ang1)
             if level2 == level and c2 > component:
-                p2 = (level, c2 + len(l_vts_canonical) - 1, h2, ang2)
+                p2 = (level, c2 + len(l_vts) - 1, h2, ang2)
             l2.append([p1,p2])
         l_vert = l2
-
-        return MultiscaleVeeringTriangulation(vts,l_horiz,l_vert)
+        
+        mvt = MultiscaleVeeringTriangulation(vts,l_horiz,l_vert)
+        for i in range(len(l)):
+            mvt = mvt.set_canonical_labels(level, component + i)
+        return mvt
 
     def transport_by_monodromy(self, lc, ld):
         r"""
