@@ -47,7 +47,7 @@ class LabelledDiGraph:
         sage: G.incoming_edges(3)
         [4, 44, -8, -7]
     """
-    __slots__ = ['_digraph', '_vertices', '_vertex_index', '_edge_sources', '_edge_targets', '_edges', '_mutable']
+    __slots__ = ['_digraph', '_vertices', '_vertex_index', '_edges', '_edge_sources', '_edge_targets']
 
     def __init__(self, digraph, root=None, sort=False, mutable=False):
         if isinstance(digraph, LabelledDiGraph):
@@ -82,6 +82,75 @@ class LabelledDiGraph:
                 self._digraph.add_edge(i, j, k)
         else:
             raise TypeError("invalid input")
+
+    def copy(self):
+        ans = self.__class__.__new__(self.__class__)
+        ans._digraph = self._digraph.copy()
+        ans._vertices = self._vertices[:]
+        ans._vertex_index = self._vertex_index.copy()
+        ans._edge_sources = self._edge_sources[:]
+        ans._edge_targets = self._edge_targets[:]
+        ans._edges = self._edges[:]
+        return ans
+
+    def __eq__(self, other):
+        if not isinstance(other, LabelledDiGraph):
+            return False
+        return self._vertices == other._vertices and self._edges == other._edges and self._digraph == other._digraph
+
+    def __ne__(self, other):
+        return not (self == other)
+
+    def is_subgraph(self, other):
+        r"""
+        Test whether this graph is a subgraph of ``other``.
+
+        EXAMPLES::
+
+            sage: from veerer.labelled_digraph import LabelledDiGraph
+            sage: G0 = LabelledDiGraph(DiGraph([('a', 'b', 0), ('b', 'a', 1), ('c', 'a', 2)]), root='a')
+            sage: G1 = LabelledDiGraph(DiGraph([('b', 'a', 1), ('c', 'a', 2), ('a', 'b', 0)]), root='b')
+            sage: G2 = LabelledDiGraph(DiGraph([('b', 'a', 1), ('c', 'a', 2), ('a', 'b', 0), ('c, b', 3)]), root='b')
+            sage: G3 = LabelledDiGraph(DiGraph([('b', 'a', 0), ('c', 'a', 2)]), root='b')
+
+            sage: G0.is_subgraph(G1)
+            True
+            sage: G1.is_subgraph(G0)
+            True
+            sage: G0.is_subgraph(G2)
+            True
+            sage: G2.is_subgraph(G0)
+            False
+            sage: G0.is_subgraph(G3)
+            False
+            sage: G3.is_subgraph(G0)
+            False
+        """
+        if not isinstance(other, LabelledDiGraph):
+            raise TypeError
+        if len(self._vertices) > len(other._vertices) or len(self._edges) > len(other._edges):
+            return False
+        for u0, v0, label0 in zip(self._edge_sources, self._edge_targets, self._edges):
+            u1 = other._vertex_index.get(self._vertices[u0])
+            if u1 is None:
+                return False
+            v1 = other._vertex_index.get(self._vertices[v0])
+            if v1 is None:
+                return False
+
+            if not other._digraph.has_edge(u1, v1):
+                return False
+
+            if other._digraph.allows_multiple_edges():
+                if not any(label0 == other._edges[k] for k in other._digraph.edge_label(u1, v1)):
+                    return False
+            else:
+                if label0 != other._edges[other._digraph.edge_label(u1, v1)]:
+                    return False
+        return True
+
+    def is_equivalent(self, other):
+        return self.is_subgraph(other) and other.is_subgraph(self)
 
     def __repr__(self):
         return "LabelledDiGraph on {} vert{} and {} edge{}".format(self.num_verts(), "ex" if self.num_verts() <= 1 else "ices",

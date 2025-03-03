@@ -197,6 +197,11 @@ class NodalLabelledDiGraph(LabelledDiGraph):
 
         super().__init__(digraph)
 
+    def copy(self):
+        ans = LabelledDiGraph.copy(self)
+        ans._prime_decomposition = self._prime_decomposition[:]
+        return ans
+
     def __repr__(self):
         return "Multiscale veering triangulation nodal graph with prime decomposition {}, {} horizontal and {} vertical nodes".format(self._prime_decomposition, sum(self.vertex_level(self.edge_source(e)) == self.vertex_level(self.edge_target(e)) for e in range(self.num_edges())), sum(self.vertex_level(self.edge_source(e)) != self.vertex_level(self.edge_target(e)) for e in range(self.num_edges())))
 
@@ -484,6 +489,31 @@ class MultiscaleVeeringTriangulation:
         return l
 
     def _check(self):
+        NG = self._nodal_digraph
+        for e in range(NG.num_edges()):
+            u = NG._edge_sources[e]
+            v = NG._edge_targets[e]
+            if u == v:
+                # horizontal edge
+                level, comp = NG._vertices[u]
+                (h0, h1) = NG._edges[e]
+                if h0 != self._veering_triangulations[level][comp]._check_infinite_cylinder(h0):
+                    raise ValueError(f"non-normalized half-edge h0={h0} in horizontal node")
+                if h1 != self._veering_triangulations[level][comp]._check_infinite_cylinder(h1):
+                    raise ValueError(f"non-normalized half-edge h1={h1} in horizontal node")
+            else:
+                # vertical edge
+                level0, comp0 = NG._vertices[u]
+                level1, comp1 = NG._vertices[v]
+                if level0 >= level1:
+                    raise ValueError("invalid vertical node orientation in the nodal di-graph")
+                (h0, a0, h1, a1) = NG._edges[e]
+                if (h0, a0) != self._veering_triangulations[level0][comp0]._check_vertex_separatrix(h0, a0):
+                    raise ValueError(f"non-normalized vertex separatrix (h0, a0)=({h0}, {a0}) in vertical node")
+                if ((h1, a1) != self._veering_triangulations[level1][comp1]._check_face_separatrix(h1, a1) or
+                    (h1, a1) != self._veering_triangulations[level1][comp1]._normalize_face_separatrix(h1, a1)):
+                    raise ValueError(f"non-normalized face separatrix (h1, a1)=({h1}, {a1}) in vertical node")
+
         self._check_horizontal_residue_conditions()
         self._check_prong_matching()
         self._check_global_residue_conditions()
@@ -853,8 +883,8 @@ class MultiscaleVeeringTriangulation:
 
         ans = MultiscaleVeeringTriangulation.__new__(MultiscaleVeeringTriangulation)
         ans._veering_triangulations = [[vt.copy(mutable) for vt in vts] for vts in self._veering_triangulations]
-        # TODO: the labelled digraph is immutable...
-        ans._nodal_digraph = self._nodal_digraph
+        # TODO: the labelled digraph is always mutable...
+        ans._nodal_digraph = self._nodal_digraph.copy()
         ans._mutable = mutable
 
         return ans
@@ -1361,8 +1391,13 @@ class MultiscaleVeeringTriangulation:
             sage: from veerer import *
 
             sage: vt = VeeringTriangulationLinearFamily("(~0,2,3)(~1,4,5)(~2,6,7)(~3,~5,8)(~4,9,10)(~6,11,12)(~7,13,14)(~8,~12,15)(~9,16,~15)(~11,17,18)(~14,~18,19)(~16,~17,20)(0:1)(1:1)(~10:1)(~13:1)(~19:1)(~20:1)", "BBRRRBBBRBBRRBRBRRBBB", [(1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), (0, 0, 1, 1, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, -1, -1, -1, 0, 0, 1, 1), (0, 0, 0, 0, 1, 1, 0, 0, -1, 0, -1, 0, 0, -1, 1, 1, 1, 0, 0, -1, -1), (0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, -1, -1), (0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, -1, 0, -1, 0, 0, 1, 1), (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, -1, -1, -1), (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1)])
-            sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[vt], horizontal_nodes=[[[(0, 2), (21, 27), (39, 41)]]], prong_matchings=[])
-            sage: l = mvt.codimension_one_vertical_degenerations()
+            sage: L = vt.linear_subvariety()
+            sage: l = list(L.codimension_one_vertical_degenerations())
+
+            sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)])], [VeeringTriangulationLinearFamily("(0:1,1:1,~0:1,~1:1)", "RB", [(1, 0), (0, 1)])]], horizontal_nodes=[[[]], [[]]], prong_matchings=[((0, 0, 0, 0), (1, 0, 3, 0))]
+            sage: L = mvt.linear_subvariety()
+            sage: l0 = list(L.codimension_one_vertical_degenerations(0))
+            sage: l1 = list(L.codimension_one_vertical_degenerations(1))
         """
         if level is None:
             for level in range(self.num_levels()):
@@ -1406,6 +1441,13 @@ class MultiscaleVeeringTriangulation:
             sage: mvt.replace_veering_triangulation(0, 0, VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,~5)", "RRBBRB", [(1, 0, -1, -1, 0, -1), (0, 1, 1, 1, 0, 1), (0, 0, 0, 0, 1, 1)]))
             sage: mvt.ambient_stratum()
             H_2(1^2)
+
+            sage: vt0 = VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)])
+            sage: vt1 = VeeringTriangulationLinearFamily("(0:1,1:1,~0:1,~1:1)", "RB", [(1, 0), (0, 1)])
+            sage: mvt = MultiscaleVeeringTriangulation([vt0, vt1], horizontal_nodes=[[[]], [[]]], prong_matchings=[((0, 0, 0, 0), (1, 0, 2, 0))], mutable=True)
+            sage: vt = VeeringTriangulationLinearFamily("(0:1,1:2,~0:1,~1:2)", "RR", [(1, 0), (0, 1)])
+            sage: mvt.replace_veering_triangulation(1, 0, vt, framing=([(3, 0)], [(3, 0)], [], []), original_framing=([(0, 0)], [(0, 0)], [], []))
+            sage: mvt._check()
         """
         if not self._mutable:
             raise ValueError
