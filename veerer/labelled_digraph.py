@@ -148,6 +148,12 @@ class LabelledDiGraph:
             return self._edge_targets[i]
         else:
             return self._edge_sources[~i]
+    
+    def adjacent_edges(self, vertex):
+        r"""
+        Return the list of the edges adjacent to the vertex.
+        """
+        return [e for e in range(self.num_edges()) if self.edge_source(e) == vertex or self.edge_target(e) == vertex]
 
     def outgoing_edges(self, i, reverse=True):
         r"""
