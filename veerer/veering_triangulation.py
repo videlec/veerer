@@ -235,6 +235,12 @@ class VeeringTriangulation(Triangulation):
             raise ValueError(f"angle (={angle}) out of range for separatrix at half_edge={half_edge}; must be >= 0 and <= {num_seps}")
         return self._normalize_face_separatrix(half_edge, angle)
 
+    def _check_infinite_cylinder(self, half_edge):
+        half_edge = self._check_half_edge(half_edge)
+        if self._bdry[half_edge] == 0 or self.face_angle(half_edge) != 0:
+            raise ValueError("not a cylinder half-edge")
+        return min(perm_orbit(self._fp, half_edge))
+
     def _check(self, error=RuntimeError):
         """
         EXAMPLES::
@@ -912,6 +918,13 @@ class VeeringTriangulation(Triangulation):
             ans.append((atom, VeeringTriangulationLinearFamily(graph, subspace, mutable=mutable, check=check)))
         return ans
 
+    def connected_components_subgraphs(self, mutable=False, check=True):
+        ans = []
+        for atom in self.constellation().connected_components():
+            graph = self.constellation().subgraph(atom)
+            ans.append((atom, VeeringTriangulation(graph, mutable=mutable, check=check)))
+        return ans
+
     def half_edge_num_separatrices(self, h, slope=VERTICAL, check=True):
         h = self._check_half_edge(h)
         col0 = self._colouring[h // 2]
@@ -1554,7 +1567,7 @@ class VeeringTriangulation(Triangulation):
             (H_1(2, -2), H_1(2, -2))
         """
         if not self.is_connected():
-            return tuple(component.stratum() for component in self.connected_components_subgraphs())
+            return tuple(component.stratum() for atom, component in self.connected_components_subgraphs())
 
         from .features import surface_dynamics_feature
         surface_dynamics_feature.require()
