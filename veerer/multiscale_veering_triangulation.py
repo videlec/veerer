@@ -154,8 +154,7 @@ class NodalLabelledDiGraph(LabelledDiGraph):
     r"""
     Graph encoding the level structure of a multiscale veering triangulation.
 
-    The vertices are triple of integers ``(level, prime_component_number,
-    connected_component_number)`` that are in bijection with the connected
+    The vertices are pairs of integers ``(level, prime_component_number)`` that are in bijection with the connected
     components of the multiscale veering triangulations. The edges represent
     the nodes and could either be between two components in the same
     level (horizontal nodes) or from a component in some level to some
@@ -163,82 +162,68 @@ class NodalLabelledDiGraph(LabelledDiGraph):
 
     EXAMPLES::
 
-        sage: from veerer.multiscale_veering_triangulation import NodalLabelledDiGraph
-        sage: N = NodalLabelledDiGraph([[2], [3], [1, 1]], [(0, 0, 1, 7, 0, 8), (1, 0, 0, 3, 1, 5), (1, 0, 2, 2, 0, 4)],
-        ....:                      [((0, 0, 1, 3, 3), (2, 1, 0, 2, 2)),
-        ....:                       ((1, 0, 0, 5, 2), (2, 0, 0, 3, 7)),
-        ....:                       ((0, 0, 0, 2, 6), (2, 0, 0, 3, 2))])
+        sage: from veerer.multiscale_veering_triangulation import NodalLabelledDiGraph    
+    
+        sage: N = NodalLabelledDiGraph([1, 1, 2], [(0, 0, 7, 8), (1, 0, 3, 5), (1, 0, 2, 4)],
+        ....:                      [((0, 0, 3, 3), (2, 1, 2, 2)),
+        ....:                       ((1, 0, 5, 2), (2, 0, 3, 7)),
+        ....:                       ((0, 0, 2, 6), (2, 0, 3, 2))])
         sage: N
-        Multiscale veering triangulation nodal graph with prime-connected decomposition ((2,), (3,), (1, 1)), 3 horizontal and 3 vertical nodes
-
+        Multiscale veering triangulation nodal graph with prime decomposition (1, 1, 2), 3 horizontal and 3 vertical nodes
+        
         sage: list(N.vertices(0))  # vertices at level 0
-        [0, 1]
+        [0]
         sage: list(N.vertices(1))  # vertices at level -1
-        [2, 3, 4]
+        [1]
         sage: list(N.vertices(2))  # vertices at level -2
-        [5, 6]
+        [2, 3]
 
         sage: list(N.vertices(2, 0))  # vertices in the first prime component at level -2
-        [5]
+        [2]
         sage: list(N.vertices(2, 1))  # vertices in the second prime component at level -2
-        [6]
-
-        sage: N.subgraph_above_level(0).edges()
-        []
-        sage: N.subgraph_above_level(1).edges()
-        [(1, 0, 1)]
-        sage: N.subgraph_above_level(2).edges()
-        [(1, 0, 1), (2, 3, 3), (4, 2, 5)]
-        sage: N.subgraph_above_level(3).edges()
-        [(0, 5, 0), (1, 0, 1), (1, 6, 2), (2, 3, 3), (2, 5, 4), (4, 2, 5)]
+        [3]
     """
-    def __init__(self, prime_connected_decomposition, horizontal_nodes, vertical_nodes):
+    def __init__(self, prime_decomposition, horizontal_nodes, vertical_nodes):
         r"""
         INPUT:
 
-        - ``prime_connected_decomposition`` -- a list of lists of integers. The i-th list
-          ``prime_connected_decomposition[i]`` encodes the i-th level of the level graph
-          and its length is the number of prime components in this level.  The
-          integer at position ``prime_connected_decomposition[i][j]`` is the
-          number of connected components, the j-th prime component is made of.
+        - ``prime_decomposition`` -- a list of integers. The i-th list
+          ``prime_decomposition[i]`` encodes the i-th level of the level graph
+          and the number of prime components in this level.  The
+          integer at position ``prime_connected_decomposition[i]`` is the
+          number of prime components in the i-th level.
 
-        - ``horizontal_nodes`` -- a list of horizontal node data ``(l, pc, cc1, h1, cc2, h2)``
+        - ``horizontal_nodes`` -- a list of horizontal node data ``(l, pc, h1, h2)``
 
-        - ``vertical_nodes`` -- a list of vertical node data ``((l1, pc1, cc1, h1, a1), (l2, pc2, cc2, h2, a2))``
+        - ``vertical_nodes`` -- a list of vertical node data ``((l1, pc1, h1, a1), (l2, pc2, h2, a2))``
         """
-        self._prime_connected_decomposition = tuple(map(tuple, prime_connected_decomposition))
+        self._prime_decomposition = tuple(prime_decomposition)
 
         digraph = DiGraph(loops=True, multiedges=True)
-        digraph.add_vertices([(l, pc, cc)
-                              for l, prime_component_decompositions in enumerate(prime_connected_decomposition)
-                              for pc, num_ccs in enumerate(prime_component_decompositions)
-                              for cc in range(num_ccs)])
+        digraph.add_vertices([(l, pc)
+                              for l, num_pc in enumerate(prime_decomposition)
+                              for pc in range(num_pc)])
 
         # Add horizontal edges
-        for l, pc, cc1, h1, cc2, h2 in horizontal_nodes:
-            v1 = (l, pc, cc1)
-            v2 = (l, pc, cc2)
-            if not (0 <= l < len(prime_connected_decomposition) and
-                    0 <= pc < len(prime_connected_decomposition[l]) and
-                    0 <= cc1 < prime_connected_decomposition[l][pc] and
-                    0 <= cc2 < prime_connected_decomposition[l][pc]):
-                raise ValueError(f"invalid horizontal node between ({l}, {pc}, {cc1}) and ({l}, {pc}, {cc2})")
+        for l, pc, h1, h2 in horizontal_nodes:
+            v = (l, pc)
+            if not (0 <= l < len(prime_decomposition) and
+                    0 <= pc < prime_decomposition[l]):
+                raise ValueError(f"invalid horizontal node between ({l}, {pc}) and ({l}, {pc})")
             if h2 <= h1:
                 raise ValueError(f"invalid normalization of half-edges for horizontal node; got h1={h1} and h2={h2}")
-            digraph.add_edge(v1, v2, (h1, h2))
+            digraph.add_edge(v, v, (h1, h2))
 
         # Add vertical edges
         for p1, p2 in vertical_nodes:
-            l1, pc1, cc1, h1, ang1 = p1
-            l2, pc2, cc2, h2, ang2 = p2
-            if not (0 <= l1 < l2 < len(prime_connected_decomposition) and
-                    0 <= pc1 < len(prime_connected_decomposition[l1]) and
-                    0 <= pc2 < len(prime_connected_decomposition[l2]) and
-                    0 <= cc1 < prime_connected_decomposition[l1][pc1] and
-                    0 <= cc2 < prime_connected_decomposition[l2][pc2]):
+            l1, pc1, h1, ang1 = p1
+            l2, pc2, h2, ang2 = p2
+            if not (0 <= l1 < l2 < len(prime_decomposition) and
+                    0 <= pc1 < prime_decomposition[l1] and
+                    0 <= pc2 < prime_decomposition[l2]):
                 raise ValueError(f"invalid vertical node between (l={l1}, pc={pc1}, cc={cc1}) and (l={l2}, pc={pc2}, cc={cc2})")
-            v1 = (l1, pc1, cc1)
-            v2 = (l2, pc2, cc2)
+            v1 = (l1, pc1)
+            v2 = (l2, pc2)
             digraph.add_edge(v1, v2, (h1, ang1, h2, ang2))
 
         # TODO: Should we allow disconnected level graphs?
@@ -248,14 +233,7 @@ class NodalLabelledDiGraph(LabelledDiGraph):
         super().__init__(digraph)
 
     def __repr__(self):
-        return "Multiscale veering triangulation nodal graph with prime-connected decomposition {}, {} horizontal and {} vertical nodes".format(self._prime_connected_decomposition, sum(self.vertex_level(self.edge_source(e)) == self.vertex_level(self.edge_target(e)) for e in range(self.num_edges())), sum(self.vertex_level(self.edge_source(e)) != self.vertex_level(self.edge_target(e)) for e in range(self.num_edges())))
-
-    # TODO: maybe this could move to LabelledDiGraph?
-    def adjacent_edges(self, vertex):
-        r"""
-        Return the list of the edges adjacent to the vertex.
-        """
-        return [e for e in range(self.num_edges()) if self.edge_source(e) == vertex or self.edge_target(e) == vertex]
+        return "Multiscale veering triangulation nodal graph with prime decomposition {}, {} horizontal and {} vertical nodes".format(self._prime_decomposition, sum(self.vertex_level(self.edge_source(e)) == self.vertex_level(self.edge_target(e)) for e in range(self.num_edges())), sum(self.vertex_level(self.edge_source(e)) != self.vertex_level(self.edge_target(e)) for e in range(self.num_edges())))
 
     def vertex_level(self, vertex):
         return self._vertices[vertex][0]
@@ -265,7 +243,7 @@ class NodalLabelledDiGraph(LabelledDiGraph):
         Iterate through vertices.
 
         If a ``level`` is provided, only return the vertices in a given level. If both
-        ``level`` and ``prime_component`` are provided, the only iterate through vertices
+        ``level`` and ``prime_component`` are provided, return the vertex
         corresponding to a given prime component.
         """
         if level is None:
@@ -273,31 +251,58 @@ class NodalLabelledDiGraph(LabelledDiGraph):
                 raise ValueError("invalid input")
             return range(self.num_verts())
         elif prime_component is None:
-            for prime_component, num_ccs in enumerate(self._prime_connected_decomposition[level]):
-                for connected_component in range(self._prime_connected_decomposition[level][prime_component]):
-                    yield self._vertex_index[(level, prime_component, connected_component)]
+            for prime_component in range(self._prime_decomposition[level]):
+                yield self._vertex_index[(level, prime_component)]
         else:
-            for connected_component in range(self._prime_connected_decomposition[level][prime_component]):
-                yield self._vertex_index[(level, prime_component, connected_component)]
+            yield self._vertex_index[(level, prime_component)]
+
+    def level_graph(self, mvt):
+            r"""
+            Return the unerlying level graph of the multi-scale veering triangulation as a labelled digraph.
+            """
+            vts = mvt._veering_triangulations
+            digraph = DiGraph(loops=True, multiedges=True)
+            digraph.add_vertices([(l, pc, cc)
+                                for l, pc in self._vertices
+                                for cc in range(len(vts[l][pc].connected_components()))])
+            for e, label in enumerate(self._edges):
+                l1, pc1 = self._vertices[self.edge_source(e)]
+                l2, pc2 = self._vertices[self.edge_target(e)]
+                if len(label) == 2:
+                    assert (l1, pc1) == (l2, pc2)
+                    vt = vts[l1][pc1]
+                    h1, h2 = label
+                    cc1 = in_connected_component(vt,h1)
+                    cc2= in_connected_component(vt, h2)
+                elif len(label) == 4:
+                    h1, _, h2, _ = label
+                    vt1 = vts[l1][pc1]
+                    vt2 = vts[l2][pc2]
+                    cc1 = in_connected_component(vt1,h1)
+                    cc2 = in_connected_component(vt2,h2)
+                v1 = (l1, pc1, cc1)
+                v2 = (l2, pc2, cc2)
+                digraph.add_edge(v1, v2, label)
+            return LabelledDiGraph(digraph)
 
     # TODO: do we really need to compute edges here? In other words, is it
     # fine to just return self._digraph.subgraph(vertices=vertices)?
-    def subgraph_above_level(self, level):
+    def subgraph_above_level(self, mvt, level):
         r"""
-        Return the subgraph induced on vertices with level above ``level``.
+        Return the subgraph of the level graph of ``mvt`` induced on vertices with level above ``level``.
         """
-        vertices = []
-        for l in range(level):
-            vertices.extend(self.vertices(l))
-        return self._digraph.subgraph(vertices=vertices)
+        d = self.level_graph(mvt)
+        vertices = [i for i, v in enumerate(d._vertices) if v[0] < level]
+        return d._digraph.subgraph(vertices=vertices)
 
-    def vertical_edges_for_GRC(self, level):
-        dg = self.subgraph_above_level(level)
-        components = dg.connected_components(sort=False)
+    def vertical_edges_for_GRC(self, mvt, level):
+        d = self.level_graph(mvt)
+        subd = self.subgraph_above_level(mvt, level)
+        components = subd.connected_components(sort=False)
         edges = []
         ne = self.num_edges()
         for comp in components:
-            l = [e for e in range(ne) if (self.edge_source(e) in comp) and (self.vertex_level(self.edge_target(e)) == level)] 
+            l = [e for e in range(ne) if (d.edge_source(e) in comp) and (d._vertices[d.edge_target(e)][0] == level)] 
             edges.append(l)
         return edges
 
@@ -367,18 +372,17 @@ class MultiscaleVeeringTriangulation:
     def __init__(self, veering_triangulations=None, horizontal_nodes=None, prong_matchings=None, mutable=False, check=True):
         if isinstance(veering_triangulations, list):
             self._veering_triangulations = []
-            num_connected_components = [] # data for building nodal digraph
+            prime_decomposition = [] # data for building nodal digraph
             for level, vts in enumerate(veering_triangulations):
-                num_connected_components.append([])
                 if isinstance(vts, VeeringTriangulation):
                     self._veering_triangulations.append([vts])
-                    num_connected_components[-1].append(len(vts.connected_components()))
+                    prime_decomposition.append(1)
                 elif isinstance(vts, list):
-                    for comp, vt in enumerate(vts):
+                    for vt in vts:
                         if not isinstance(vt, VeeringTriangulation):
                             raise TypeError(f"'vt' (value: {vt}) is not an instance of the VeeringTriangulation.")
-                        num_connected_components[-1].append(len(vt.connected_components()))
                     self._veering_triangulations.append(list(vts))
+                    prime_decomposition.append(len(vts))
                 else:
                     raise ValueError(f"The input of veering triangulations {vts} at level-{level} is bad.")
         else:
@@ -420,14 +424,12 @@ class MultiscaleVeeringTriangulation:
                     for node in nodes_at_c:
                         h1, h2 = node
                         h1 = min(perm_orbit(fp, h1))
-                        cc1 = in_connected_component(vt,h1) # data for building nodal digraph
                         h2 = min(perm_orbit(fp, h2))
-                        cc2= in_connected_component(vt, h2) # data for building nodal digraph
-                        (cc1, h1), (cc2, h2) = sorted([(cc1, h1), (cc2, h2)], key=lambda x: x[1])
+                        h1, h2 = sorted([h1, h2])
                         if check:
                             self._check_horizontal_node(level, c, (h1, h2))
-                        data_horiz_nodes.append((level, c, cc1, h1, cc2, h2)) # data for building nodal digraph
-                    data_horiz_nodes = sorted(data_horiz_nodes, key=lambda x: (x[0], x[1], x[3], x[5])) # data for building nodal digraph
+                        data_horiz_nodes.append((level, c, h1, h2))
+                    data_horiz_nodes = sorted(data_horiz_nodes)
         elif horizontal_nodes is None:
             data_horiz_nodes = []
         else:
@@ -470,17 +472,14 @@ class MultiscaleVeeringTriangulation:
                 if check:
                     self._check_local_prong_matching(pm)
                 
-                cc1 = in_connected_component(vt1,h1) # data for building nodal digraph
-                cc2 = in_connected_component(vt2,h2) # data for building nodal digraph
-                data_vert_nodes.append(((l1, c1, cc1, h1, a1), (l2, c2, cc2, h2, a2))) # data for building nodal digraph
-            
-            data_vert_nodes = sorted(data_vert_nodes, key=lambda x: x[0][:2] + x[0][3:5] + x[1][:2] + x[1][3:5]) # data for building nodal digraph
+                data_vert_nodes.append(pm)
+            data_vert_nodes = sorted(data_vert_nodes)
         elif prong_matchings is None:
             data_vert_nodes = []
         else:
             raise ValueError("The 'prong_matchings' must be a list.")
 
-        self._nodal_digraph = NodalLabelledDiGraph(num_connected_components, data_horiz_nodes,data_vert_nodes) # build the nodal digraph. Note that the order of the loops in the digraph are inverted?
+        self._nodal_digraph = NodalLabelledDiGraph(prime_decomposition, data_horiz_nodes,data_vert_nodes) # build the nodal digraph. Note that the order of the loops in the digraph are inverted?
 
         self._mutable = True
         if not mutable:
@@ -497,7 +496,7 @@ class MultiscaleVeeringTriangulation:
         
         for e, label in enumerate(g._edges):
             if len(label) == 2:
-                level, c, _ = g.vertex_label(g.edge_source(e))
+                level, c = g.vertex_label(g.edge_source(e))
                 l[level][c].append(label)
         
         for level in range(N):
@@ -511,8 +510,8 @@ class MultiscaleVeeringTriangulation:
         for e, label in enumerate(g._edges):
             if len(label) == 4:
                 h1, ang1, h2, ang2 = label
-                level1, c1, _ = g.vertex_label(g.edge_source(e))
-                level2, c2, _ = g.vertex_label(g.edge_target(e))
+                level1, c1 = g.vertex_label(g.edge_source(e))
+                level2, c2 = g.vertex_label(g.edge_target(e))
                 l.append(((level1, c1, h1, ang1), (level2, c2, h2, ang2)))
         return sorted(l)
 
@@ -672,13 +671,17 @@ class MultiscaleVeeringTriangulation:
         vertex_labels = g._vertices
         edge_labels = g._edges
 
+        abelian, global_oris = self.is_abelian(certificate=True)
+        if not abelian:
+            return NotImplementedError
+
         for level in range(1, N):
-            components = g.subgraph_above_level(level).connected_components(sort=False)
-            l = g.vertical_edges_for_GRC(level)
+            components = g.subgraph_above_level(self, level).connected_components(sort=False)
+            l = g.vertical_edges_for_GRC(self, level)
             for i, comp in enumerate(components):
                 skip = False
                 for v in comp:
-                    lvl, c, _ = vertex_labels[v]
+                    lvl, c = vertex_labels[v]
                     if not self.without_prescribed_poles(lvl, c):
                         skip = True
                         break
@@ -698,9 +701,6 @@ class MultiscaleVeeringTriangulation:
 
                 vt = self._veering_triangulations[level][c]
                 is_abelian, oris_vt = vt.is_abelian(certificate=True)
-                if not is_abelian:
-                    continue
-                
                 
                 base_ring = vt.base_ring()
                 orig_constraints_matrix = vt.constraints_matrix()
@@ -713,7 +713,6 @@ class MultiscaleVeeringTriangulation:
                 nf = len(bdry)
                 r1 = vt.residue_matrix()
                 
-                _, global_oris = self.is_abelian(certificate=True)
                 global_oris_vt = global_oris[level][c]
                 ne = vt._ne
                 modify_oris = matrix.identity(ne)
@@ -905,7 +904,7 @@ class MultiscaleVeeringTriangulation:
         perm_on_list(self._veering_triangulations[level], p, n)
 
         # TODO: this is not super clean
-        self._nodal_digraph.vertex_relabelling({(l, c, cc): (l, p[c], cc) for (l, c, cc) in self._nodal_digraph._vertices if l == level})
+        self._nodal_digraph.vertex_relabelling({(l, c): (l, p[c]) for (l, c) in self._nodal_digraph._vertices if l == level})
 
         self._check()
 
@@ -943,10 +942,8 @@ class MultiscaleVeeringTriangulation:
         edge_labels = g._edges
         vt = self._veering_triangulations[level][comp]
         
-        edges = set()
-        for c in range(len(vt.connected_components())):
-            v = vertex_labels.index((level, comp, c)) 
-            edges.update(g.adjacent_edges(v))    
+        v = vertex_labels.index((level, comp))
+        edges = set(g.adjacent_edges(v))    
         
         for f in vt.boundary_faces():
             skip = False
@@ -1009,7 +1006,7 @@ class MultiscaleVeeringTriangulation:
                 cur_oris.append(orient)
             oris.append(cur_oris)
 
-        g = self._nodal_digraph
+        g = self._nodal_digraph.level_graph(self)
         vertex_labels = g._vertices
         edge_labels = g._edges
         vertices = set(range(len(vertex_labels)))
@@ -1091,18 +1088,18 @@ class MultiscaleVeeringTriangulation:
             if vertex:
                 if len(label) == 4:
                     h1 = label[0]
-                    lvl, c, _ = g.vertex_label(g.edge_source(e))
+                    lvl, c = g.vertex_label(g.edge_source(e))
                     if ((lvl, c) == (level, component)) and (halfedge in perm_orbit(vt._vp, h1)):
                         return True
             elif face:
                 if len(label) == 2:
                     h1, h2 = label
-                    lvl, c, _ = g.vertex_label(g.edge_source(e))
+                    lvl, c = g.vertex_label(g.edge_source(e))
                     if ((lvl, c) == (level, component)) and ((halfedge in perm_orbit(vt._fp, h1)) or (halfedge in perm_orbit(vt._fp, h2))):
                         return True
                 elif len(label) == 4:
                     h2 = label[2]
-                    lvl, c, _ = g.vertex_label(g.edge_target(e))
+                    lvl, c = g.vertex_label(g.edge_target(e))
                     if ((lvl, c) == (level, component)) and (halfedge in perm_orbit(vt._fp, h2)):
                         return True
         return False
