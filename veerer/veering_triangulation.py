@@ -6117,6 +6117,9 @@ class VeeringTriangulation(Triangulation):
 
     def framing_separatrices(self, framing=None):
         """
+        Return a list of separatrices that gives a converse mapping to
+        :meth:`framing_indices`.
+
         EXAMPLES::
 
             sage: from veerer import VeeringTriangulation
@@ -6153,23 +6156,37 @@ class VeeringTriangulation(Triangulation):
 
         return seps
 
-    # TODO: make a proper doctest
     def framing_indices(self, framing=None):
         r"""
-        Return a 6-tuple ``(vseps_indices, vseps_angles, fseps_indices, fseps_angles, cseps_indices, fhedges_indices)``
-        of dictionaries mapping vertex separatrices, face separatrices, infinite cylinders and folded half edges
-        to their indices and angles.
+        Return a 6-tuple ``(vseps_indices, vseps_angles, fseps_indices,
+        fseps_angles, cseps_indices, fhedges_indices)`` of dictionaries mapping
+        vertex separatrices, face separatrices, infinite cylinders and folded
+        half edges to their indices or angles.
+
+        Each vertex separatrix and each face separatrix is encoded by a pair
+        ``(h, a)`` while each infinite cylinders and each folded edges by a
+        single half-edge ``h``. A framing allows to map vertex separatrices and
+        face separatrices to pairs of integers and infinite separatrices and
+        folded edges to integers.
 
         INPUT:
 
-        - ``framing`` -- (optional) a framing. If not specified, then uses the one obtained with
-          :meth:`framing`.
+        - ``framing`` -- (optional) a framing. If not specified, then uses the
+          one obtained with :meth:`framing`.
 
         EXAMPLES::
 
             sage: from veerer import VeeringTriangulation
             sage: vt = VeeringTriangulation("(0:1)(~0:1,1:1,2:1,~1:1)(~2:1)", "RBR")
-            sage: _ = vt.framing_indices()
+            sage: vt.framing_indices() == ({(0, 0): 0, (1, 0): 0, (1, 1): 0, (2, 0): 0, (3, 0): 1,
+            ....:                           (5, 0): 1, (4, 0): 1, (4, 1): 1},
+            ....:                          {(0, 0): 0, (1, 0): 1, (1, 1): 2, (2, 0): 3, (3, 0): 0,
+            ....:                           (5, 0): 1, (4, 0): 2, (4, 1): 3},
+            ....:                          {(1, 0): 2, (4, 0): 2},
+            ....:                          {(1, 0): 0, (4, 0): 1},
+            ....:                          {0: 3, 5: 4},
+            ....:                          {})
+            True
         """
         if framing is None:
             framing = self.framing()
@@ -6202,24 +6219,29 @@ class VeeringTriangulation(Triangulation):
 
         return vseps_indices, vseps_angles, fseps_indices, fseps_angles, cseps_indices, fhedges_indices
 
-    # TODO: arguments should rather be (self, framing1, framing0=None, G=None)
     def framing_group_element(self, framing, original_framing=None, ambient_framing_group=None):
         r"""
-        Return the group element in the framing group mapping the separatrices
-        ``(vseps0, fseps0, cseps0, fhedges0)`` onto the separatrices ``(vseps1,
-        fseps1, cseps1, fhedges1)`` in the coordinates of the former.
+        Return the group element mapping the original framing to the given one.
 
         INPUT:
 
-        - ``vseps0``, ``vseps1`` - batches of vertex separatrices
+        - ``framing`` -- a framing, that is a 4-tuple ``(vertex_separatrices,
+          face_separatrices, infinite_cylinders, folded_half_edges)``.
 
-        - ``fseps0``, ``fseps`` - batches of face separatrices
+        - ``original_framing`` -- (optional) base framing. If not provided uses the one obtained
+          from :meth:`framing`.
 
-        - ``cseps0``, ``cseps1`` - batches of infinite cylinder separatrices
+        - ``ambient_framing_group`` - (optional) framing group. If not provided uses the one obtained
+          from :meth:`framing_group`.
 
-        - ``fhedges0``, ``fhedges1`` - batches of folded edges
+        EXAMPLES::
 
-        - ``G`` - (optional) the framing group of ``state``
+            sage: from veerer import *
+            sage: vt = VeeringTriangulation("(0:1)(~0:1,1:1,2:1,~1:1)(~2:1)", "RBR")
+            sage: vt.framing_group_element(([(0, 0), (3, 0)], [(1, 0)], [0, 5], []))
+            ()
+            sage: vt.framing_group_element(([(4, 1), (1, 1)], [(4, 0)], [5, 0], []))
+            (0:3, 1:2)(2:1)(3:0, 4:0)
         """
         if ambient_framing_group is None:
             ambient_framing_group = self.framing_group()

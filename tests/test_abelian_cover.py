@@ -18,7 +18,7 @@
 ######################################################################
 
 import pytest
-from veerer import VeeringTriangulation, RED, BLUE, PURPLE, GREEN
+from veerer import VeeringTriangulation
 
 @pytest.mark.parametrize("fp, cols",
 [

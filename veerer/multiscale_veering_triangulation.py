@@ -1081,29 +1081,10 @@ class MultiscaleVeeringTriangulation:
 
         return (True, oris) if certificate else True
 
-    def is_in_node(self, level, component, halfedge, vertex=None, face=None):
-        g = self._nodal_digraph
-        vt = self._veering_triangulations[level][component]
-        for e, label in enumerate(g._edges):
-            if vertex:
-                if len(label) == 4:
-                    h1 = label[0]
-                    lvl, c = g.vertex_label(g.edge_source(e))
-                    if ((lvl, c) == (level, component)) and (halfedge in perm_orbit(vt._vp, h1)):
-                        return True
-            elif face:
-                if len(label) == 2:
-                    h1, h2 = label
-                    lvl, c = g.vertex_label(g.edge_source(e))
-                    if ((lvl, c) == (level, component)) and ((halfedge in perm_orbit(vt._fp, h1)) or (halfedge in perm_orbit(vt._fp, h2))):
-                        return True
-                elif len(label) == 4:
-                    h2 = label[2]
-                    lvl, c = g.vertex_label(g.edge_target(e))
-                    if ((lvl, c) == (level, component)) and (halfedge in perm_orbit(vt._fp, h2)):
-                        return True
-        return False
-    
+    # TODO: this should be used to check that degeneration does produce mvt in the same
+    # ambient stratum
+    # TODO: maybe we want to changed the name as the ambient stratum could be the generalized
+    # stratum (in the sense of admcycles)
     def ambient_stratum(self):
         r"""
         Return the ambient stratum of the multi-scale veering triangulation.
@@ -1111,35 +1092,60 @@ class MultiscaleVeeringTriangulation:
         EXAMPLES::
 
             sage: from veerer import *
-            
+
             sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,~5)", "RRBBRR", [(1, 0, -1, -1, 0, -1), (0, 1, 1, 1, 0, 1), (0, 0, 0, 0, 1, 1)])],[VeeringTriangulationLinearFamily("(0:1)(~0:3)(1:1)(~1:3)", "RR", [(1, 1)])]], horizontal_nodes=[[[]], [[(0, 2)]]], prong_matchings=[((0, 0, 0, 0), (1, 0, 1, 0)), ((0, 0, 1, 0), (1, 0, 3, 0))])
             sage: mvt.ambient_stratum()
             H_2(1^2)
         """
         g = self._nodal_digraph
-        
+
         if not g._digraph.is_connected():
             return NotImplemented
-        
-        N = self.num_levels()
-        angles = []
-        for level in range(self.num_levels()):
-            for c, vt in enumerate(self._veering_triangulations[level]):
-                angs, reps = vt.angles(half_edge_representatives=True)
-                for i, ang in enumerate(angs):
-                    h = reps[i]
-                    if ((ang > 0) and (not self.is_in_node(level, c, h, vertex=True))) or ((ang <= 0) and (not self.is_in_node(level, c, h, face=True))):
-                        angles.append(ang)
-        
+
+        # build the collection of all angles
+        from collections import defaultdict
+        angles = defaultdict(int)
+        for vts in self._veering_triangulations:
+            for vt in vts:
+                for a in vt.angles():
+                    angles[a] += 1
+
+        is_abelian = all(a % 2 == 0 for a in angles) and self.is_abelian()
+
+        # remove angles attached to nodes
+        for e in range(g.num_edges()):
+            u = g.edge_source(e)
+            v = g.edge_target(e)
+            if u == v:
+                # horizontal node
+                assert angles[0] >= 2
+                angles[0] -= 2
+            else:
+                # vertical node
+                assert g.vertex_level(v) > g.vertex_level(u)
+                (l0, c0) = g.vertex_label(u)
+                (l1, c1) = g.vertex_label(v)
+                (h0, a0, h1, a1) = g.edge_label(e)
+
+                a = self._veering_triangulations[l0][c0].vertex_angle(h0)
+                assert angles[a] >= 1
+                angles[a] -= 1
+
+                a = self._veering_triangulations[l1][c1].face_angle(h1)
+                assert angles[a] >= 1
+                angles[a] -= 1
+
+        angles = [a for a, num in angles.items() for _ in range(num)]
+
         from .features import surface_dynamics_feature
         surface_dynamics_feature.require()
 
         from surface_dynamics.flat_surfaces.strata import Stratum
 
-        if any(a % 2 for a in angles) or not self.is_abelian():
-            return Stratum([(a - 2) for a in angles], 2)
-        else:
+        if is_abelian:
             return Stratum([(a - 2) // 2 for a in angles], 1)
+        else:
+            return Stratum([(a - 2) for a in angles], 2)
 
     def degeneration(self, level, component, edges_low=None, edges_up=None):
         r"""
@@ -1327,6 +1333,84 @@ class MultiscaleVeeringTriangulation:
         for edges in self._veering_triangulations[level][component].vertical_degeneration_low_edges_subsets():
             yield self.degeneration(level, component, edges_low=edges)
 
+    def replace_veering_triangulation(self, level, component, veering_triangulation, framing=None, original_framing=None):
+        r"""
+        Replace the veering triangulation at ``(level, component)`` in this
+        multiscale veering triangulation.
+
+        In order to make sense, the veering triangulation used for replacement
+        must belong to the same stratum.
+
+        INPUT:
+
+        - ``level``, ``component`` -- the indices of the prime component to replace
+
+        - ``veering_triangulation`` -- the veering triangulation used to replace the current one
+
+        - ``framing`` -- an optional framing for ``veering_triangulation``
+
+        - ``original_framing`` -- an optional framing for the current veering triangulation
+
+        EXAMPLES::
+
+            sage: from veerer import *
+            sage: vt0 = VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,~5)", "RRBBRR", [(1, 0, -1, -1, 0, -1), (0, 1, 1, 1, 0, 1), (0, 0, 0, 0, 1, 1)])
+            sage: vt1 = VeeringTriangulationLinearFamily("(0:1)(~0:3)(1:1)(~1:3)", "RR", [(1, 1)])
+            sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[vt0], [vt1]], horizontal_nodes=[[[]], [[(0, 2)]]], prong_matchings=[((0, 0, 0, 0), (1, 0, 1, 0)), ((0, 0, 1, 0), (1, 0, 3, 0))], mutable=True)
+            sage: mvt.ambient_stratum()
+            H_2(1^2)
+            sage: mvt.replace_veering_triangulation(0, 0, VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,~5)", "RRBBRB", [(1, 0, -1, -1, 0, -1), (0, 1, 1, 1, 0, 1), (0, 0, 0, 0, 1, 1)]))
+            sage: mvt.ambient_stratum()
+            H_2(1^2)
+        """
+        if not self._mutable:
+            raise ValueError
+        if original_framing is None:
+            original_framing = self._veering_triangulations[level][component].framing()
+        if framing is None:
+            framing = veering_triangulation.framing()
+
+        # NOTE: original_indices is a 6-tuple
+        original_indices = self._veering_triangulations[level][component].framing_indices(original_framing)
+        vseps_indices, vseps_angles, fseps_indices, fseps_angles, cseps_indices, fhedges_indices = original_indices
+        new_separatrices = veering_triangulation.framing_separatrices(framing)
+
+        # relabel edges in the nodal graph
+        # TODO: we would better not access internals of LabelledDiGraph here
+        D = self._nodal_digraph
+        i = D.vertex_index((level, component))
+        for e in D.outgoing_edges(i, reverse=False):
+            target_level, target_component = D._vertices[D._edge_targets[e]]
+            if level == target_level:
+                # horizontal edge
+                assert component == target_component
+                (h0, h1) = self._nodal_digraph._edges[e]
+                h0_new = new_separatrices[original_indices[4][h0]]
+                h1_new = new_separatrices[original_indices[4][h1]]
+                D._edges[e] = (h0_new, h1_new)
+            else:
+                # vertical edge
+                assert target_level > level
+                (h0, a0, h1, a1) = self._nodal_digraph._edges[e]
+                h0_new, a0_new = new_separatrices[vseps_indices[(h0, a0)]][vseps_angles[(h0, a0)]]
+                D._edges[e] = (h0_new, a0_new, h1, a1)
+
+        for e in D.incoming_edges(i, reverse=False):
+            source_level, source_component = D._vertices[D._edge_source[e]]
+            if level == target_level:
+                # horizontal edge (these are loops and have been treated in the previous loop)
+                assert component == source_component
+                continue
+            else:
+                # vertical edge
+                assert level > source_level
+                (h0, a0, h1, a1) = self._nodal_digraph._edges[e]
+                h1_new, a1_new = new_separatrices[fseps_indices[(h1, a1)]][fseps_angles[(h1, a1)]]
+                D._edges[e] = (h0, a0, h1_new, a1_new)
+
+        self._veering_triangulations[level][component] = veering_triangulation
+
+    # TODO: remove. One should use the simpler replace_veering_triangulation above
     def transport_along_path(self, level, component, path):
         r"""
         Return the multi-scale Veering triangulation obtained by deforming the prime veering triangulation at ``(level, component)`` along the path in the Delaunay-Strebel graph.
