@@ -1108,67 +1108,88 @@ class MultiscaleVeeringTriangulation:
     # ambient stratum
     # TODO: maybe we want to changed the name as the ambient stratum could be the generalized
     # stratum (in the sense of admcycles)
-    def ambient_stratum(self):
+    def ambient_stratum(self, multiscale_structure=False):
         r"""
         Return the ambient stratum of the multi-scale veering triangulation.
+
+        If ``multiscale_structure`` is True, return the stratum for each vertex of the level graph. Otherwise, return the stratum of the veering triangulation by collapsing all the nodes of the multi-scale veering triangulation.  
 
         EXAMPLES::
 
             sage: from veerer import *
 
             sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,~5)", "RRBBRR", [(1, 0, -1, -1, 0, -1), (0, 1, 1, 1, 0, 1), (0, 0, 0, 0, 1, 1)])],[VeeringTriangulationLinearFamily("(0:1)(~0:3)(1:1)(~1:3)", "RR", [(1, 1)])]], horizontal_nodes=[[[]], [[(0, 2)]]], prong_matchings=[((0, 0, 0, 0), (1, 0, 1, 0)), ((0, 0, 1, 0), (1, 0, 3, 0))])
+            
+        When ``multiscale_structure`` is False::
             sage: mvt.ambient_stratum()
             H_2(1^2)
+
+        When ``multiscale_structure`` is True::
+            sage: mvt.ambient_stratum(multiscale_structure=True)
+            [[H_1(0^2)], [(H_0(1, -1, -2), H_0(1, -1, -2))]]
         """
         g = self._nodal_digraph
 
         if not g._digraph.is_connected():
             return NotImplemented
 
-        # build the collection of all angles
-        from collections import defaultdict
-        angles = defaultdict(int)
-        for vts in self._veering_triangulations:
-            for vt in vts:
-                for a in vt.angles():
-                    angles[a] += 1
+        if not multiscale_structure:
+            # build the collection of all angles
+            from collections import defaultdict
+            angles = defaultdict(int)
+            for vts in self._veering_triangulations:
+                for vt in vts:
+                    for a in vt.angles():
+                        angles[a] += 1
 
-        is_abelian = all(a % 2 == 0 for a in angles) and self.is_abelian()
+            is_abelian = all(a % 2 == 0 for a in angles) and self.is_abelian()
 
-        # remove angles attached to nodes
-        for e in range(g.num_edges()):
-            u = g.edge_source(e)
-            v = g.edge_target(e)
-            if u == v:
-                # horizontal node
-                assert angles[0] >= 2
-                angles[0] -= 2
+            # remove angles attached to nodes
+            for e in range(g.num_edges()):
+                u = g.edge_source(e)
+                v = g.edge_target(e)
+                if u == v:
+                    # horizontal node
+                    assert angles[0] >= 2
+                    angles[0] -= 2
+                else:
+                    # vertical node
+                    assert g.vertex_level(v) > g.vertex_level(u)
+                    (l0, c0) = g.vertex_label(u)
+                    (l1, c1) = g.vertex_label(v)
+                    (h0, a0, h1, a1) = g.edge_label(e)
+
+                    a = self._veering_triangulations[l0][c0].vertex_angle(h0)
+                    assert angles[a] >= 1
+                    angles[a] -= 1
+
+                    a = self._veering_triangulations[l1][c1].face_angle(h1)
+                    assert angles[a] >= 1
+                    angles[a] -= 1
+
+            angles = [a for a, num in angles.items() for _ in range(num)]
+
+            from .features import surface_dynamics_feature
+            surface_dynamics_feature.require()
+
+            from surface_dynamics.flat_surfaces.strata import Stratum
+
+            if is_abelian:
+                return Stratum([(a - 2) // 2 for a in angles], 1)
             else:
-                # vertical node
-                assert g.vertex_level(v) > g.vertex_level(u)
-                (l0, c0) = g.vertex_label(u)
-                (l1, c1) = g.vertex_label(v)
-                (h0, a0, h1, a1) = g.edge_label(e)
+                return Stratum([(a - 2) for a in angles], 2)
+        
+        l = []
+        N = self.num_levels()
+        for level in range(N):
+            l.append([])
+            for vt in self._veering_triangulations[level]:
+                from .features import surface_dynamics_feature
+                surface_dynamics_feature.require()
 
-                a = self._veering_triangulations[l0][c0].vertex_angle(h0)
-                assert angles[a] >= 1
-                angles[a] -= 1
-
-                a = self._veering_triangulations[l1][c1].face_angle(h1)
-                assert angles[a] >= 1
-                angles[a] -= 1
-
-        angles = [a for a, num in angles.items() for _ in range(num)]
-
-        from .features import surface_dynamics_feature
-        surface_dynamics_feature.require()
-
-        from surface_dynamics.flat_surfaces.strata import Stratum
-
-        if is_abelian:
-            return Stratum([(a - 2) // 2 for a in angles], 1)
-        else:
-            return Stratum([(a - 2) for a in angles], 2)
+                from surface_dynamics.flat_surfaces.strata import Stratum
+                l[level].append(vt.stratum())
+        return l
 
     def degeneration(self, level, component, edges_low=None, edges_up=None):
         r"""

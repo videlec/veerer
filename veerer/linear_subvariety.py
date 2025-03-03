@@ -547,7 +547,7 @@ class IrreducibleRealLinearSubvariety:
         level = self._check_level(level)
         return tuple(sorted(sum((comp.root().stratum().signature() for comp in self._levels[level]), tuple())))
 
-    def ambient_stratum(self, level=None):
+    def ambient_stratum(self, multiscale_structure=False):
         r"""
         Return the ambient stratum of this subvariety.
 
@@ -556,17 +556,19 @@ class IrreducibleRealLinearSubvariety:
             sage: from veerer import VeeringTriangulation
             sage: vt = VeeringTriangulation("(0,1,2)(~1,3,4)(~3,5,6)(~6,~2,~5)(~4,7,8)(~8,~0,~7)", "RBBBRRBBR")
             sage: L = vt.linear_subvariety()
-            sage: L.ambient_stratum()  # optional - surface_dynamics
+            sage: L.ambient_stratum(multiscale_structure=True)  # optional - surface_dynamics
             [[H_2(2)]]
             sage: for Ldeg in sorted(L.codimension_one_vertical_degenerations()):  # optional - surface_dynamics
-            ....:     print(Ldeg.ambient_stratum())
-            [[H_1(0)], [H_1(2, -2)]]
-            [[H_1(0^2)], [H_0(2, -2^2)]]
+            ....:     print(Ldeg.ambient_stratum(), Ldeg.ambient_stratum(multiscale_structure=True))
+            H_2(2) [[H_1(0)], [H_1(2, -2)]]
+            H_2(2) [[H_1(0)], [H_1(2, -2)]]
+            H_2(2) [[H_1(0)], [H_1(2, -2)]]
+            H_2(2) [[H_1(0)], [H_1(2, -2)]]
+            H_2(2) [[H_1(0)], [H_1(2, -2)]]
+            H_2(2) [[H_1(0)], [H_1(2, -2)]]
+            H_2(2) [[H_1(0^2)], [H_0(2, -2^2)]]
         """
-        if level is None:
-            return [self.ambient_stratum(level) for level in self.levels()]
-        level = self._check_level(level)
-        return [comp.root().stratum() for comp in self._levels[level]]
+        return self._mvt.ambient_stratum(multiscale_structure=multiscale_structure)
 
     def dimension(self, level=None):
         r"""
