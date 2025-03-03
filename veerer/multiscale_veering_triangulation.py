@@ -1441,7 +1441,7 @@ class MultiscaleVeeringTriangulation:
 
         for e in D.incoming_edges(i, reverse=False):
             source_level, source_component = D._vertices[D._edge_sources[e]]
-            if level == target_level:
+            if level == source_level:
                 # horizontal edge (these are loops and have been treated in the previous loop)
                 assert component == source_component
                 continue
