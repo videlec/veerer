@@ -6,6 +6,7 @@ from array import array
 import itertools
 import numbers
 
+from sage.structure.richcmp import op_LT, op_GT, op_LE, op_GE, rich_to_bool
 from sage.structure.element import Matrix
 from sage.rings.integer_ring import ZZ
 from sage.matrix.constructor import matrix
@@ -487,24 +488,25 @@ class MultiscaleVeeringTriangulation:
 
         if check:
             self._check()
-    
-    def _horizontal_nodes(self):
+
+    def _horizontal_nodes(self, sort=False):
         g = self._nodal_digraph
         N = self.num_levels()
-        
+
         l = [[[] for _ in range(len(self._veering_triangulations[level]))] for level in range(N)]
-        
+
         for e, label in enumerate(g._edges):
             if len(label) == 2:
                 level, c = g.vertex_label(g.edge_source(e))
                 l[level][c].append(label)
-        
-        for level in range(N):
-            for c in range(len(l[level])):
-                l[level][c].sort()
+
+        if sort:
+            for level in range(N):
+                for c in range(len(l[level])):
+                    l[level][c].sort()
         return l
-    
-    def _prong_matchings(self):
+
+    def _prong_matchings(self, sort=False):
         g = self._nodal_digraph
         l = []
         for e, label in enumerate(g._edges):
@@ -513,7 +515,9 @@ class MultiscaleVeeringTriangulation:
                 level1, c1 = g.vertex_label(g.edge_source(e))
                 level2, c2 = g.vertex_label(g.edge_target(e))
                 l.append(((level1, c1, h1, ang1), (level2, c2, h2, ang2)))
-        return sorted(l)
+        if sort:
+            l.sort()
+        return l
 
     def _check(self):
         self._check_horizontal_residue_conditions()
@@ -820,6 +824,61 @@ class MultiscaleVeeringTriangulation:
         if type(self) != type(other):
             raise TypeError
         return (self._veering_triangulations != other._veering_triangulations) and (self._horizontal_nodes() != other._horizontal_nodes()) and (self._prong_matchings() != other._prong_matchings())
+
+    def _cmp_(self, other):
+        if type(self) is not type(other):
+            raise TypeError
+
+        # number of levels
+        c = len(self._veering_triangulations) - len(other._veering_triangulations)
+        if c:
+            return c
+
+        for self_level, other_level in zip(self._veering_triangulations, other._veering_triangulations):
+            # number of prime components in each level
+            c = len(self_level) - len(other_level)
+            if c:
+                return c
+
+            # prime components
+            for (self_vt, other_vt) in zip(self_level, other_level):
+                c = self_vt._cmp_(other_vt)
+                if c:
+                    return c
+
+        # horizontal nodes
+        self_horiz = self._horizontal_nodes(sort=True)
+        other_horiz = other._horizontal_nodes(sort=True)
+        c = (self_horiz > other_horiz) - (self_horiz < other_horiz)
+        if c:
+            return c
+
+        # vertical nodes
+        self_vert = self._prong_matchings(sort=True)
+        other_vert = other._prong_matchings(sort=True)
+        c = (self_vert > other_vert) - (self_vert < other_vert)
+        if c:
+            return c
+
+        return 0
+
+    def _richcmp_(self, other, op):
+        if type(self) is not type(other):
+            raise TypeError("can not compare {} with {}".format(type(self).__name__, type(other).__name__))
+
+        return rich_to_bool(op, self._cmp_(other))
+
+    def __lt__(self, other):
+        return self._richcmp_(other, op_LT)
+
+    def __le__(self, other):
+        return self._richcmp_(other, op_LE)
+
+    def __gt__(self, other):
+        return self._richcmp_(other, op_GT)
+
+    def __ge__(self, other):
+        return self._richcmp_(other, op_GE)
 
     def copy(self, mutable=None):
         if mutable is None:
@@ -1396,7 +1455,7 @@ class MultiscaleVeeringTriangulation:
                 D._edges[e] = (h0_new, a0_new, h1, a1)
 
         for e in D.incoming_edges(i, reverse=False):
-            source_level, source_component = D._vertices[D._edge_source[e]]
+            source_level, source_component = D._vertices[D._edge_sources[e]]
             if level == target_level:
                 # horizontal edge (these are loops and have been treated in the previous loop)
                 assert component == source_component
