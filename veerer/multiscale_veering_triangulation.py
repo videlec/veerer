@@ -903,19 +903,6 @@ class MultiscaleVeeringTriangulation:
         n = len(self._veering_triangulations[level])
         p = perm_init(p, n)
         perm_on_list(self._veering_triangulations[level], p, n)
-        perm_on_list(self._horizontal_nodes()[level], p, n)
-
-        # permute prong matchings
-        for i, (pm0, pm1) in enumerate(self._prong_matchings()):
-            level0, comp0, h0, a0 = pm0
-            level1, comp1, h1, a1 = pm1
-            if level0 == level:
-                pm0 = (level0, p[comp0], h0, a0)
-                self._prong_matchings()[i] = (pm0, pm1)
-            elif level1 == level:
-                pm1 = (level1, p[comp1], h1, a1)
-                self._prong_matchings()[i] = (pm0, pm1)
-        self._prong_matchings().sort()
 
         # TODO: this is not super clean
         self._nodal_digraph.vertex_relabelling({(l, c, cc): (l, p[c], cc) for (l, c, cc) in self._nodal_digraph._vertices if l == level})
