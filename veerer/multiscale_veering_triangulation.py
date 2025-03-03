@@ -22,7 +22,6 @@ from .monodromy import *
 
 
 # TODO: Store the data of horizontal and vertical nodes in terms of LabeleddDiGraph
-# TODO: Add the method ambient stratum
 
 def str_to_label(h):
     r"""
@@ -116,41 +115,6 @@ def new_prong_matching(vt, f_low, r_up, r_low, level, comp):
                     lpoles.append(f_pole)
     return newpm
 
-def tree_with_target(self, root=0, target_vertices=[]):
-    """
-    Return paths to all target vertices, preserving the order of target_vertices.
-    """
-    tree = [None] * len(self)
-    seen = [False] * len(self)
-    seen[root] = True
-    todo = [root]
-
-    path_dic = {}
-    paths = [None] * len(target_vertices)
-    while todo:
-        v = todo.pop()
-        if v in target_vertices and v not in path_dic:
-            path = []
-            current = v
-            while current != root:
-                edge = tree[current]
-                path.append(edge)
-                current = self.edge_target(edge)
-            path = [-(e + 1) for e in path]
-            path.reverse()
-            path_dic[v] = LabelledDiGraphPath(self, 0, path)
-
-        for i in self.incoming_edges(v):
-            u = self.edge_source(i)
-            if not seen[u]:
-                tree[u] = i
-                seen[u] = True
-                todo.append(u)
-
-        for i, target in enumerate(target_vertices):
-            paths[i] = path_dic.get(target)
-    return paths
-
 class NodalLabelledDiGraph(LabelledDiGraph):
     r"""
     Graph encoding the level structure of a multiscale veering triangulation.
@@ -222,7 +186,7 @@ class NodalLabelledDiGraph(LabelledDiGraph):
             if not (0 <= l1 < l2 < len(prime_decomposition) and
                     0 <= pc1 < prime_decomposition[l1] and
                     0 <= pc2 < prime_decomposition[l2]):
-                raise ValueError(f"invalid vertical node between (l={l1}, pc={pc1}, cc={cc1}) and (l={l2}, pc={pc2}, cc={cc2})")
+                raise ValueError(f"invalid vertical node between (l={l1}, pc={pc1}) and (l={l2}, pc={pc2})")
             v1 = (l1, pc1)
             v2 = (l2, pc2)
             digraph.add_edge(v1, v2, (h1, ang1, h2, ang2))
@@ -1468,79 +1432,6 @@ class MultiscaleVeeringTriangulation:
                 D._edges[e] = (h0, a0, h1_new, a1_new)
 
         self._veering_triangulations[level][component] = veering_triangulation
-
-    # TODO: remove. One should use the simpler replace_veering_triangulation above
-    def transport_along_path(self, level, component, path):
-        r"""
-        Return the multi-scale Veering triangulation obtained by deforming the prime veering triangulation at ``(level, component)`` along the path in the Delaunay-Strebel graph.
-
-        EXAMPLES::
-
-            sage: from veerer import *
-
-            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,9)(~8,10,11)(~9,~10,~11)", "RRBBRRRRBBBR")
-            sage: edges_up = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-            sage: mvt0 = MultiscaleVeeringTriangulation([vt], [[""]], [])
-            sage: mvt = mvt0.degeneration(0,0,edges_up=edges_up)
-            sage: mvt
-            MultiscaleVeeringTriangulation(
-            veering_triangulations=[
-                [VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "RRBBRRRRB", [(1, 0, -1, -1, 0, -1, -1, 0, 1), (0, 1, 1, 1, 0, 1, 1, 0, -1), (0, 0, 0, 0, 1, 1, 1, 0, -1), (0, 0, 0, 0, 0, 0, 0, 1, 1)])],
-                [VeeringTriangulationLinearFamily("(0:4,~0:4)", "R", [(1)])]
-            ],
-            horizontal_nodes=[[[]], [[]]],
-            prong_matchings=[((0, 0, 0, 0), (1, 0, 1, 2))]
-            )
-            sage: vt0 = mvt._veering_triangulations[0][0]
-            sage: ds_graph = vt0.delaunay_strebel_graph()
-            sage: path = ds_graph.path(0, [3, 13, 16])
-            sage: mvt.transport_along_path(0, 0, path)
-            MultiscaleVeeringTriangulation(
-            veering_triangulations=[
-                [VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "BRBBRRRBR", [(1, 0, 1, 1, 0, 1, 1, 0, 1), (0, 1, 1, 1, 0, 1, 1, 0, 1), (0, 0, 0, 0, 1, 1, 1, 0, 1), (0, 0, 0, 0, 0, 0, 0, 1, -1)])],
-                [VeeringTriangulationLinearFamily("(0:4,~0:4)", "R", [(1)])]
-            ],
-            horizontal_nodes=[[[]], [[]]],
-            prong_matchings=[((0, 0, 2, 0), (1, 0, 1, 2))]
-            )
-        """
-        level = self._check_level(level)
-
-        ds_graph = path._graph
-        vt0 = ds_graph.vertex_label(path.start())
-        vt1 = ds_graph.vertex_label(path.end())
-        assert self._veering_triangulations[level][component] == vt0
-
-        vts = copy.deepcopy(self._veering_triangulations)
-        vts[level][component] = vt1
-
-        mono = SeparatrixMonodromy(ds_graph)
-
-        #new horizontal nodes
-        l1 = [] #new horizontal nodes at (level, component)
-        l_horiz = self._horizontal_nodes()
-        for h1, h2 in l_horiz[level][component]:
-            h1 = mono.infinite_cylinder_transport(path, h1)
-            h2 = mono.infinite_cylinder_transport(path, h2)
-            l1.append((h1,h2))
-        l_horiz[level][component] = l1
-        
-        #new vertical nodes
-        l2 = []
-        l_vert = self._prong_matchings()
-        for pm in l_vert:
-            p1, p2 = pm
-            level1, c1, h1, ang1 = p1
-            level2, c2, h2, ang2 = p2
-            if level1 == level and c1 == component:
-                h1, ang1 = mono.vertex_separatrix_transport(path, h1, ang1)
-            if level2 == level and c2 == component:
-                h2, ang2 = mono.face_separatrix_transport(path, h2, ang2)
-            assert level1 >= 0 and level2 >= 0
-            l2.append([(level1, c1, h1, ang1),(level2, c2, h2, ang2)])
-        l_vert = l2
-
-        return MultiscaleVeeringTriangulation(vts,l_horiz,l_vert)
 
     def set_canonical_labels(self, level, comp):
         r"""

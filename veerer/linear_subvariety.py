@@ -29,7 +29,7 @@ import sys
 
 from .automaton import DelaunayStrebelAutomaton
 from .veering_triangulation import VeeringTriangulation
-from .multiscale_veering_triangulation import MultiscaleVeeringTriangulation, tree_with_target
+from .multiscale_veering_triangulation import MultiscaleVeeringTriangulation
 from .strebel_graph import StrebelGraph
 from .delaunay_strebel_graph import DelaunayStrebelGraph
 from .polyhedron.linear_algebra import is_rank_one
