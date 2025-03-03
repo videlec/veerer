@@ -137,20 +137,20 @@ class DelaunayStrebelGraph(LabelledDiGraph):
         r"""
         Return the number of transitions corresponding to a forward Delaunay flip.
         """
-        return sum(label[0] == "flip" for label in self._edge_labels)
+        return sum(label[0] == "flip" for label in self._edges)
 
     def num_rotation_transitions(self):
         r"""
         Return the number of transitions corresponding to a rotation.
         """
-        return sum(label[0] == "rotate" for label in self._edge_labels)
+        return sum(label[0] == "rotate" for label in self._edges)
 
     def num_strebel_transitions(self):
         r"""
         Return the number of transitions corresponding to a veering
         triangulation to Strebel forgetful map.
         """
-        return sum(label[0] == "strebel" for label in self._edge_labels)
+        return sum(label[0] == "strebel" for label in self._edges)
 
     def __str__(self):
         return "Delaunay-Strebel graph on {} vertices and {} edges".format(self.num_verts(), self.num_edges())
@@ -307,13 +307,11 @@ class DelaunayStrebelGraph(LabelledDiGraph):
             ....:     g2 = ds_graph.framing_monodromy(path2)
             ....:     assert g0 == g2, (path0, path2, g0, g2, g0._p, g0._r, g2._p, g2._r)
         """
-        from .monodromy import framing_group_element
-
         if path._graph is not self:
             raise ValueError
 
         if monodromy is None:
-            from .monodromy import SeparatrixMonodromy, framing_group_element
+            from .monodromy import SeparatrixMonodromy
             monodromy = SeparatrixMonodromy(self)
         if ambient_framing_group is None:
             ambient_framing_group = self._ambient_framing_group()
@@ -329,7 +327,9 @@ class DelaunayStrebelGraph(LabelledDiGraph):
         cseps1 = [monodromy.infinite_cylinder_transport(path, h) for h in cseps1]
         fhedges1 = [monodromy.folded_half_edge_transport(path, h) for h in fhedges1]
 
-        return framing_group_element(self._vertices[v], ambient_framing_group, vseps0, vseps1, fseps0, fseps1, cseps0, cseps1, fhedges0, fhedges1)
+        return self._vertices[v].framing_group_element((vseps1, fseps1, cseps1, fhedges1),
+                                                       original_framing=(vseps0, fseps0, cseps0, fhedges0),
+                                                       ambient_framing_group=ambient_framing_group)
 
     @cached_method
     def framing_group(self):
@@ -398,7 +398,7 @@ class DelaunayStrebelGraph(LabelledDiGraph):
             sage: f.delaunay_strebel_graph().framing_group().structure_description()
             'C2 x S4'
         """
-        from .monodromy import SeparatrixMonodromy, framing_group_element
+        from .monodromy import SeparatrixMonodromy
 
         vseps, fseps, cseps, fhedges = self.separatrix_trivialization()
 
@@ -433,7 +433,9 @@ class DelaunayStrebelGraph(LabelledDiGraph):
             fhedges0 = fhedges[0]
             fhedges1 = [aut[h] for h in fhedges[0]]
 
-            g = framing_group_element(self._vertices[v], G, vseps0, vseps1, fseps0, fseps1, cseps0, cseps1, fhedges0, fhedges1)
+            framing0 = (vseps0, fseps0, cseps0, fhedges0)
+            framing1 = (vseps1, fseps1, cseps1, fhedges1)
+            g = self._vertices[v].framing_group_element(framing1, original_framing=framing0, ambient_framing_group=G)
             H.add_generator(g)
 
         H.set_immutable()

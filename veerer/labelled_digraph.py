@@ -47,7 +47,9 @@ class LabelledDiGraph:
         sage: G.incoming_edges(3)
         [4, 44, -8, -7]
     """
-    def __init__(self, digraph, root=None, sort=False):
+    __slots__ = ['_digraph', '_vertices', '_vertex_index', '_edge_sources', '_edge_targets', '_edges', '_mutable']
+
+    def __init__(self, digraph, root=None, sort=False, mutable=False):
         if isinstance(digraph, LabelledDiGraph):
             if root or sort:
                 raise NotImplementedError
@@ -56,7 +58,7 @@ class LabelledDiGraph:
             self._vertex_index = digraph._vertex_index
             self._edge_sources = digraph._edge_sources
             self._edge_targets = digraph._edge_targets
-            self._edge_labels = digraph._edge_labels
+            self._edges = digraph._edges
         elif isinstance(digraph, DiGraph):
             self._digraph = DiGraph(len(digraph), loops=digraph.allows_loops(), multiedges=digraph.allows_multiple_edges())
 
@@ -68,7 +70,7 @@ class LabelledDiGraph:
 
             self._edge_sources = []
             self._edge_targets = []
-            self._edge_labels = []
+            self._edges = []
 
             edges = list(digraph.edges(sort=sort))
             for k, (u, v, label) in enumerate(edges):
@@ -76,7 +78,7 @@ class LabelledDiGraph:
                 j = self._vertex_index[v]
                 self._edge_sources.append(i)
                 self._edge_targets.append(j)
-                self._edge_labels.append(label)
+                self._edges.append(label)
                 self._digraph.add_edge(i, j, k)
         else:
             raise TypeError("invalid input")
@@ -119,7 +121,7 @@ class LabelledDiGraph:
         return self._vertices[i]
 
     def edge_label(self, i):
-        return self._edge_labels[i] if i >= 0 else self._edge_labels[~i]
+        return self._edges[i] if i >= 0 else self._edges[~i]
 
     def vertex_index(self, v):
         return self._vertex_index[v]
