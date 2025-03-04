@@ -59,6 +59,11 @@ def face_boundary_init(faces, boundary=None):
         sage: face_boundary_init('(0:1,1:2,2)(~0)(~1)(~2)')
         (array('i', [2, 1, 4, 3, 0, 5]), array('i', [1, 0, 2, 0, 0, 0]))
 
+        sage: face_boundary_init([0, 2, 4, 5, 1, 6, 3, 7])
+        (array('i', [0, 2, 4, 5, 1, 6, 3, 7]), array('i', [0, 0, 0, 0, 0, 0, 0, 0]))
+        sage: face_boundary_init([0, 2, 4, 5, 1, 6, 3, 7], [0, 1, 3, 0, 0, 2, 0, 0])
+        (array('i', [0, 2, 4, 5, 1, 6, 3, 7]), array('i', [0, 1, 3, 0, 0, 2, 0, 0]))
+
     TESTS:
 
     Check that the edge permutation does not depend on the details of faces::
@@ -68,87 +73,119 @@ def face_boundary_init(faces, boundary=None):
         sage: f3 = "(6,4,3)(~6,~5,1)(5,0,2)"
         sage: assert face_boundary_init(f1)[1] == face_boundary_init(f2)[1] == face_boundary_init(f3)[1]
     """
+    fp = None
     if boundary is None:
         if isinstance(faces, str):
             l, boundary = str_to_cycles_and_data(faces)
+        elif isinstance(faces, array):
+            if len(faces) % 2:
+                raise ValueError(f"invalid input for faces (={faces})")
+            np = len(faces) // 2
+            fp = faces
+        elif isinstance(faces, (tuple, list)):
+            if all(isinstance(elt, (tuple, list)) for elt in faces):
+                l = [[int(i) for i in c] for c in faces]
+            elif len(faces) % 2 == 0:
+                ne = len(faces) // 2
+                fp = perm_init(faces, partial=True)
+                boundary = array('i', [0] * (2 * ne))
+            else:
+                raise ValueError(f"invalid input for faces (={faces})")
         else:
-            l = [[int(i) for i in c] for c in faces]
+            raise TypeError("invalid input for faces of type {}".format(type(faces).__name__))
     else:
         if isinstance(faces, str):
             l = str_to_cycles(faces)
+        elif isinstance(faces, array):
+            if len(faces) != len(boundary) or len(faces) % 2:
+                raise ValueError(f"invalid input for faces (={faces}) and boundary (={boundary})")
+            ne = len(faces) // 2
+            fp = faces
+        elif isinstance(faces, (tuple, list)):
+            if all(isinstance(elt, (tuple, list)) for elt in faces):
+                l = [[int(i) for i in c] for c in faces]
+            elif len(faces) % 2 == 0:
+                ne = len(faces) // 2
+                fp = perm_init(faces, partial=True)
+                boundary = array('i', boundary)
+            else:
+                raise ValueError(f"invalid input for faces (={faces})")
         else:
-            l = [[int(i) for i in c] for c in faces]
+            raise TypeError("invalid input for faces of type {}".format(type(faces).__name__))
+
         if isinstance(boundary, str):
             ll, boundary = str_to_cycles_and_data(boundary)
             l.extend(ll)
 
-    pos = []
-    neg = []
-    for c in l:
-        for e in c:
-            if e < 0:
-                neg.append(e)
-            else:
-                pos.append(e)
-
-    for e in neg:
-        if ~e not in pos:
-            raise ValueError("inconsistent permutation data")
-
-    pos.sort()
-    neg.sort(reverse=True)
-    if pos[0] != 0:
-        raise ValueError("missing half-edge 0")
-    for i in range(len(pos) - 1):
-        if pos[i] == pos[i+1]:
-            raise ValueError("repeated half-edge {}".format(pos[i]))
-        elif pos[i + 1] != pos[i] + 1:
-            raise ValueError("missing half-edge {}".format(pos[i] + 1))
-    for i in range(len(neg) - 1):
-        if neg[i] == neg[i+1]:
-            raise ValueError("repeated half-edge ~{}".format(~neg[i]))
-
-    # number of half edges
-    ne = len(pos)
-
-    def to_half_edge(x):
-        return 2 * x if x >= 0 else 2 * ~x + 1
-
-    # build the face permutation
-    fp = [-1] * (2 * ne)
-    for c in l:
-        k = len(c)
-        for i in range(k):
-            e0 = to_half_edge(c[i])
-            e1 = to_half_edge(c[(i + 1) % k])
-            fp[e0] = e1
-    fp = perm_init(fp, partial=True)
-
-    # construct the boundary
-    if boundary is None:
-        boundary = array('i', [0] * (2 * ne))
-    elif isinstance(boundary, (tuple, list, array)):
-        if len(boundary) != 2 * ne:
-            raise ValueError('invalid input argument')
-        boundary = array('i', boundary)
-    elif isinstance(boundary, dict):
-        output = array('i', [0] * (2 * ne))
-        for e, v in boundary.items():
-            if isinstance(e, str):
-                if not e:
-                    raise ValueError('keys must be valid edges, got {!r}'.format(e))
-                elif e[0] == '~':
-                    e = ~int(e[1:])
+    if fp is None:
+        pos = []
+        neg = []
+        for c in l:
+            for e in c:
+                if e < 0:
+                    neg.append(e)
                 else:
+                    pos.append(e)
+
+        for e in neg:
+            if ~e not in pos:
+                raise ValueError("inconsistent permutation data")
+
+        pos.sort()
+        neg.sort(reverse=True)
+        if pos[0] != 0:
+            raise ValueError("missing half-edge 0")
+        for i in range(len(pos) - 1):
+            if pos[i] == pos[i+1]:
+                raise ValueError("repeated half-edge {}".format(pos[i]))
+            elif pos[i + 1] != pos[i] + 1:
+                raise ValueError("missing half-edge {}".format(pos[i] + 1))
+        for i in range(len(neg) - 1):
+            if neg[i] == neg[i+1]:
+                raise ValueError("repeated half-edge ~{}".format(~neg[i]))
+
+        # number of half edges
+        ne = len(pos)
+
+        def to_half_edge(x):
+            return 2 * x if x >= 0 else 2 * ~x + 1
+
+        # build the face permutation
+        fp = [-1] * (2 * ne)
+        for c in l:
+            k = len(c)
+            for i in range(k):
+                e0 = to_half_edge(c[i])
+                e1 = to_half_edge(c[(i + 1) % k])
+                fp[e0] = e1
+
+        fp = perm_init(fp, partial=True)
+
+        # construct the boundary
+        if boundary is None:
+            boundary = array('i', [0] * (2 * ne))
+        elif isinstance(boundary, (tuple, list, array)):
+            if len(boundary) != 2 * ne:
+                raise ValueError('invalid input argument')
+            boundary = array('i', boundary)
+        elif isinstance(boundary, dict):
+            output = array('i', [0] * (2 * ne))
+            for e, v in boundary.items():
+                if isinstance(e, str):
+                    if not e:
+                        raise ValueError('keys must be valid edges, got {!r}'.format(e))
+                    elif e[0] == '~':
+                        e = ~int(e[1:])
+                    else:
+                        e = int(e)
+                elif isinstance(e, numbers.Integral):
                     e = int(e)
-            elif isinstance(e, numbers.Integral):
-                e = int(e)
-            if e not in pos and e not in neg:
-                raise ValueError('keys in the bdry dictionary must be valid half-edges, got {!r}'.format(e))
-            output[to_half_edge(e)] = v
-        boundary = output
-    else:
-        raise TypeError('invalid boundary data')
+                if e not in pos and e not in neg:
+                    raise ValueError('keys in the bdry dictionary must be valid half-edges, got {!r}'.format(e))
+                output[to_half_edge(e)] = v
+            boundary = output
+        else:
+            raise TypeError('invalid boundary data')
 
     return fp, boundary
 
