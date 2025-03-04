@@ -557,7 +557,7 @@ class IrreducibleRealLinearSubvariety:
                         perm_check(a)
                         prime_component_perm_gens.append((level, component, a))
                     if len(atoms) >= 3:
-                        a = array('i', 2 * root.num_edges())
+                        a = array('i', range(2 * root.num_edges()))
                         for i in range(len(atoms)):
                             for j in range(len(atoms[0])):
                                 a[atoms[i][j]] = atoms[(i + 1) % len(atoms)][j]
