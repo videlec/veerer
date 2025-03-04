@@ -1454,6 +1454,59 @@ class VeeringTriangulationLinearFamilies:
         return VeeringTriangulationLinearFamily(vt, matrix([s, t]))
 
     @staticmethod
+    def diagonal(veering_triangulation, repeat):
+        r"""
+        Return the linear family obtained by taking ``repeat`` identical copies of ``veering_triangulation``.
+
+        More generally ``repeat`` could be a list of scalings.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation, VeeringTriangulationLinearFamilies
+            sage: vt = VeeringTriangulation("(0:2,~0:2)", "R")
+
+            sage: VeeringTriangulationLinearFamilies.diagonal(vt, 3)
+            VeeringTriangulationLinearFamily("(0:2,~0:2)(1:2,~1:2)(2:2,~2:2)", "RRR", [(1, 1, 1)])
+
+            sage: VeeringTriangulationLinearFamilies.diagonal(vt, [AA(3).sqrt(), 1, 2 - AA(2).sqrt()])
+            VeeringTriangulationLinearFamily("(0:2,~0:2)(1:2,~1:2)(2:2,~2:2)", "RRR", [(1.000000000000000?, 0.5773502691896258?, 0.3382039574515255?)])
+        """
+        if not isinstance(veering_triangulation, VeeringTriangulation):
+            raise TypeError("veering_triangulation must be a veering triangulation")
+
+        base_ring = veering_triangulation.base_ring()
+
+        if isinstance(repeat, numbers.Integral):
+            repeat = int(repeat)
+            if repeat < 1:
+                raise ValueError("repeat must be a positive integer")
+            repeat = [1] * repeat
+        elif isinstance(repeat, (tuple, list)):
+            if not repeat:
+                raise ValueError("repeat must be a list of positive real numbers")
+            from sage.structure.sequence import Sequence
+            repeat = Sequence(repeat)
+            base_ring = cm.common_parent(base_ring, repeat.universe())
+        else:
+            raise TypeError("invalid argument repeat of type {}".format(type(repeat).__name__))
+
+        fp = array('i', [-1] * (2 * veering_triangulation._ne * len(repeat)))
+        for j in range(len(repeat)):
+            for i in range(2 * veering_triangulation._ne):
+                fp[j * (2 * veering_triangulation._ne) + i] = j * (2 * veering_triangulation._ne) + veering_triangulation._fp[i]
+        bdry = veering_triangulation._bdry * len(repeat)
+        colouring = veering_triangulation._colouring * len(repeat)
+        vt_diag = VeeringTriangulation(triangulation=fp, boundary=bdry, colouring=colouring)
+
+        gens = veering_triangulation.generators_matrix()
+        subspace_diag = matrix(base_ring, gens.nrows(), gens.ncols() * len(repeat))
+        for i, r in enumerate(gens):
+            for j, coeff in enumerate(repeat):
+                subspace_diag[i, j * veering_triangulation._ne : (j + 1) * veering_triangulation._ne] = coeff * r
+
+        return VeeringTriangulationLinearFamily(vt_diag, subspace_diag)
+
+    @staticmethod
     def triangle_3_4_13_unfolding_orbit_closure():
         r"""
         EXAMPLES::
