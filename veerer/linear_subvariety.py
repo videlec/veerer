@@ -399,8 +399,9 @@ class IrreducibleRealLinearSubvariety:
         sage: M # optional - surface_dynamics
         MultiscaleCompactification Irreducible real linear subvariety of projective dimension 0 in [[H_0(1^2, -2^2)]]
     """
-    # TODO: allow input to be a single multiscale veering triangulation
-    # TODO: ds_graphs would better be pointers in a PrimeDegenerations
+    # TODO: simplify the constructor. It should __init__(self, ds_graphs, mvt=None)
+    # for StrebelGraph, VeeringTriangulations and linear families, building the associated linear subvariety
+    # should be done with the method .linear_subvariety()
     def __init__(self, *args):
         # list of dictionaries: self._levels[i] is a tuple representing the
         # i-th level
