@@ -377,21 +377,55 @@ class Constellation:
         return x
 
     def _check_half_edge(self, h):
+        r"""
+        TESTS::
+
+            sage: from veerer import Triangulation
+            sage: Triangulation("(0,1,~1)")._check_half_edge(0)
+            0
+            sage: Triangulation("(0,1,~1)")._check_half_edge(-4)
+            Traceback (most recent call last):
+            ...
+            ValueError: half-edge number out of range h=-4
+            sage: Triangulation("(0,1,~1)")._check_half_edge(12)
+            Traceback (most recent call last):
+            ...
+            ValueError: half-edge number out of range h=12
+            sage: Triangulation("(0,1,~1)")._check_half_edge(1)
+            Traceback (most recent call last):
+            ...
+            ValueError: invalid half-edge h=1; the underlying edges is folded
+        """
         if not isinstance(h, numbers.Integral):
             raise TypeError('invalid half-edge {}'.format(h))
         h = int(h)
         if h < 0 or h >= 2 * self._ne:
-            raise ValueError('half-edge number out of range e={}'.format(e))
+            raise ValueError(f"half-edge number out of range h={h}")
         if self._vp[h] == -1:
-            raise ValueError("invalid half-edge h={}; the underlying edges is folded".format(h))
+            raise ValueError(f"invalid half-edge h={h}; the underlying edges is folded")
         return h
 
     def _check_edge(self, e):
+        r"""
+        TESTS::
+
+            sage: from veerer import Triangulation
+            sage: Triangulation("(0,1,~1)")._check_edge(0)
+            0
+            sage: Triangulation("(0,1,~1)")._check_edge(-1)
+            Traceback (most recent call last):
+            ...
+            ValueError: edge number out of range e=-1
+            sage: Triangulation("(0,1,~1)")._check_edge(2)
+            Traceback (most recent call last):
+            ...
+            ValueError: edge number out of range e=2
+        """
         if not isinstance(e, numbers.Integral):
-            raise TypeError("invalid edge {}".format(e))
+            raise TypeError(f"invalid edge {e}")
         e = int(e)
         if e < 0 or e >= self._ne:
-            raise ValueError("edge number out of range e={}".format(e))
+            raise ValueError(f"edge number out of range e={e}")
         return e
 
     def constellation(self):
