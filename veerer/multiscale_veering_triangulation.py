@@ -261,20 +261,41 @@ class NodalLabelledDiGraph(LabelledDiGraph):
         r"""
         Return the subgraph of the level graph of ``mvt`` induced on vertices with level above ``level``.
         """
-        d = self.level_graph(mvt)
-        vertices = [i for i, v in enumerate(d._vertices) if v[0] < level]
-        return d._digraph.subgraph(vertices=vertices)
+        level_g = self.level_graph(mvt)
+        vertices = [i for i, v in enumerate(level_g._vertices) if v[0] < level]
+        return level_g._digraph.subgraph(vertices=vertices)
 
     def vertical_edges_for_GRC(self, mvt, level):
-        d = self.level_graph(mvt)
-        subd = self.subgraph_above_level(mvt, level)
-        components = subd.connected_components(sort=False)
-        edges = []
-        ne = self.num_edges()
-        for comp in components:
-            l = [e for e in range(ne) if (d.edge_source(e) in comp) and (d._vertices[d.edge_target(e)][0] == level)] 
-            edges.append(l)
-        return edges
+            r"""
+            Return a list of dictionary for later check of global residue conditions.
+
+            The key `v` of each dictionary is a vertex at the `level`-th level of the nodal graph. The value of key `v` consists of the edges from the same component of the subgraph above level-`level` to the vertices in the prime component of `v`. Note the the indices of the edges refer to the indicex in the nodal graph.
+
+            EXAMPLES::
+                sage: from veerer import *
+
+                sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[VeeringTriangulationLinearFamily("(0:1)(~0:1)(1:1)(~1:1)(2:1)(~2:1)(3:1)(~3:1)", "RRRR", [(1, 1, 1, 1)])],[VeeringTriangulationLinearFamily("(0:3)(~0:3)(1:3)(~1:3)", "RR", [(1, 1)])]],horizontal_nodes=[[[(0, 2), (1, 4), (3, 5), (6, 7)]], [[]]],prong_matchings=[((0, 0, 0, 0), (1, 0, 0, 1)), ((0, 0, 4, 0), (1, 0, 3, 1))])
+                sage: g = mvt._nodal_digraph
+                sage: g.vertical_edges_for_GRC(mvt, 1)
+                [defaultdict(<class 'list'>, {1: [5, 4]}), defaultdict(<class 'list'>, {})]
+            """
+            
+            level_g = self.level_graph(mvt)
+            subd = self.subgraph_above_level(mvt, level)
+            components = subd.connected_components(sort=False)
+            edges = []
+            ne = self.num_edges()
+            for comp in components:
+                l = [e for e in range(ne) if (level_g.edge_source(e) in comp) and (level_g._vertices[level_g.edge_target(e)][0] == level)]
+                l1 = [self._edges.index(level_g._edges[e]) for e in l] # change the indices of the edges of the level graph to the indices of nodal graph.
+                # divide the list `l1` according to the edge targets in the nodal graph.
+                targets = [self.edge_target(e) for e in l1] 
+                from collections import defaultdict
+                dic_groups = defaultdict(list)
+                for index, v in enumerate(targets):
+                    dic_groups[v].append(l1[index])
+                edges.append(dic_groups)
+            return edges
 
 
 class MultiscaleVeeringTriangulation:
@@ -662,10 +683,18 @@ class MultiscaleVeeringTriangulation:
             l2.append((level2, c2, h2))
 
     def _check_global_residue_conditions(self):
-        # Note that there are cases where some levels are Abelian and the other levels are quadratic. The method does not apply to this case yet.
+        r"""
+        Check the global residue condition.
 
+        EXAMPLES::
+            sage: from veerer import *
+
+            sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[VeeringTriangulationLinearFamily("(0:1)(~0:1)(1:1)(~1:1)(2:1)(~2:1)(3:1)(~3:1)", "RRRR", [(1, 1, 1, 1)])],[VeeringTriangulationLinearFamily("(0:3)(~0:3)(1:3)(~1:3)", "RR", [(1, 1)])]],horizontal_nodes=[[[(0, 2), (1, 4), (3, 5), (6, 7)]], [[]]],prong_matchings=[((0, 0, 0, 0), (1, 0, 0, 1)), ((0, 0, 4, 0), (1, 0, 3, 1))])
+        """
+        # Note that there are cases where some levels are Abelian and the other levels are quadratic. The method does not apply to this case yet.
         N = self.num_levels()
         g = self._nodal_digraph
+        level_g = g.level_graph(self)
         vertex_labels = g._vertices
         edge_labels = g._edges
 
@@ -675,34 +704,21 @@ class MultiscaleVeeringTriangulation:
 
         for level in range(1, N):
             components = g.subgraph_above_level(self, level).connected_components(sort=False)
-            l = g.vertical_edges_for_GRC(self, level)
+            list_groups = g.vertical_edges_for_GRC(self, level)
             for i, comp in enumerate(components):
                 skip = False
                 for v in comp:
-                    lvl, c = vertex_labels[v]
+                    lvl, c, _ = level_g._vertices[v]
                     if not self.without_prescribed_poles(lvl, c):
                         skip = True
                         break
                 if skip:
                     continue
 
-                edges = l[i]
-                if not edges:
-                    continue
-                #c = vertex_labels[g.edge_target(edges[0])][1]
-                #for e in edges:
-                    #if c != vertex_labels[g.edge_target(e)][1]:
-                        #raise ValueError(f"The global residue conditions are not satisfied for the level-{level}")
-                # divide the list `edges` according to the edge targets
-                targets = [g.edge_target(e) for e in edges] 
-                from collections import defaultdict
-                dic_groups = defaultdict(list)
-                for index, v in enumerate(targets):
-                    dic_groups[v].append(index)
-                #check residue consition for the edges in the each value of the dic_groups
-                for v in list(dic_groups.keys()):
+                groups = list_groups[i]
+                for v in list(groups.keys()):
                     lvl, c = vertex_labels[v]
-                    group = dic_groups[v]
+                    group = groups[v]
                     assert lvl == level
                     vt = self._veering_triangulations[lvl][c]
                     _, oris_vt = vt.is_abelian(certificate=True)
@@ -727,7 +743,7 @@ class MultiscaleVeeringTriangulation:
                     
                     rr1 = matrix(ZZ, 1, nf)
                     for e in group:
-                        _, _, h, _ = edge_labels[edges[e]]
+                        _, _, h, _ = edge_labels[e] # Note that the indices of edges in g and level_g are different
                         for j, f in enumerate(bdry):
                             if h in f:
                                 rr1[0, j] = 1
