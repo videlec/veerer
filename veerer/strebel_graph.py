@@ -1049,3 +1049,184 @@ class StrebelGraph(Constellation):
             a = a - self._excess[h]
         return a
 
+    # TODO: fix documentation
+    # TODO: add doctests
+    def framing(self):
+        r"""
+        Return the quadruple ``(vertex_separatrices, face_separatrices,
+        infinite_cylinders, folded_half_edges)`` that defines a framing on
+        the underlying surface induced by this veering triangulation.
+
+        A *framing* for an Abelian or a quadratic differential is an ordered
+        list containing
+        - a vertical separatrix for each singularity of positive angle
+          (equivalently, degree greater or equal than -1)
+        - a vertical separatrix for each singularity of negative angle
+          (equivalently, degree less or equal than -3)
+        - the infinite cylinders (equivalently, degree equal to -2)
+
+        As in a veering triangulation, folded edges are allowed (in which case
+        the middle of the edge is a singularity of degree -1), the folded edges
+        form a fourth category.
+
+        Note that two isomorphic veering triangulation might give rise to two
+        different framing.
+        """
+        vertex_separatrices = [(len(sep), sep[0]) for sep in self.vertex_separatrices(flat=False)]
+        vertex_separatrices.sort()
+        vertex_separatrices = [sep for a, sep in vertex_separatrices]
+
+        face_separatrices = [(len(sep), sep[0]) for sep in self.face_separatrices(flat=False)]
+        face_separatrices.sort()
+        face_separatrices = [sep for a, sep in face_separatrices]
+
+        infinite_cylinders = [min(f) for f in self.boundary_faces() if self.face_angle(f[0]) == 0]
+
+        folded_half_edges = [2 * e for e in range(self._ne) if self._vp[2 * e + 1] == -1]
+
+        return vertex_separatrices, face_separatrices, infinite_cylinders, folded_half_edges
+
+    # TODO: fix documentation
+    # TODO: add doctests
+    def framing_group(self):
+        r"""
+        Return the abstract framing group associated to the permutation of
+        singularities and separatrices on the underlying surface.
+        """
+        from .framing_group import runs, FramingGroup
+
+        vseps, fseps, cseps, fhedges = self.framing()
+
+        vertex_angles_and_multiplicities = [self.vertex_angle(h) for h, a in vseps]
+        vertex_angles = []
+        vertex_multiplicities = []
+        for a, m in runs(vertex_angles_and_multiplicities):
+            vertex_angles.append(a)
+            vertex_multiplicities.append(m)
+
+        face_angles_and_multiplicities = [-self.face_angle(h) for h, a in fseps]
+        face_angles = []
+        face_multiplicities = []
+        for a, m in runs(face_angles_and_multiplicities):
+            face_angles.append(a)
+            face_multiplicities.append(m)
+
+        ncyls = len(cseps)
+        nfhedges = len(fhedges)
+
+        angles = vertex_angles + face_angles
+        multiplicities = vertex_multiplicities + face_multiplicities
+        if ncyls:
+            angles.append(1)
+            multiplicities.append(ncyls)
+        if nfhedges:
+            angles.append(1)
+            multiplicities.append(nfhedges)
+
+        return FramingGroup(angles, multiplicities)
+
+    # TODO: fix documentation
+    # TODO: add doctests
+    def framing_indices(self, framing=None):
+        r"""
+        Return a 6-tuple ``(vseps_indices, vseps_angles, fseps_indices,
+        fseps_angles, cseps_indices, fhedges_indices)`` of dictionaries mapping
+        vertex separatrices, face separatrices, infinite cylinders and folded
+        half edges to their indices or angles.
+
+        Each vertex separatrix and each face separatrix is encoded by a pair
+        ``(h, a)`` while each infinite cylinders and each folded edges by a
+        single half-edge ``h``. A framing allows to map vertex separatrices and
+        face separatrices to pairs of integers and infinite separatrices and
+        folded edges to integers.
+
+        INPUT:
+
+        - ``framing`` -- (optional) a framing. If not specified, then uses the
+          one obtained with :meth:`framing`.
+        """
+        if framing is None:
+            framing = self.framing()
+
+        nv = len(framing[0])
+        nf = len(framing[1])
+        nc = len(framing[2])
+
+        vseps_indices = {}
+        vseps_angles = {}
+        for i, (h, a) in enumerate(framing[0]):
+            for b, s in enumerate(self.vertex_separatrices(h, a)):
+                vseps_indices[s] = i
+                vseps_angles[s] = b
+
+        fseps_indices = {}
+        fseps_angles = {}
+        for i, (h, a) in enumerate(framing[1]):
+            for b, s in enumerate(self.face_separatrices(h, a)):
+                fseps_indices[s] = nv + i
+                fseps_angles[s] = b
+
+        cseps_indices = {}
+        for i, s in enumerate(framing[2]):
+            cseps_indices[s] = nv + nf + i
+
+        fhedges_indices = {}
+        for i, s in enumerate(framing[3]):
+            fhedges_indices[s] = nv + nf + nc + i
+
+        return vseps_indices, vseps_angles, fseps_indices, fseps_angles, cseps_indices, fhedges_indices
+
+    # TODO: fix documentation
+    # TODO: add doctests
+    def framing_group_element(self, framing, original_framing=None, ambient_framing_group=None):
+        r"""
+        Return the group element mapping the original framing to the given one.
+
+        INPUT:
+
+        - ``framing`` -- a framing, that is a 4-tuple ``(vertex_separatrices,
+          face_separatrices, infinite_cylinders, folded_half_edges)``.
+
+        - ``original_framing`` -- (optional) base framing. If not provided uses the one obtained
+          from :meth:`framing`.
+
+        - ``ambient_framing_group`` - (optional) framing group. If not provided uses the one obtained
+          from :meth:`framing_group`.
+        """
+        if ambient_framing_group is None:
+            ambient_framing_group = self.framing_group()
+
+        if original_framing is None:
+            original_framing = self.framing()
+
+        vseps0, fseps0, cseps0, fhedges0 = original_framing
+        nv = len(vseps0)
+        nf = len(fseps0)
+        nc = len(cseps0)
+        nfh = len(fhedges0)
+        vseps_indices, vseps_angles, fseps_indices, fseps_angles, cseps_indices, fhedges_indices = self.framing_indices(original_framing)
+
+        vseps1, fseps1, cseps1, fhedges1 = framing
+
+        # vertex separatrices
+        p1 = [vseps_indices[s] for s in vseps1]
+        r1 = [vseps_angles[s] for s in vseps1]
+        assert len(p1) == len(r1) == nv
+
+        # face separatrices
+        p1.extend(fseps_indices[s] for s in fseps1)
+        r1.extend(fseps_angles[s] for s in fseps1)
+        assert len(p1) == len(r1) == nv + nf
+
+        # infinite cylinders
+        p1.extend(cseps_indices[s] for s in cseps1)
+        r1.extend([0] * nc)
+        assert len(p1) == len(r1) == nv + nf + nc
+
+        # folded edges
+        p1.extend(fhedges_indices[s] for s in fhedges1)
+        r1.extend([0] * nfh)
+        assert len(p1) == len(r1) == nv + nf + nc + nfh
+
+        g1 = ambient_framing_group(array('i', p1), array('i', r1))
+        return g1
