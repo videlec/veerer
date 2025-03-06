@@ -44,19 +44,50 @@ def in_connected_component(vt, h):
 
 def track_prong(vt, r_up, r_low, prong, vertex=False, face=False):
     r"""
-    Return the prong after the vertival degeneration.
+    Return the prong after the vertival degeneration (without normalization).
 
-    Note that r_up and r_low are from the method VeeringTriangulation.degeneration by setting `collapsed_half_edge_relabelling=True` 
+    Note that r_up and r_low are from the method VeeringTriangulation.degeneration by setting `collapsed_half_edge_relabelling=True`.
+
+    EXAMPLES::
+        sage: from veerer import *
+        sage: from veerer.multiscale_veering_triangulation import track_prong
+
+        sage: vt = VeeringTriangulation("(0,1,2)(~1,~5,~0)(~2,3,4)(5,~3,~4)","RRBBRB")
+        sage: edges_low = [4]
+        sage: _, f_low, r_up, r_low = vt.degeneration(edges_low=edges_low, collapsed_half_edge_relabelling=True)
+        sage: prong1 = (0, 0, 1, 0)
+        sage: prong2 = (0, 0, 9, 0)
+        sage: track_prong(vt, r_up, r_low, prong1, vertex=True)
+        (1, 0, 0, 1)
+        sage: track_prong(vt, r_up, r_low, prong2, vertex=True)
+        (1, 0, 1, 0)
+
+        sage: vt = VeeringTriangulation("(0,1,2)(~0:1,~2:1,~1:2)", "BRR")
+        sage: edges_low = [0]
+        sage: _, _, r_up, r_low = vt.degeneration(edges_low=edges_low, collapsed_half_edge_relabelling=True)
+        sage: prong = (0, 0, 5, 0)
+        sage: track_prong(vt, r_up, r_low, prong, vertex=True)
+        (1, 0, 0, 0)
+        sage: track_prong(vt, r_up, r_low, prong, face=True)
+        (0, 0, 1, 0)
+
+        sage: vt = VeeringTriangulation("(~0,~2,~3)(~1,2,3)(0:4,1:4)", "BBRR")
+        sage: edges_up = [2, 3]
+        sage: _, _, r_up, r_low = vt.degeneration(edges_up=edges_up, collapsed_half_edge_relabelling=True)
+        sage: prong = (1, 3, 2, 1)
+        sage: track_prong(vt, r_up, r_low, prong, face=True)
+        (1, 3, 2, 1)
     """
     l, c, h, ang = prong
     l = abs(l)
 
     if vertex:
+        vt._check_vertex_separatrix(h, ang)
         vh = [r_up[e] for e in perm_orbit(vt._vp, h)]
         if min(vh) >= 0: # The vertex of h is contaiend in f_up
             return (l, c, r_up[h], ang)
         
-        # Otherwise the vertex prong must be contained in f_low        
+        # Otherwise the vertex prong must be contained in f_low
         a = 0
         while r_up[h] >= 0:
             h = vt.previous_at_vertex(h)
@@ -66,7 +97,8 @@ def track_prong(vt, r_up, r_low, prong, vertex=False, face=False):
         assert r_low[h] >= 0
         return (l + 1, 0, r_low[h], ang) if max(r_up) >=0 else (l, c, r_low[h], ang) # Note that the degeneration might be horizontal
     
-    if face:
+    elif face:
+        vt._check_face_separatrix(h, ang)
         assert vt.boundary_vector()[h] > 0
         fh = [r_low[e] for e in perm_orbit(vt._fp, h)]
         if min(fh) >= 0: #The pole of h is contaiend in f_low
@@ -81,6 +113,9 @@ def track_prong(vt, r_up, r_low, prong, vertex=False, face=False):
         ang = ang + a
         assert r_up[h] >= 0
         return (l, c, r_up[h], ang)
+    
+    else:
+        return ValueError("Missing argument of 'vertex' or 'face'.")
 
 def _vaninshing_red_blue_corner(vt, r_up, r_low, h):
     hh = vt.next_at_vertex(h)
@@ -90,6 +125,21 @@ def _vaninshing_red_blue_corner(vt, r_up, r_low, h):
         return False
 
 def new_prong_matching(vt, f_low, r_up, r_low, level, comp):
+    r"""
+    Return the new vertical node indecued by the vertical degeneration of the veering triangulation.
+
+    Note that r_up and r_low are from the method VeeringTriangulation.degeneration by setting `collapsed_half_edge_relabelling=True`.
+
+    EXAMPLES::
+        sage: from veerer import *
+        sage: from veerer.multiscale_veering_triangulation import new_prong_matching
+
+        sage: vt = VeeringTriangulation("(0,1,2)(~1,~5,~0)(~2,3,4)(5,~3,~4)","RRBBRB")
+        sage: edges_low = [4]
+        sage: _, f_low, r_up, r_low = vt.degeneration(edges_low=edges_low, collapsed_half_edge_relabelling=True)
+        sage: new_prong_matching(vt, f_low, r_up, r_low, 0, 0)
+        [[(0, 0, 0, 0), (1, 0, 1, 1)]]
+    """
     level = abs(level)
     nh = 2 * vt.num_edges()
     newpm = []
@@ -972,7 +1022,7 @@ class MultiscaleVeeringTriangulation:
                 level.append(i)
             ds_graphs.append(level)
 
-        IrreducibleRealLinearSubvariety([[P._components[i] for i in level] for level in ds_graphs], self)
+        return IrreducibleRealLinearSubvariety([[P._components[i] for i in level] for level in ds_graphs], self)
 
     def permute_level(self, level, p):
         r"""
