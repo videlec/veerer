@@ -316,36 +316,41 @@ class NodalLabelledDiGraph(LabelledDiGraph):
         return level_g._digraph.subgraph(vertices=vertices)
 
     def vertical_edges_for_GRC(self, mvt, level):
-            r"""
-            Return a list of dictionary for later check of global residue conditions.
+        r"""
+        Return a list of dictionary for later check of global residue conditions.
 
-            The key `v` of each dictionary is a vertex at the `level`-th level of the nodal graph. The value of key `v` consists of the edges from the same component of the subgraph above level-`level` to the vertices in the prime component of `v`. Note the the indices of the edges refer to the indicex in the nodal graph.
+        The key `v` of each dictionary is a vertex at the `level`-th level of the nodal graph. 
+        The value of key `v` consists of the edges from the same component of the subgraph above 
+        level-`level` to the vertices in the prime component of `v`. Note the the indices of the 
+        edges refer to the indices in the level graph.
 
-            EXAMPLES::
-                sage: from veerer import *
+        EXAMPLES::
+            sage: from veerer import *
 
-                sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[VeeringTriangulationLinearFamily("(0:1)(~0:1)(1:1)(~1:1)(2:1)(~2:1)(3:1)(~3:1)", "RRRR", [(1, 1, 1, 1)])],[VeeringTriangulationLinearFamily("(0:3)(~0:3)(1:3)(~1:3)", "RR", [(1, 1)])]],horizontal_nodes=[[[(0, 2), (1, 4), (3, 5), (6, 7)]], [[]]],prong_matchings=[((0, 0, 0, 0), (1, 0, 0, 1)), ((0, 0, 4, 0), (1, 0, 3, 1))])
-                sage: g = mvt._nodal_digraph
-                sage: g.vertical_edges_for_GRC(mvt, 1)
-                [defaultdict(<class 'list'>, {1: [5, 4]}), defaultdict(<class 'list'>, {})]
-            """
-            
-            level_g = self.level_graph(mvt)
-            subd = self.subgraph_above_level(mvt, level)
-            components = subd.connected_components(sort=False)
-            edges = []
-            ne = self.num_edges()
-            for comp in components:
-                l = [e for e in range(ne) if (level_g.edge_source(e) in comp) and (level_g._vertices[level_g.edge_target(e)][0] == level)]
-                l1 = [self._edges.index(level_g._edges[e]) for e in l] # change the indices of the edges of the level graph to the indices of nodal graph.
-                # divide the list `l1` according to the edge targets in the nodal graph.
-                targets = [self.edge_target(e) for e in l1] 
-                from collections import defaultdict
-                dic_groups = defaultdict(list)
-                for index, v in enumerate(targets):
-                    dic_groups[v].append(l1[index])
-                edges.append(dic_groups)
-            return edges
+            sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[VeeringTriangulationLinearFamily("(0:1)(~0:1)(1:1)(~1:1)(2:1)(~2:1)(3:1)(~3:1)", "RRRR", [(1, 1, 1, 1)])],[VeeringTriangulationLinearFamily("(0:3)(~0:3)(1:3)(~1:3)", "RR", [(1, 1)])]],horizontal_nodes=[[[(0, 2), (1, 4), (3, 5), (6, 7)]], [[]]],prong_matchings=[((0, 0, 0, 0), (1, 0, 0, 1)), ((0, 0, 4, 0), (1, 0, 3, 1))])
+            sage: g = mvt._nodal_digraph
+            sage: g.vertical_edges_for_GRC(mvt, 1)
+            [defaultdict(<class 'list'>, {1: [2, 4]}), defaultdict(<class 'list'>, {})]
+        """
+        
+        level_g = self.level_graph(mvt)
+        subd = self.subgraph_above_level(mvt, level)
+        components = subd.connected_components(sort=False)
+        edges = []
+        ne = self.num_edges()
+        for comp in components:
+            l = [e for e in range(ne) if (level_g.edge_source(e) in comp) and (level_g._vertices[level_g.edge_target(e)][0] == level)]
+            # divide the list `l1` according to the edge targets in the nodal graph.
+            targets = []
+            for e in l:
+                lvl, c,_ = level_g._vertices[level_g.edge_target(e)]
+                targets.append(self.vertex_index((lvl,c))) 
+            from collections import defaultdict
+            dic_groups = defaultdict(list)
+            for index, v in enumerate(targets):
+                dic_groups[v].append(l[index])
+            edges.append(dic_groups)
+        return edges
 
 
 class MultiscaleVeeringTriangulation:
@@ -746,7 +751,7 @@ class MultiscaleVeeringTriangulation:
         g = self._nodal_digraph
         level_g = g.level_graph(self)
         vertex_labels = g._vertices
-        edge_labels = g._edges
+        edge_labels = level_g._edges
 
         abelian, global_oris = self.is_abelian(certificate=True)
         if not abelian:
