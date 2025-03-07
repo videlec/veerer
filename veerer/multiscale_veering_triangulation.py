@@ -1642,6 +1642,41 @@ class MultiscaleVeeringTriangulation:
 
         return MultiscaleVeeringTriangulation(vts, horiz_nodes, pms)
 
+    def transport_to_root(self, level, component, ds_graph):
+        r"""
+        Return the multi_scale veering triangulation by transport the veering triangulation at ``(level, component)`` along its Delaunay-Strebel graph to the root.
+
+        EXAMPLES::
+            sage: from veerer import *
+
+            sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[VeeringTriangulationLinearFamily("(0,5,~4)(~0,~3,4)(1,~2,~5)(~1,2,3)", "RRBBBB", [(1, 0, 0, 0, -1, 0), (0, 1, 0, -1, -1, -1), (0, 0, 1, 1, 1, 1)])],[VeeringTriangulationLinearFamily("(0:2,1:1,~1:2,~0:1)", "RR", [(1, 0), (0, 1)])]],horizontal_nodes=[[[]], [[]]],prong_matchings=[((0, 0, 1, 0), (1, 0, 3, 0))])
+            sage: vt1 = mvt._veering_triangulations[0][0]
+            sage: ds_graph1 = vt1.delaunay_strebel_graph()
+            sage: vt2 = mvt._veering_triangulations[1][0]
+            sage: ds_graph2 = vt2.delaunay_strebel_graph()
+            sage: mvt1 = mvt.transport_to_root(0, 0, ds_graph1)
+            sage: mvt2 = mvt1.transport_to_root(1, 0, ds_graph2)
+            sage: mvt2
+            MultiscaleVeeringTriangulation(
+            veering_triangulations=[
+                [VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,~5)", "RRBBRR", [(1, 0, -1, -1, 0, -1), (0, 1, 1, 1, 0, 1), (0, 0, 0, 0, 1, 1)])],
+                [VeeringTriangulationLinearFamily("(0:1,~0:2,1:1,~1:2)", "RR", [(1, 0), (0, 1)])]
+            ],
+            horizontal_nodes=[[[]], [[]]],
+            prong_matchings=[((0, 0, 1, 0), (1, 0, 3, 0))]
+            )
+        """
+        level = self._check_level(level)
+        mvt = self.set_canonical_labels(level, component)
+        original_vt = mvt._veering_triangulations[level][component]
+        original_framing = ds_graph.framing(ds_graph.vertex_index(original_vt))   
+        vt = ds_graph.root()
+        vt_framing = ds_graph.framing(0)
+        mvt = mvt.copy(mutable=True)
+        mvt.replace_veering_triangulation(level, component, vt, framing=vt_framing, original_framing=original_framing)
+        mvt.set_immutable()
+        return mvt
+    
     def prime_decomposition(self, level, component):
         r"""
         Return a prime decomposition of a component at ``(level, component)`` of multi-scale veering triangulation.
