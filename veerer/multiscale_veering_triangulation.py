@@ -212,6 +212,7 @@ class NodalLabelledDiGraph(LabelledDiGraph):
 
         - ``vertical_nodes`` -- a list of vertical node data ``((l1, pc1, h1, a1), (l2, pc2, h2, a2))``
         """
+        # TODO: remove this attribute
         self._prime_decomposition = tuple(prime_decomposition)
 
         digraph = DiGraph(loops=True, multiedges=True)
@@ -437,7 +438,7 @@ class MultiscaleVeeringTriangulation:
         if isinstance(horizontal_nodes, list):
             if len(horizontal_nodes) != len(self._veering_triangulations):
                 raise ValueError("Miss information for horizontal nodes at some levels")
-            data_horiz_nodes =[] # data for building nodal digraph
+            data_horiz_nodes = [] # data for building nodal digraph
             for level in range(len(horizontal_nodes)):
                 nodes = horizontal_nodes[level]
                 vts = self._veering_triangulations[level]
@@ -463,7 +464,7 @@ class MultiscaleVeeringTriangulation:
                                 node[j] = vt._check_half_edge(h)
                             nodes_at_c[i] = tuple(node)
                     else:
-                        raise ValueError(f"The input of horizontal nodes of the {c}-th component at level-{level} is bad")
+                        raise ValueError(f"The input of horizontal nodes of the {c}-th component at level-{level} is bad {nodes[c]}")
 
                     # normalization of horizontal nodes
                     fp = vt.face_permutation()
@@ -479,45 +480,14 @@ class MultiscaleVeeringTriangulation:
         elif horizontal_nodes is None:
             data_horiz_nodes = []
         else:
-            raise TypeError("The 'horizontal_nodes' must be a list; got {}".format(type(horizontal_nodes)))
+            raise TypeError("The 'horizontal_nodes' must be a list; got {}".format(type(horizontal_nodes).__name__))
 
         if isinstance(prong_matchings, list):
             data_vert_nodes = [] # data for building nodal digraph
             for pm in prong_matchings:
-                prong1, prong2 = pm
-                (l1, c1, h1, a1) = prong1
-                (l2, c2, h2, a2) = prong2
-
-                l1 = self._check_level(l1)
-                l2 = self._check_level(l2)
-                if l2 <= l1:
-                    raise ValueError(f"invalid prong matching; got l1={l1} and l2={l2}")
-
-                if isinstance(h1, str):
-                    h1 = str_to_label(h1)
-                if isinstance(h2, str):
-                    h2 = str_to_label(h2)
-
-                vt1 = self._veering_triangulations[l1][c1]
-                vt2 = self._veering_triangulations[l2][c2]
-
-                h1, a1 = vt1._check_vertex_separatrix(h1, a1)
-                h2, a2 = vt2._check_face_separatrix(h2, a2)
-
-                # adjust prong2 according to our convention that we do not consider the last prong in the each corner
-                h2, a2 = self._veering_triangulations[l2][c2]._normalize_face_separatrix(h2, a2)
-
-                for (hh1, aa1), (hh2, aa2) in zip(vt1.vertex_separatrices(h1, a1), vt2.face_separatrices(h2, a2)):
-                    if (hh1, aa1) < (h1, a1):
-                        h1 = hh1
-                        a1 = aa1
-                        h2 = hh2
-                        a2 = aa2
-
-                pm = ((l1, c1, h1, a1), (l2, c2, h2, a2))
+                pm = self._normalize_prong_matching(pm)
                 if check:
                     self._check_local_prong_matching(pm)
-                
                 data_vert_nodes.append(pm)
             data_vert_nodes = sorted(data_vert_nodes)
         elif prong_matchings is None:
@@ -535,6 +505,9 @@ class MultiscaleVeeringTriangulation:
             self._check()
 
     def _horizontal_nodes(self, sort=False):
+        r"""
+        Return horizontal nodes as a list of list
+        """
         g = self._nodal_digraph
         N = self.num_levels()
 
@@ -550,6 +523,28 @@ class MultiscaleVeeringTriangulation:
                 for c in range(len(l[level])):
                     l[level][c].sort()
         return l
+
+    def _normalize_prong_matching(self, pm):
+        (l1, c1, h1, a1), (l2, c2, h2, a2) = pm
+        l1 = self._check_level(l1)
+        c1 = self._check_component(l1, c1)
+        l2 = self._check_level(l2)
+        c2 = self._check_component(l2, c2)
+        if l2 <= l1:
+            raise ValueError(f"invalid prong matching; got l1={l1} and l2={l2}")
+        vt1 = self._veering_triangulations[l1][c1]
+        vt2 = self._veering_triangulations[l2][c2]
+        h1, a1 = vt1._check_vertex_separatrix(h1, a1)
+        h2, a2 = vt2._check_face_separatrix(h2, a2)
+        h2, a2 = vt2._normalize_face_separatrix(h2, a2)
+        for (hh1, aa1), (hh2, aa2) in zip(vt1.vertex_separatrices(h1, a1), vt2.face_separatrices(h2, a2)):
+            if (hh1, aa1) < (h1, a1):
+                h1 = hh1
+                a1 = aa1
+                h2 = hh2
+                a2 = aa2
+        assert a1 == 0
+        return ((l1, c1, h1, a1), (l2, c2, h2, a2))
 
     def _prong_matchings(self, sort=False):
         g = self._nodal_digraph
@@ -606,6 +601,15 @@ class MultiscaleVeeringTriangulation:
         if not 0 <= level < self.num_levels():
             raise ValueError("level out of range")
         return level
+
+    def _check_component(self, level, component):
+        level = self._check_level(level)
+        if not isinstance(component, numbers.Integral):
+            raise TypeError("component must be integral; got {}".format(type(component).__name__))
+        component = int(component)
+        if not 0 <= component < len(self._veering_triangulations[level]):
+            raise ValueError("component out of range")
+        return component
 
     def _check_horizontal_node(self, level, c, node):
 
@@ -674,15 +678,6 @@ class MultiscaleVeeringTriangulation:
 
         l1, c1, h1, a1 = prong1
         l2, c2, h2, a2 = prong2
-
-        l1 = self._check_level(l1)
-        l2 = self._check_level(l2)
-
-        #check the levels are valid
-        if l1 < 0 or l1 >= N or l2 < 0 or l2 >= N:
-            raise ValueError(f"The levels in {pm} are invalid")
-        if l1 >= l2:
-            raise ValueError(f"The level of {prong1} should be greater than the level of {prong2}")
 
         vt1 = self._veering_triangulations[l1][c1]
         vt2 = self._veering_triangulations[l2][c2]
@@ -1031,7 +1026,7 @@ class MultiscaleVeeringTriangulation:
 
     def permute_level(self, level, p):
         r"""
-        Apply the permutation ``p`` on the components of level ``level``.
+        Apply the permutation ``p`` on the prime components of level ``level``.
 
         EXAMPLES::
 
@@ -1253,12 +1248,14 @@ class MultiscaleVeeringTriangulation:
             sage: from veerer import *
 
             sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,~5)", "RRBBRR", [(1, 0, -1, -1, 0, -1), (0, 1, 1, 1, 0, 1), (0, 0, 0, 0, 1, 1)])],[VeeringTriangulationLinearFamily("(0:1)(~0:3)(1:1)(~1:3)", "RR", [(1, 1)])]], horizontal_nodes=[[[]], [[(0, 2)]]], prong_matchings=[((0, 0, 0, 0), (1, 0, 1, 0)), ((0, 0, 1, 0), (1, 0, 3, 0))])
-            
+
         When ``multiscale_structure`` is False::
+
             sage: mvt.ambient_stratum()
             H_2(1^2)
 
         When ``multiscale_structure`` is True::
+
             sage: mvt.ambient_stratum(multiscale_structure=True)
             [[H_1(0^2)], [(H_0(1, -1, -2), H_0(1, -1, -2))]]
         """
@@ -1600,6 +1597,8 @@ class MultiscaleVeeringTriangulation:
 
         self._veering_triangulations[level][component] = veering_triangulation
 
+    # TODO: this should be done inplace and not return anything as it is the case
+    # with every other classes in veerer
     def set_canonical_labels(self, level, comp):
         r"""
         Return the multi-scale veering triangulation with the veering triangulation at ``(level, comp)`` set the canonical label.
@@ -1682,6 +1681,7 @@ class MultiscaleVeeringTriangulation:
         mvt.set_immutable()
         return mvt
     
+    # TODO: prime_decomposition should not call set_canonical_labels
     def prime_decomposition(self, level, component):
         r"""
         Return a prime decomposition of a component at ``(level, component)`` of multi-scale veering triangulation.
