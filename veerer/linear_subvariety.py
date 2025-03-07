@@ -400,9 +400,9 @@ class NodesCanonicalizer:
         []
         sage: C.prong_matchings()[0]
         ((0, 0, 0, 1, 0, 0, 0), (0, 0, 0, 1, 0, 1, 0))
-        sage: C._levels[0][0].root().stratum()
+        sage: C._levels[0][0].root().stratum()  # optional - surface_dynamics
         H_1(0)
-        sage: C._levels[1][0].root().stratum()
+        sage: C._levels[1][0].root().stratum()  # optional - surface_dynamics
         H_1(2, -2)
 
         sage: C.libgap_group().Size()
@@ -425,11 +425,11 @@ class NodesCanonicalizer:
         sage: vt1 = VeeringTriangulationLinearFamily("(0:2,~0:2)", "R", [(1)])
         sage: vt2 = VeeringTriangulationLinearFamily("(0:3)(~0:3)", "R", [(1)])
         sage: C = NodesCanonicalizer([[vt0.delaunay_strebel_graph()], [vt1.delaunay_strebel_graph()], [vt2.delaunay_strebel_graph()]])
-        sage: C._levels[0][0].root().stratum()
+        sage: C._levels[0][0].root().stratum()  # optional - surface_dynamics
         H_1(0)
-        sage: C._levels[1][0].root().stratum()
+        sage: C._levels[1][0].root().stratum()  # optional - surface_dynamics
         H_0(0^2, -2)
-        sage: C._levels[2][0].root().stratum()
+        sage: C._levels[2][0].root().stratum()  # optional - surface_dynamics
         H_0(2, -2^2)
         sage: mvt = MultiscaleVeeringTriangulation([[vt0], [vt1], [vt2]], horizontal_nodes=[[[]], [[]], [[]]], prong_matchings=[((0, 0, 0, 0), (1, 0, 1, 0)), ((1, 0, 0, 0), (2, 0, 0, 1)), ((1, 0, 1, 0), (2, 0, 1, 1))])
         sage: C.canonical_multiscale_structure(mvt)
@@ -1009,7 +1009,7 @@ class IrreducibleRealLinearSubvariety:
             sage: from veerer import VeeringTriangulation
             sage: vt = VeeringTriangulation("(0,8,~7)(~0,~6,7)(1,9,~8)(~1,~11,4)(2,10,~9)(~2,~4,5)(3,11,~10)(~3,~5,6)", "RRRRBBBBBBBB")
             sage: L = vt.linear_subvariety()
-            sage: L.ambient_stratum()
+            sage: L.ambient_stratum()  # optional - surface_dynamics
             H_1(0^4)
             sage: for Ldeg in sorted(L.codimension_one_vertical_degenerations()):  # optional - surface_dynamics
             ....:     print(Ldeg.ambient_stratum(), Ldeg.ambient_stratum(multiscale_structure=True))

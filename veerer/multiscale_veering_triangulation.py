@@ -409,7 +409,7 @@ class MultiscaleVeeringTriangulation:
     An example with non-trivial glabal residue condition::
 
         sage: vt = VeeringTriangulation("(0,1,2)(4,~2,3)(~3,5,6)(~6,~0,~1)(11, 12,~10)(8,9,10)(~13, 7, ~9)(13,~11,~12)(~5,~7,14)(~14,~4,~8)", "RBBBRRBBBRRBRRB")
-        sage: vt.stratum()
+        sage: vt.stratum()  # optional - surface dynamics
         H_3(4)
         sage: vt.is_delaunay()
         True
@@ -427,14 +427,14 @@ class MultiscaleVeeringTriangulation:
         )
         sage: vt0 = mvt1._veering_triangulations[0][0]
         sage: vt1 = mvt1._veering_triangulations[1][0]
-        sage: vt0.stratum()
+        sage: vt0.stratum()  # optional - surface dynamics
         (H_1(0), H_1(0))
-        sage: vt1.stratum()
+        sage: vt1.stratum()  # optional - surface dynamics
         H_1(4, -2^2)
         sage: vt1.residue_constraints()
         [1 0]
         [0 1]
-        sage: mvt1.ambient_stratum()
+        sage: mvt1.ambient_stratum()  # optional - surface dynamics
         H_3(4)
     """
 
@@ -1273,12 +1273,12 @@ class MultiscaleVeeringTriangulation:
 
         When ``multiscale_structure`` is False::
 
-            sage: mvt.ambient_stratum()
+            sage: mvt.ambient_stratum()  # optional - surface dynamics
             H_2(1^2)
 
         When ``multiscale_structure`` is True::
 
-            sage: mvt.ambient_stratum(multiscale_structure=True)
+            sage: mvt.ambient_stratum(multiscale_structure=True)  # optional - surface dynamics
             [[H_1(0^2)], [(H_0(1, -1, -2), H_0(1, -1, -2))]]
         """
         g = self._nodal_digraph
@@ -1559,10 +1559,10 @@ class MultiscaleVeeringTriangulation:
             sage: vt0 = VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,~5)", "RRBBRR", [(1, 0, -1, -1, 0, -1), (0, 1, 1, 1, 0, 1), (0, 0, 0, 0, 1, 1)])
             sage: vt1 = VeeringTriangulationLinearFamily("(0:1)(~0:3)(1:1)(~1:3)", "RR", [(1, 1)])
             sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[vt0], [vt1]], horizontal_nodes=[[[]], [[(0, 2)]]], prong_matchings=[((0, 0, 0, 0), (1, 0, 1, 0)), ((0, 0, 1, 0), (1, 0, 3, 0))], mutable=True)
-            sage: mvt.ambient_stratum()
+            sage: mvt.ambient_stratum()  # optional - surface dynamics
             H_2(1^2)
             sage: mvt.replace_veering_triangulation(0, 0, VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,~5)", "RRBBRB", [(1, 0, -1, -1, 0, -1), (0, 1, 1, 1, 0, 1), (0, 0, 0, 0, 1, 1)]))
-            sage: mvt.ambient_stratum()
+            sage: mvt.ambient_stratum()  # optional - surface dynamics
             H_2(1^2)
 
             sage: vt0 = VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)])
