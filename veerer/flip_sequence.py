@@ -39,7 +39,7 @@ The same flip sequence defined in one line::
 # ****************************************************************************
 #  This file is part of veerer
 #
-#       Copyright (C) 2020 Vincent Delecroix
+#       Copyright (C) 2020-2024 Vincent Delecroix
 #
 #  This program is free software; you can redistribute it and/or
 #  modify it under the terms of the GNU General Public License
@@ -68,8 +68,10 @@ from .veering_triangulation import VeeringTriangulation
 def flip_sequence_to_string(sequence):
     return " ".join("%d%s" % (e, colour_to_char(col)) for e,col in sequence)
 
+
 def flip_sequence_from_string(s):
     return [(int(f[:-1]), colour_from_char(f[-1])) for f in s.split()]
+
 
 class VeeringFlipSequence(object):
     r"""

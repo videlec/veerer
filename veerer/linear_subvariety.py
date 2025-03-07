@@ -4,8 +4,8 @@ Real linear subvarieties in the moduli space of meromorphic Abelian differential
 # ****************************************************************************
 #  This file is part of veerer
 #
-#       Copyright (C) 2024 Vincent Delecroix
-#                     2024 Kai Fu
+#       Copyright (C) 2024-2025 Vincent Delecroix
+#                     2024-2025 Kai Fu
 #
 #  This program is free software; you can redistribute it and/or
 #  modify it under the terms of the GNU General Public License
