@@ -265,6 +265,25 @@ class DelaunayStrebelGraph(LabelledDiGraph):
         state = self._vertices[v]
         return state.framing_group_element_permutation(g, self.framing(v))
 
+    def automorphism_framing_monodromy(self, aut, v=0, monodromy=None, ambient_framing_group=None):
+        if monodromy is None:
+            from .monodromy import SeparatrixMonodromy
+            monodromy = SeparatrixMonodromy(self)
+        if ambient_framing_group is None:
+            ambient_framing_group = self._ambient_framing_group()
+
+        state = self._vertices[v]
+        vseps0, fseps0, cseps0, fhedges0 = self.framing(v)
+        vseps1 = [(aut[h], a) for h, a in vseps0]
+        fseps1 = [(aut[h], a) for h, a in fseps0]
+        cseps1 = [min(perm_orbit(state._fp, aut[h])) for h in cseps0]
+        fhedges1 = [aut[h] for h in fhedges0]
+
+        return self.root().framing_group_element((vseps1, fseps1, cseps1, fhedges1),
+                                                       original_framing=(vseps0, fseps0, cseps0, fhedges0),
+                                                       ambient_framing_group=ambient_framing_group)
+
+    # TODO: rename path_framing_monodromy
     def framing_monodromy(self, path, monodromy=None, ambient_framing_group=None):
         r"""
         Return the framing monodromy of a (not necessarily closed) path.
