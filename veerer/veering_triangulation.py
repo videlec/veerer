@@ -2027,8 +2027,8 @@ class VeeringTriangulation(Triangulation):
         r"""
         Apply the pi/2 rotation.
 
-        This amount to change the colouring (the combinatorics of the
-        triangulation remains unchanged).
+        This amount to change the colouring of half-edges (the adjacencies and
+        angle excesses remain unchanged).
 
         EXAMPLES::
 
@@ -5809,6 +5809,7 @@ class VeeringTriangulation(Triangulation):
             else:
                 raise ValueError('invalid slope parameter')
 
+    # TODO: fix in the presence of folded edges
     def strebel_graph(self, slope=VERTICAL, mapping=False, mutable=False):
         r"""
         Return the Strebel graph associated to this veering triangulation.
@@ -6296,6 +6297,12 @@ class VeeringTriangulation(Triangulation):
 
     def framing_group_element_permutation(self, g, framing=None):
         r"""
+        Return a 4-tuple of dictionaries ``(d_vseps, d_fseps, d_cseps,
+        d_fhedges)`` encoding respectively the permutations of vertex
+        separatrices, face separatrices, cylinder half-edges and folded
+        half-edges.
+
+
         EXAMPLES::
 
             sage: from veerer import *
