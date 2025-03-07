@@ -12,19 +12,17 @@ dependencies:
   - ipywidgets
   - scipy
   - matplotlib-base
-  - gap-defaults
+  - gap
   - sympy
   - sagemath-db-conway-polynomials
-  - sagelib >=9.3
-  # some of the tests rely on ipywidgets which is not required by sagelib
-  - ipywidgets
+  - sagelib
   - pyeantic >=1  # optional: pyeantic
   - pyintervalxt >=3,<4  # optional: pyintervalxt
   - pyflatsurf >=3.10.1 # optional: pyflatsurf
   # Work around https://github.com/conda-forge/pynormaliz-feedstock/issues/10 by pinning normaliz and pynormaliz
   - pynormaliz 2.19  # optional: pynormaliz
   - normaliz 3.10.2  # optional: pynormaliz
-  - sphinx >=4.2.0,<6  # optional: doc
+  - sphinx
   - pip
   - surface-dynamics  # optional: surface_dynamics
   - pip:
