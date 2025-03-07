@@ -301,7 +301,7 @@ class NodalLabelledDiGraph(LabelledDiGraph):
 
     def level_graph(self, mvt):
             r"""
-            Return the unerlying level graph of the multi-scale veering triangulation as a labelled digraph.
+            Return the underlying level graph of the multi-scale veering triangulation as a labelled digraph.
             """
             vts = mvt._veering_triangulations
             digraph = DiGraph(loops=True, multiedges=True)
@@ -1186,7 +1186,7 @@ class MultiscaleVeeringTriangulation:
         vertices = set(range(len(vertex_labels)))
         
         while vertices:
-            #propagete the orietation in the connected component containing the vertex v. 
+            #propagete the orientation in the connected component containing the vertex v. 
             v0 = vertices.pop()
             l0 = g.adjacent_edges(v0)
             lv = {v0} #the vertices visited so far
