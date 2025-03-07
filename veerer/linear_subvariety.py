@@ -22,6 +22,8 @@ Real linear subvarieties in the moduli space of meromorphic Abelian differential
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 # ****************************************************************************
 
+
+import array
 import collections
 import itertools
 import numbers
@@ -33,11 +35,13 @@ from .multiscale_veering_triangulation import MultiscaleVeeringTriangulation
 from .strebel_graph import StrebelGraph
 from .delaunay_strebel_graph import DelaunayStrebelGraph
 from .polyhedron.linear_algebra import is_rank_one
-from .permutation import perm_check
+from .permutation import perm_check, perm_orbit, perm_cycles
 
 from sage.structure.richcmp import op_LT, op_LE, op_EQ, op_NE, op_GT, op_GE, rich_to_bool
 from sage.misc.cachefunc import cached_method
-from sage.graphs.digraph import DiGraph
+from sage.rings.integer_ring import ZZ
+from sage.matrix.constructor import matrix
+from sage.libs.gap.libgap import libgap
 
 # TODO: optimization: vertical/horizontal degenerations commute
 # TODO: for each horiz/vert degeneration, we should record the multiscale structure and
@@ -375,6 +379,466 @@ def _convert(cls, x):
     return x if isinstance(x, cls) else cls(x)
 
 
+class NodesCanonicalizer:
+    r"""
+    Utility class to compute canonical representatives of multiscale structure
+    in a given linear subvariety.
+
+    EXAMPLES::
+
+        sage: from veerer import VeeringTriangulationLinearFamily, MultiscaleVeeringTriangulation
+        sage: from veerer.linear_subvariety import NodesCanonicalizer
+
+    An example with two possible prong matchings::
+
+        sage: vt0 = VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)])
+        sage: vt1 = VeeringTriangulationLinearFamily("(0:1,1:1,~0:1,~1:1)", "RB", [(1, 0), (0, 1)])
+        sage: C = NodesCanonicalizer([[vt0.delaunay_strebel_graph()], [vt1.delaunay_strebel_graph()]])
+        sage: list(C.horizontal_nodes(0, 0))
+        []
+        sage: list(C.horizontal_nodes(1, 0))
+        []
+        sage: C.prong_matchings()[0]
+        ((0, 0, 0, 1, 0, 0, 0), (0, 0, 0, 1, 0, 1, 0))
+        sage: C._levels[0][0].root().stratum()
+        H_1(0)
+        sage: C._levels[1][0].root().stratum()
+        H_1(2, -2)
+
+        sage: C.libgap_group().Size()
+        2
+
+        sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[vt0], [vt1]], horizontal_nodes=[[[]], [[]]], prong_matchings=[((0, 0, 0, 0), (1, 0, 1, 0))])
+        sage: C.canonical_multiscale_structure(mvt)
+        MultiscaleVeeringTriangulation(
+          veering_triangulations=[
+            [VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)])],
+            [VeeringTriangulationLinearFamily("(0:1,1:1,~0:1,~1:1)", "RB", [(1, 0), (0, 1)])]
+          ],
+          horizontal_nodes=[[[]], [[]]],
+          prong_matchings=[((0, 0, 0, 0), (1, 0, 0, 0))]
+        )
+
+    An example with three levels::
+
+        sage: vt0 = VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)])
+        sage: vt1 = VeeringTriangulationLinearFamily("(0:2,~0:2)", "R", [(1)])
+        sage: vt2 = VeeringTriangulationLinearFamily("(0:3)(~0:3)", "R", [(1)])
+        sage: C = NodesCanonicalizer([[vt0.delaunay_strebel_graph()], [vt1.delaunay_strebel_graph()], [vt2.delaunay_strebel_graph()]])
+        sage: C._levels[0][0].root().stratum()
+        H_1(0)
+        sage: C._levels[1][0].root().stratum()
+        H_0(0^2, -2)
+        sage: C._levels[2][0].root().stratum()
+        H_0(2, -2^2)
+        sage: mvt = MultiscaleVeeringTriangulation([[vt0], [vt1], [vt2]], horizontal_nodes=[[[]], [[]], [[]]], prong_matchings=[((0, 0, 0, 0), (1, 0, 1, 0)), ((1, 0, 0, 0), (2, 0, 0, 1)), ((1, 0, 1, 0), (2, 0, 1, 1))])
+        sage: C.canonical_multiscale_structure(mvt)
+        MultiscaleVeeringTriangulation(
+          veering_triangulations=[
+            [VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)])],
+            [VeeringTriangulationLinearFamily("(0:2,~0:2)", "R", [(1)])],
+            [VeeringTriangulationLinearFamily("(0:3)(~0:3)", "R", [(1)])]
+          ],
+          horizontal_nodes=[[[]], [[]], [[]]],
+          prong_matchings=[((0, 0, 0, 0), (1, 0, 0, 0)), ((1, 0, 0, 0), (2, 0, 0, 0)), ((1, 0, 1, 0), (2, 0, 1, 0))]
+        )
+
+    An example with a single level::
+
+        sage: vt = VeeringTriangulationLinearFamily("(0:1)(~0:1,1:1)(~1:1,2:1)(~2:1)", "RRR", [(1, 0, 1), (0, 1, 0)])
+        sage: C = NodesCanonicalizer([[vt.delaunay_strebel_graph()]])
+        sage: C.libgap_group().Size()
+        2
+    """
+    HN = 0    # code for horizontal node
+    PM = 1    # code for prong matching
+
+    def __init__(self, ds_graphs):
+        self._levels = ds_graphs
+
+        from sage.features.gap import GapPackage
+        GapPackage("images").require()
+
+    def _normalize_prong_matching(self, l0, c0, h0, a0, l1, c1, h1, a1):
+        r"""
+        Return a normalized triple (hh0, hh1, aa1)
+        """
+        vt0 = self._levels[l0][c0].root()
+        vt1 = self._levels[l1][c1].root()
+        h1, a1 = vt1._normalize_face_separatrix(h1, a1)
+        for (hh0, aa0), (hh1, aa1) in zip(vt0.vertex_separatrices(h0, a0), vt1.face_separatrices(h1, a1)):
+            if (hh0, aa0) < (h0, a0):
+                h0 = hh0
+                a0 = aa0
+                h1 = hh1
+                a1 = aa1
+        assert a0 == 0
+        return (h0, h1, a1)
+
+    def infinite_cylinder_representatives(self, level, component):
+        r"""
+        Return a sorted list of (potential) horizontal nodes as quadruples (l, c, h0, h1).
+        """
+        ds_graph = self._levels[level][component]
+        vt = ds_graph.root()
+        cyls = []
+        for face in perm_cycles(vt._fp):
+            if all(vt._bdry[i] == 1 and vt._colouring[i // 2] == vt._colouring[face[0] // 2] for i in face):
+                # pole of angle zero
+                cyls.append(min(face))
+        return tuple(cyls)
+
+    # TODO: this should be moved to VeeringTriangualtion
+    def double_pole_residues(self, level, component):
+        vt = self._levels[level][component].root()
+        ne = vt._ne
+        colouring = vt._colouring
+        fp = vt._fp
+
+        cyls = self.infinite_cylinder_representatives(level, component)
+        r = matrix(ZZ, len(cyls), ne)
+        for i, h in enumerate(cyls):
+            o = 1
+            for h0 in perm_orbit(fp, h):
+                r[i, h0 // 2] += o
+
+                h1 = fp[h0]
+                if vt.half_edge_num_separatrices(h1) % 2 == 0:
+                    o *= -1
+        return r
+
+    def horizontal_nodes(self, level, component):
+        r"""
+        EXAMPLES::
+
+            sage: from veerer.linear_subvariety import NodesCanonicalizer
+            sage: from veerer import VeeringTriangulationLinearFamily, MultiscaleVeeringTriangulation
+            sage: vt = VeeringTriangulationLinearFamily("(0:1)(~0:1,1:1)(~1:1,2:1)(~2:1)", "RRR", [(1, 0, 1), (0, 1, 0)])
+            sage: C = NodesCanonicalizer([[vt.delaunay_strebel_graph()]])
+            sage: list(C.horizontal_nodes(0, 0))
+            [(0, 5), (1, 3)]
+        """
+        vt = self._levels[level][component].root()
+        residues = self.double_pole_residues(level, component) * vt.generators_matrix().transpose()
+        by_residues = collections.defaultdict(list)
+        for h, r in zip(self.infinite_cylinder_representatives(level, component), residues):
+            if r[r.nonzero_positions()[0]] < 0:
+                r *= -1
+            r.set_immutable()
+            by_residues[r].append(h)
+
+        return itertools.chain(*[itertools.combinations(cyl_reps, 2) for cyl_reps in by_residues.values()])
+
+    def separatrix_representatives(self):
+        r"""
+        Return the pair ``(vertex_separatrices, face_separatrices)`` of
+        respectively vertex separatrices and face separatrices that could occur
+        in a (normalized) prong matching.
+        """
+        vertex_separatrices = [[[] for _ in range(len(self._levels[level]))] for level in range(len(self._levels))]
+        face_separatrices = [[[] for _ in range(len(self._levels[level]))] for level in range(len(self._levels))]
+
+        zeros = collections.defaultdict(list)  # list of waiting separatrices
+
+        for l1, ds_graphs in enumerate(self._levels):
+            new_zeros = collections.defaultdict(list)
+            for c1, ds_graph in enumerate(ds_graphs):
+                vt = ds_graph.root()
+
+                for vseps in vt.vertex_separatrices(flat=False):
+                    assert vseps[0][1] == 0
+                    new_zeros[len(vseps)].append((l1, c1, vseps[0][0]))
+
+                for fseps in vt.face_separatrices(flat=False):
+                    assert fseps[0][1] == 0
+                    order = len(fseps)
+
+                    if zeros[order]:
+                        for l, c, vsep in zeros[order]:
+                            vertex_separatrices[l][c].append(vsep)
+                        zeros[order].clear()
+                        face_separatrices[l1][c1].extend(fseps)
+
+            for x, y in new_zeros.items():
+                zeros[x].extend(y)
+            new_zeros.clear()
+
+        return tuple(vertex_separatrices), tuple(face_separatrices)
+
+    def prong_matchings(self):
+        r"""
+        Return a sorted list of (potential) prong matchings as 7-tuples (l0, c0, h0, l1, c1, h1, a1).
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation, VeeringTriangulationLinearFamilies
+            sage: from veerer.linear_subvariety import NodesCanonicalizer
+
+            sage: vt0 = VeeringTriangulation("(0:1)(~0:1)", "R")
+            sage: vt1 = VeeringTriangulation("(0:3)(~0:3)", "R")
+            sage: ds_graph0 = VeeringTriangulationLinearFamilies.diagonal(vt0, [1, 1, 1, 1]).delaunay_strebel_graph()
+            sage: ds_graph1 = VeeringTriangulationLinearFamilies.diagonal(vt1, [1, 1]).delaunay_strebel_graph()
+            sage: pms, pm_from, pm_to = NodesCanonicalizer([[ds_graph0], [ds_graph1]]).prong_matchings()
+            sage: pms
+            ((0, 0, 0, 1, 0, 0, 0),
+             (0, 0, 0, 1, 0, 0, 1),
+             (0, 0, 2, 1, 0, 0, 0),
+             (0, 0, 2, 1, 0, 0, 1),
+             ...
+             (0, 0, 6, 1, 0, 3, 1))
+        """
+        prong_matchings_from = [[[] for _ in range(len(self._levels[level]))] for level in range(len(self._levels))]
+        prong_matchings_to = [[[] for _ in range(len(self._levels[level]))] for level in range(len(self._levels))]
+        pms = []
+
+        zeros = collections.defaultdict(list)
+
+        for l1, ds_graphs in enumerate(self._levels):
+            new_zeros = collections.defaultdict(list)
+            for c1, ds_graph in enumerate(ds_graphs):
+                vt = ds_graph.root()
+
+                for vseps in vt.vertex_separatrices(flat=False):
+                    assert vseps[0][1] == 0
+                    new_zeros[len(vseps)].append((l1, c1, vseps[0][0]))
+
+                for fseps in vt.face_separatrices(flat=False):
+                    assert fseps[0][1] == 0
+                    order = len(fseps)
+
+                    for (l0, c0, h0) in zeros[order]:
+                        for h1, a1 in fseps:
+                            pm = (l0, c0, h0, l1, c1, h1, a1)
+                            pms.append(pm)
+                            prong_matchings_from[l0][c0].append(pm)
+                            prong_matchings_to[l1][c1].append(pm)
+
+            for x, y in new_zeros.items():
+                zeros[x].extend(y)
+            new_zeros.clear()
+
+        return tuple(pms), prong_matchings_from, prong_matchings_to
+
+    def vertices(self):
+        for level, ds_graphs in enumerate(self._levels):
+            for component, ds_graph in enumerate(ds_graphs):
+                yield (level, component, ds_graph)
+
+    @cached_method
+    def ambient_domain(self):
+        r"""
+        Return the dictionary mapping the infinite cylinder and separatrix
+        representatives to integers and is used in communication with libgap.
+        """
+        dom = []
+        to_dom = {}
+
+        # horizontal nodes
+        for level, component, _ in self.vertices():
+            for h0, h1 in self.horizontal_nodes(level, component):
+                elt = (self.HN, level, component, h0, h1)
+                dom.append(elt)
+                to_dom[elt] = len(to_dom)
+
+        # prong matchings
+        for pm in self.prong_matchings()[0]:
+            elt = (self.PM,) + pm
+            dom.append(elt)
+            to_dom[elt] = len(to_dom)
+
+        return dom, to_dom
+
+    def monodromy_permutation(self, level, component, g):
+        r"""
+        Convert the monodromy element ``g`` of ``(level, component)`` into a permutation of the domain.
+        """
+        domain, to_domain = self.ambient_domain()
+
+        ds_graph = self._levels[level][component]
+        vt = ds_graph.root()
+        g_vseps, g_fseps, g_cyls, g_fhedges = vt.framing_group_element_permutation(g, ds_graph.framing(0))
+
+        p = array.array('i', range(len(to_domain)))
+
+        # action on horizontal nodes
+        for h0, h1 in self.horizontal_nodes(level, component):
+            hh0 = min(perm_orbit(vt._fp, g_cyls[h0]))
+            hh1 = min(perm_orbit(vt._fp, g_cyls[h1]))
+            if hh1 < hh0:
+                hh0, hh1 = hh1, hh0
+            i = to_domain[self.HN, level, component, h0, h1]
+            j = to_domain[self.HN, level, component, hh0, hh1]
+            p[i] = j
+
+        # action on prong matchings
+        prong_matchings, prong_matchings_from, prong_matchings_to = self.prong_matchings()
+        for (l0, c0, h0, l1, c1, h1, a1) in prong_matchings_from[level][component]:
+            assert l0 == level and c0 == component, (level, component, l0, c0)
+            hh0, aa0 = g_vseps[h0, 0]
+            hh0, hh1, aa1 = self._normalize_prong_matching(l0, c0, hh0, aa0, l1, c1, h1, a1)
+            i = to_domain[self.PM, l0, c0, h0, l1, c1, h1, a1]
+            j = to_domain[self.PM, l0, c0, hh0, l1, c1, hh1, aa1]
+            p[i] = j
+
+        for (l0, c0, h0, l1, c1, h1, a1) in prong_matchings_to[level][component]:
+            assert l1 == level and c1 == component, (level, component, l1, c1)
+            hh1, aa1 = g_fseps[h1, a1]
+            # NOTE: since we do not act on level l0, the prong matching is already normalized
+            i = to_domain[self.PM, l0, c0, h0, l1, c1, h1, a1]
+            j = to_domain[self.PM, l0, c0, h0, l1, c1, hh1, aa1]
+            p[i] = j
+
+        # TODO: remove check
+        perm_check(p)
+        return p
+
+    def isomorphic_prime_component_partition(self, level):
+        by_prime_comp = collections.defaultdict(list)
+        for comp, ds_graph in enumerate(self._levels[level]):
+            by_prime_comp[ds_graph].append(comp)
+        return tuple(map(tuple, by_prime_comp.values()))
+
+    def isomorphism_generators(self, level):
+        domain, to_domain = self.ambient_domain()
+        gens = []
+        prong_matchings, prong_matchings_from, prong_matchings_to = self.prong_matchings()
+        for components in self.isomorphic_prime_component_partition(level):
+            ds_graph = self._levels[level][components[0]]
+            root = ds_graph.root()
+
+            # symmetries of isomorphic prime components
+            horizontal_nodes = self.horizontal_nodes(level, components[0])
+            if len(components) == 2:
+                p = array.array('i', range(len(to_domain)))
+                for h0, h1 in self.horizontal_nodes(level, components[0]):
+                    i = to_domain[self.HN, level, components[0], h0, h1]
+                    j = to_domain[self.HN, level, components[1], h0, h1]
+                    p[i] = j
+                    p[j] = i
+                for (l0, c0, h0, l1, c1, h1, a1) in prong_matchings_from[level][components[0]]:
+                    i = to_domain[self.PM, l0, components[0], h0, l1, c1, h1, a1]
+                    j = to_domain[self.PM, l0, components[1], h0, l1, c1, h1, a1]
+                    p[i] = j
+                    p[j] = i
+                for (l0, c0, h0, l1, c1, h1, a1) in prong_matchings_to[level][components[0]]:
+                    i = to_domain[self.PM, l0, c0, l1, components[0], h1, a1]
+                    j = to_domain[self.PM, l0, c0, l1, components[1], h1, a1]
+                    p[i] = j
+                    p[j] = i
+                perm_check(p)
+                gens.append(p)
+
+            if len(components) >= 3:
+                p = array.array('i', range(len(to_domain)))
+                for k in range(len(components)):
+                    comp0 = components[k]
+                    comp1 = components[(k + 1) % len(components)]
+                    for h in cyls:
+                        i = to_domain[self.HN, level, comp0, h0, h1]
+                        j = to_domain[self.HN, level, comp1, h0, h1]
+                        p[i] = j
+                    for (l0, c0, h0, l1, c1, h1, a1) in prong_matchings_from[level, components[0]]:
+                        i = to_domain[self.PM, l0, comp0, h0, l1, c1, h1, a1]
+                        j = to_domain[self.PM, l0, comp1, h0, l1, c1, h1, a1]
+                        p[i] = j
+                    for (l0, c0, h0, l1, c1, h1, a1) in prong_matchings_to[level, components[0]]:
+                        i = to_domain[self.PM, l0, c0, h0, l1, comp0, h1, a1]
+                        j = to_domain[self.PM, l0, c0, h0, l1, comp1, h1, a1]
+                        p[i] = j
+                perm_check(p)
+                gens.append(p)
+
+                # symmetries of given prime component
+                for aut in root.automorphism_gens():
+                    g = ds_graph.automorphism_framing_monodromy(aut)
+                    p = self.monodromy_permutation(level, components[0], g)
+                    gens.append(p)
+
+        return tuple(gens)
+
+    @cached_method
+    def libgap_group(self):
+        gens = []
+        for level, ds_graphs in enumerate(self._levels):
+            for p in self.isomorphism_generators(level):
+                gens.append(libgap.PermList([i + 1 for i in p]))
+
+            # NOTE: it is enough to only use monodromy generator once per isomorphism class of DS graphs
+            # since symmetry generators are present
+            for components in self.isomorphic_prime_component_partition(level):
+                component = components[0]
+                ds_graph = self._levels[level][component]
+                for g in ds_graph.framing_group().gens():
+                    p = self.monodromy_permutation(level, component, g)
+                    gens.append(libgap.PermList([i + 1 for i in p]))
+
+        return libgap.Group(gens)
+
+    # TODO: add examples
+    def multiscale_structure_libgap_encoding(self, mvt):
+        if not isinstance(mvt, MultiscaleVeeringTriangulation):
+            raise TypeError
+        if len(mvt._veering_triangulations) != len(self._levels):
+            raise ValueError("invalid multiscale veering triangulation")
+        for level, (veering_triangulations, ds_graphs) in enumerate(zip(mvt._veering_triangulations, self._levels)):
+            if len(veering_triangulations) != len(ds_graphs):
+                raise ValueError("invalid multiscale veering triangulation")
+            for component, (vt, ds_graph) in enumerate(zip(veering_triangulations, ds_graphs)):
+                if vt != ds_graph.root():
+                    raise ValueError("invalid multiscale veering triangulation")
+
+        # turn horizontal and vertical nodes of mvt into the domain
+        domain, to_domain = self.ambient_domain()
+        nodes_encoding = []
+        horizontal_nodes = mvt._horizontal_nodes()
+        prong_matchings = mvt._prong_matchings()
+        for level, component, ds_graph in self.vertices():
+            for (h0, h1) in horizontal_nodes[level][component]:
+                nodes_encoding.append(1 + to_domain[self.HN, level, component, h0, h1])
+        for (l0, c0, h0, a0), (l1, c1, h1, a1) in mvt._prong_matchings():
+            nodes_encoding.append(1 + to_domain[self.PM, l0, c0, h0, l1, c1, h1, a1])
+        nodes_encoding.sort()
+        return libgap(nodes_encoding)
+
+    # TODO: add examples
+    def multiscale_structure_libgap_decoding(self, nodes):
+        domain, to_domain = self.ambient_domain()
+        horizontal_nodes = [[[] for _ in range(len(self._levels[level]))] for level in range(len(self._levels))]
+        prong_matchings = []
+        for i in nodes:
+            elt = domain[i - 1]
+            if elt[0] == self.HN:
+                _, l, c, h0, h1 = elt
+                horizontal_nodes[l][c].append((h0, h1))
+            elif elt[0] == self.PM:
+                _, l0, c0, h0, l1, c1, h1, a1 = elt
+                prong_matchings.append(((l0, c0, h0, 0), (l1, c1, h1, a1)))
+            else:
+                raise ValueError
+
+        return MultiscaleVeeringTriangulation([[ds_graph.root() for ds_graph in ds_graphs] for ds_graphs in self._levels],
+                                              horizontal_nodes=horizontal_nodes,
+                                              prong_matchings=prong_matchings)
+
+    def canonical_multiscale_structure(self, mvt):
+        r"""
+        Return a canonical multiscale veering triangulation in the same linear subvariety
+        as ``mvt``.
+
+        INPUT:
+
+        - ``mvt`` - a :class:`MultiscaleVeeringTriangulation` whose veering
+          triangulations and level structure coincide with the levels provided as
+          input to this canonicalizer.
+        """
+        P = self.libgap_group()
+        enc = self.multiscale_structure_libgap_encoding(mvt)
+        enc_canonical = libgap.CanonicalImage(P, enc, libgap.OnSets)
+        return self.multiscale_structure_libgap_decoding(enc_canonical)
+
+
+
+# TODO: add examples
 class IrreducibleRealLinearSubvariety:
     r"""
     Irreducible real linear subvariety of the moduli space of multiscale
@@ -384,25 +848,17 @@ class IrreducibleRealLinearSubvariety:
 
     TESTS::
 
-        sage: from veerer import *
-        sage: vt = VeeringTriangulation("(1,2,3)(~1,~2,~3)(0:1)(~0:1)", "BRBB")
-        sage: L = vt.linear_subvariety()
-        sage: L  # optional - surface_dynamics
-        Irreducible real linear subvariety of projective dimension 1 in [[H_0(0, -1^2)], [H_1(0)]]
-        sage: L.codimension_one_horizontal_degenerations()  # optional - surface_dynamics
-        [Irreducible real linear subvariety of projective dimension 0 in [[H_0(0, -1^2)], [H_0(0, -1^2)]]]
-        sage: L.codimension_one_vertical_degenerations()  # optional - surface_dynamics
-        []
-
-        sage: vt = VeeringTriangulationLinearFamily("(0:2,1:2)(~0:2,~1:2)", "RR", [(1, 1)])
-        sage: M = vt.linear_subvariety().multiscale_compactification()
-        sage: M # optional - surface_dynamics
-        MultiscaleCompactification Irreducible real linear subvariety of projective dimension 0 in [[H_0(1^2, -2^2)]]
+        sage: from veerer import VeeringTriangulationLinearFamily, MultiscaleVeeringTriangulation
+        sage: from veerer.linear_subvariety import IrreducibleRealLinearSubvariety
+        sage: vt0 = VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)])
+        sage: vt1 = VeeringTriangulationLinearFamily("(0:1,1:1,~0:1,~1:1)", "RB", [(1, 0), (0, 1)])
+        sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[vt0], [vt1]], horizontal_nodes=[[[]], [[]]], prong_matchings=[((0, 0, 0, 0), (1, 0, 1, 0))])
+        sage: L = IrreducibleRealLinearSubvariety([[vt0.delaunay_strebel_graph()], [vt1.delaunay_strebel_graph()]], mvt)
     """
     # TODO: simplify the constructor. It should __init__(self, ds_graphs, mvt=None)
     # for StrebelGraph, VeeringTriangulations and linear families, building the associated linear subvariety
     # should be done with the method .linear_subvariety()
-    def __init__(self, *args):
+    def __init__(self, *args, canonicalizer=None):
         # list of dictionaries: self._levels[i] is a tuple representing the
         # i-th level
         if len(args) == 1:
@@ -458,12 +914,15 @@ class IrreducibleRealLinearSubvariety:
 
         self._levels = tuple(map(tuple, ds_graphs))
         self._mvt = multiscale_veering_triangulation
-        if self._mvt is not None:
-            self._mvt.set_immutable()
 
         self._check()
-        self._normalize_multiscale_structure()
-        self._check()
+
+        if multiscale_veering_triangulation is not None:
+            if canonicalizer is None:
+                canonicalizer = NodesCanonicalizer(self._levels)
+            self._mvt = canonicalizer.canonical_multiscale_structure(multiscale_veering_triangulation)
+            self._mvt.set_immutable()
+            self._check()
 
     def _check_level(self, level):
         if not isinstance(level, numbers.Integral):
@@ -496,185 +955,6 @@ class IrreducibleRealLinearSubvariety:
                 for stgraph, vt in zip(stgraphs, vts):
                     if vt != stgraph.root():
                         raise error
-
-    # TODO: vertical nodes might not be properly noramlized. Namely when
-    # we apply a permutation the quadruple (h0, a0, h1, a1) has no reason
-    # to be in canonical form
-    # TODO: currently the code just be the orbit of nodal di-graphs under
-    # the three actions (monodromy, level-wise, component-wise). We need
-    # to select the "minimal" one with respect to a reasonable ordering
-    def _normalize_multiscale_structure(self):
-        r"""
-        Normalize the nodal structure by applying
-        """
-        DEBUG = False
-
-        if self._mvt is None:
-            return
-
-        from array import array
-        from collections import defaultdict
-
-        monodromy_gens = [] # monodromy on each prime component as triple (level, component, group_element)
-        level_perm_gens = []  # level-wise permutations as pairs (level, permutation)
-        prime_component_perm_gens = []  # prime-component relabelling as triples (level, component, permutation)
-
-        for level, ds_graphs in enumerate(self._levels):
-            by_prime_comp = defaultdict(list)
-            for component, ds_graph in enumerate(ds_graphs):
-                monodromy_gens.extend((level, component, gen) for gen in ds_graph.framing_group().gens())
-                by_prime_comp[ds_graph].append(component)
-
-            for ds_graph, components in by_prime_comp.items():
-                if len(components) >= 2:
-                    a = array('i', range(len(ds_graphs)))
-                    a[components[0]] = components[1]
-                    a[components[1]] = components[0]
-                    # TODO: remove check
-                    perm_check(a)
-                    level_perm_gens.append((level, a))
-                if len(components) >= 3:
-                    a = array('i', range(len(ds_graphs)))
-                    for i in range(len(components)):
-                        a[components[i]] = components[(i + 1) % len(ds_graphs)]
-                    # TODO: remove check
-                    perm_check(a)
-                    level_perm_gens.append((level, a))
-
-                by_conn_comp = defaultdict(list)
-                for (atom, cc) in ds_graph.root().connected_components_subgraphs():
-                    by_conn_comp[cc].append(atom)
-
-                root = ds_graph.root()
-                component = components[0]
-                for atoms in by_conn_comp.values():
-                    # permutation inside a prime component
-                    if len(atoms) >= 2:
-                        a = array('i', range(2 * root.num_edges()))
-                        for i, j in zip(atoms[0], atoms[1]):
-                            a[i] = j
-                            a[j] = i
-                        # TODO: remove check
-                        perm_check(a)
-                        prime_component_perm_gens.append((level, component, a))
-                    if len(atoms) >= 3:
-                        a = array('i', range(2 * root.num_edges()))
-                        for i in range(len(atoms)):
-                            for j in range(len(atoms[0])):
-                                a[atoms[i][j]] = atoms[(i + 1) % len(atoms)][j]
-                        # TODO: remove check
-                        perm_check(a)
-                        prime_component_perm_gens.append((level, component, a))
-
-        # * isomorphic connected components inside a prime component
-        if DEBUG:
-            print(f'[_normalize_multiscale_structure]: {len(monodromy_gens)} monodromy generators')
-            print(f'[_normalize_multiscale_structure]: {len(level_perm_gens)} level-wise permutation')
-            print(f'[_normalize_multiscale_structure]: {len(prime_component_perm_gens)} component-wise permutation')
-
-        # We operate directly on a modified version of the nodal_graph
-        mvt = self._mvt
-        NG = self._mvt._nodal_digraph
-        G = DiGraph(NG.num_verts(), loops=True, multiedges=True)
-        for e in range(NG.num_edges()):
-            G.add_edge(NG._edge_sources[e], NG._edge_targets[e], NG._edges[e])
-        if DEBUG:
-            print(f'[_normalize_multiscale_structure]: G.edges()={G.edges()}')
-        G = G.copy(immutable=True)
-        todo = [G]
-        orbit = set([G])
-        while todo:
-            G = todo.pop()
-
-            # monodromy
-            for (level, component, g) in monodromy_gens:
-                H = G.copy(immutable=False)
-                v = NG._vertex_index[level, component]
-                vt = mvt._veering_triangulations[level][component]
-                ds_graph = self._levels[level][component]
-                g_vseps, g_fseps, g_cyls, g_fhedges = vt.framing_group_element_permutation(g, ds_graph.framing(0))
-                for (_, v1, label) in G.outgoing_edges(v):
-                    if v == v1:
-                        # horizontal edge
-                        h0, h1 = label
-                        hh0 = g_cyls[h0]
-                        hh1 = g_cyls[h1]
-                        if hh0 > hh1:
-                            hh0, hh1 = hh1, hh0
-                        H.delete_edge(v, v1, label)
-                        H.add_edge(v, v1, (hh0, hh1))
-                    else:
-                        # vertical edge
-                        (h0, a0, h1, a1) = label
-                        hh0, aa0 = g_vseps[h0, a0]
-                        H.delete_edge(v, v1, label)
-                        H.add_edge(v, v1, (hh0, aa0, h1, a1))
-
-                for (v0, _, label) in G.incoming_edges(v):
-                    if v == v0:
-                        # horizontal edge (already treated in previous loop)
-                        continue
-                    else:
-                        (h0, a0, h1, a1) = label
-                        hh1, aa1 = g_fseps[h1, a1]
-                        H.delete_edge(v0, v, label)
-                        H.add_edge(v0, v, (h0, a0, hh1, aa1))
-
-                H = H.copy(immutable=True)
-                if H not in orbit:
-                    orbit.add(H)
-                    todo.add(H)
-
-            # level-wise permutation
-            for (level, p) in level_perm_gens:
-                H = G.copy(immutable=False)
-                relabelling = {i: i for i in G.vertices()}
-                for comp in range(len(self._levels[level])):
-                    relabelling[NG._vertex_index[level, comp]] = NG._vertex_index[level, p[comp]]
-                H.relabel(relabelling)
-                H = H.copy(immutable=True)
-                if H not in orbit:
-                    orbit.add(H)
-                    todo.add(H)
-
-            # component-wise permutation
-            for (level, component, p) in prime_component_perm_gens:
-                H = G.copy(immutable=False)
-                v = NG._vertex_index[level, component]
-                for (_, v1, label) in G.outgoing_edges(v):
-                    if v == v1:
-                        # horizontal edge
-                        h0, h1 = label
-                        hh0 = p[h0]
-                        hh1 = p[h1]
-                        if hh0 > hh1:
-                            hh0, hh1 = hh1, hh0
-                        H.delete_edge(v, v1, label)
-                        H.add_edge(v, v1, (hh0, hh1))
-                    else:
-                        # vertical edge
-                        (h0, a0, h1, a1) = label
-                        hh0 = p[h0]
-                        H.delete_edge(v, v1, label)
-                        H.add_edge(v, v1, (hh0, a0, h1, a1))
-
-                for (v0, _, label) in G.incoming_edges(v):
-                    if v0 == v:
-                        # horizontal edge (already treated in previous loop)
-                        continue
-                    else:
-                        (h0, a0, h1, a1) = label
-                        hh1 = p[h1]
-                        H.delete_edge(v0, v, label)
-                        H.add_edge(v0, v, (h0, a0, hh1, a1))
-
-                H = H.copy(immutable=True)
-                if H not in orbit:
-                    orbit.add(H)
-                    todo.append(H)
-
-        if DEBUG:
-            print(f"[_normalize_multiscale_structure]: len(orbit)={len(orbit)}")
 
     def __eq__(self, other):
         if type(self) is not type(other):
@@ -759,6 +1039,11 @@ class IrreducibleRealLinearSubvariety:
             ....:     print(Ldeg.dimension())
             4
             4
+            4
+            4
+            4
+            4
+            4
         """
         if level is None:
             return sum(self.dimension(level) for level in self.levels())
@@ -778,6 +1063,11 @@ class IrreducibleRealLinearSubvariety:
             3
             sage: for Ldeg in L.codimension_one_vertical_degenerations():
             ....:     print(Ldeg.projective_dimension())
+            2
+            2
+            2
+            2
+            2
             2
             2
         """
