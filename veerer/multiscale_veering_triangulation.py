@@ -449,31 +449,31 @@ class MultiscaleVeeringTriangulation:
                 elif isinstance(vts, list):
                     for vt in vts:
                         if not isinstance(vt, VeeringTriangulation):
-                            raise TypeError(f"'vt' (value: {vt}) is not an instance of the VeeringTriangulation.")
+                            raise TypeError(f"input must be veering triangulations; got {type(vt).__name__}")
                     self._veering_triangulations.append(list(vts))
                     prime_decomposition.append(len(vts))
                 else:
-                    raise ValueError(f"The input of veering triangulations {vts} at level-{level} is bad.")
+                    raise ValueError(f"invalid list of veering triangulations {vts} at level-{level}")
         else:
             raise ValueError("The 'veering_triangulations' must be a list.")
 
         if isinstance(horizontal_nodes, list):
             if len(horizontal_nodes) != len(self._veering_triangulations):
-                raise ValueError("Miss information for horizontal nodes at some levels")
+                raise ValueError("veering_triangulations and horizontal_nodes must have the same length; got {len(veering_triangulations)} and {len(horizontal_nodes)}")
             data_horiz_nodes = [] # data for building nodal digraph
             for level in range(len(horizontal_nodes)):
                 nodes = horizontal_nodes[level]
                 vts = self._veering_triangulations[level]
                 if len(nodes) != len(vts):
-                    raise ValueError(f"Miss information for horizontal nodes at some components at level-{level}")
+                    raise ValueError(f"veering_triangulations[{level}] and horizontal_nodes[{level}] must have the same length; got {len(vts)} and {len(nodes)}")
                 for c in range(len(vts)):
                     nodes_at_c = []
                     vt = vts[c]
-                    if isinstance(nodes[c], list):
-                        if all(len(n) == 2 for n in nodes[c]):
-                            nodes_at_c = [tuple(n) for n in nodes[c]]
+                    if isinstance(nodes[c], (tuple, list)):
+                        if all(isinstance(n, (tuple, list)) and len(n) == 2 and isinstance(n[0], numbers.Integral) and isinstance(n[1], numbers.Integral) for n in nodes[c]):
+                            nodes_at_c = [(int(n[0]), int(n[1])) for n in nodes[c]]
                         else:
-                            raise ValueError(f"The input of horizontal nodes {nodes[c]} is bad.")
+                            raise ValueError(f"invalid input {nodes[c]} to specify horizontal nodes in a given prime component; it must be a list of pairs")
                     elif isinstance(nodes[c], str):
                         nodes_at_c = str_to_cycles(nodes[c])
                         for i, node in enumerate(nodes_at_c):
@@ -486,7 +486,7 @@ class MultiscaleVeeringTriangulation:
                                 node[j] = vt._check_half_edge(h)
                             nodes_at_c[i] = tuple(node)
                     else:
-                        raise ValueError(f"The input of horizontal nodes of the {c}-th component at level-{level} is bad {nodes[c]}")
+                        raise ValueError(f"invalid horizontal node specification; got a {type(nodes[c]).__name__} at the {c}-th component of level-{level} instead of a list of pairs of half-edges")
 
                     # normalization of horizontal nodes
                     fp = vt.face_permutation()
@@ -1161,11 +1161,11 @@ class MultiscaleVeeringTriangulation:
             True
             sage: vt1.is_abelian()
             True
-            sage: mvt0 = MultiscaleVeeringTriangulation([vt0,vt1],[[""],["(~4,7)"]],[[(0,0,"0",0),(-1,0,"0",1)],[(0,0,"2",0),(-1,0,"5",1)]])
+            sage: mvt0 = MultiscaleVeeringTriangulation([vt0,vt1],[[[]],[[(9,14)]]],[[(0,0,0,0),(-1,0,0,1)],[(0,0,4,0),(-1,0,10,1)]])
             sage: mvt0.is_abelian()
             False
             sage: vt2 = VeeringTriangulationLinearFamily("(~0,1,4)(~1,~2,3)(~5,6,9)(~6,~7,8)(0:5)(2:1)(~3:1)(~4:1)(5:5)(7:1)(~8:1)(~9:1)", "BBRBRBBRBR", [(1, 0, 0, 0, 1, 0, 0, 0, 0, 0), (0, 1, 0, 1, -1, 0, 0, 1, 1, 0), (0, 0, 1, 1, 0, 0, 0, 1, 1, 0), (0, 0, 0, 0, 0, 1, 0, 0, 0, 1), (0, 0, 0, 0, 0, 0, 1, -1, 0, -1)])
-            sage: mvt1 = MultiscaleVeeringTriangulation([vt0,vt2],[[""],["(~3,~8)"]],[[(0,0,"0",0),(-1,0,"0",1)],[(0,0,"2",0),(-1,0,"5",1)]])
+            sage: mvt1 = MultiscaleVeeringTriangulation([vt0,vt2],[[[]],[[(7,17)]]], [[(0,0,0,0),(-1,0,0,1)],[(0,0,4,0),(-1,0,10,1)]])
             sage: print(mvt1.is_abelian(certificate=True))
             (True, [[[True, False, True, False, False, True, False, True, False, True]], [[False, True, False, True, False, True, False, True, False, True, True, False, True, False, True, False, True, False, True, False]]])
         """
@@ -1370,7 +1370,7 @@ class MultiscaleVeeringTriangulation:
 
             sage: vt00 = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:5,3:1)","RBRBB")
             sage: vt01 = VeeringTriangulation("(~0,1,2)(~1,~2,3)(~4,~6,~7)(6,7,~5)(0:5)(~3:1)(4:4,5:4)","BBRBBBRR")
-            sage: mvt0 = MultiscaleVeeringTriangulation([vt00,vt01],[[""],[""]],[[(0,0,"0",0),(-1,0,"0",1)],[(0,0,"2",0),(-1,0,"5",1)]])
+            sage: mvt0 = MultiscaleVeeringTriangulation([vt00,vt01], prong_matchings=[[(0,0,0,0),(-1,0,0,1)],[(0,0,4,0),(-1,0,10,1)]])
             sage: mvt0.degeneration(-1,0, edges_low=[0, 1, 2, 3, 4, 5], edges_up=[6, 7])
             MultiscaleVeeringTriangulation(
             veering_triangulations=[
