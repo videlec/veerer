@@ -386,7 +386,7 @@ class NodesCanonicalizer:
 
     EXAMPLES::
 
-        sage: from veerer import VeeringTriangulationLinearFamily, MultiscaleVeeringTriangulation
+        sage: from veerer import VeeringTriangulation, VeeringTriangulationLinearFamily, MultiscaleVeeringTriangulation
         sage: from veerer.linear_subvariety import NodesCanonicalizer
 
     An example with two possible prong matchings::
@@ -449,6 +449,25 @@ class NodesCanonicalizer:
         sage: C = NodesCanonicalizer([[vt.delaunay_strebel_graph()]])
         sage: C.libgap_group().Size()
         2
+
+    An example with two prime components in level -1::
+
+        sage: vt0 = VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,~5)", "RRBBRR", [(1, 0, -1, -1, 0, -1), (0, 1, 1, 1, 0, 1), (0, 0, 0, 0, 1, 1)])
+        sage: vt1 = VeeringTriangulation("(0:2,~0:2)", "R")
+        sage: C = NodesCanonicalizer([[vt0.delaunay_strebel_graph()], [vt1.delaunay_strebel_graph()] * 2])
+        sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[vt0], [vt1] * 2], prong_matchings=[((0, 0, 0, 0), (1, 0, 0, 0)), ((0, 0, 1, 0), (1, 1, 0, 0))])
+        sage: C.libgap_group().Size()
+        16
+        sage: C.canonicalize_multiscale_structure(mvt)
+        MultiscaleVeeringTriangulation(
+          veering_triangulations=[
+            [VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,~5)", "RRBBRR", [(1, 0, -1, -1, 0, -1), (0, 1, 1, 1, 0, 1), (0, 0, 0, 0, 1, 1)])],
+            [VeeringTriangulation("(0:2,~0:2)", "R"), VeeringTriangulation("(0:2,~0:2)", "R")]
+          ],
+          horizontal_nodes=[[[]], [[], []]],
+          prong_matchings=[((0, 0, 0, 0), (1, 0, 0, 0)), ((0, 0, 1, 0), (1, 1, 0, 0))]
+        )
+
     """
     HN = 0    # code for horizontal node
     PM = 1    # code for prong matching
@@ -721,8 +740,8 @@ class NodesCanonicalizer:
                     p[i] = j
                     p[j] = i
                 for (l0, c0, h0, l1, c1, h1, a1) in prong_matchings_to[level][components[0]]:
-                    i = to_domain[self.PM, l0, c0, l1, components[0], h1, a1]
-                    j = to_domain[self.PM, l0, c0, l1, components[1], h1, a1]
+                    i = to_domain[self.PM, l0, c0, h0, l1, components[0], h1, a1]
+                    j = to_domain[self.PM, l0, c0, h0, l1, components[1], h1, a1]
                     p[i] = j
                     p[j] = i
                 perm_check(p)
