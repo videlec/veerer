@@ -127,13 +127,16 @@ class Constellation:
         if check:
             self._check(ValueError)
 
-    def _ep(self, i):
-        if self._vp[i] == -1:
+    def _ep(self, h):
+        r"""
+        Return the image of ``h`` under the edge permutation.
+        """
+        if self._vp[h] == -1:
             return -1
-        elif self._vp[i ^ 1] == -1:
-            return i
+        elif self._vp[h ^ 1] == -1:
+            return h
         else:
-            return i ^ 1
+            return h ^ 1
 
     def _set_data_pointers(self):
         pass
@@ -177,10 +180,11 @@ class Constellation:
             raise TypeError("reallocation needed")
 
     def _realloc(self, n_max):
+        if self._half_edges_data or self._edges_data:
+            raise NotImplementedError
         if n_max < self._n:
             return
         self._vp.extend([-1] * (n_max - self._n))
-        self._ep.extend([-1] * (n_max - self._n))
         self._fp.extend([-1] * (n_max - self._n))
 
     def __getstate__(self):
@@ -1613,6 +1617,9 @@ class Constellation:
         best_relabellings = self.best_relabelling(return_all=True)[0]
         p0 = perm_invert(best_relabellings[0])
         return [perm_compose(p, p0) for p in best_relabellings]
+
+    def automorphism_gens(self):
+        return self.automorphisms()
 
     def best_relabelling(self, return_all=False):
         r"""
