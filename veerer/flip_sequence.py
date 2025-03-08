@@ -104,7 +104,7 @@ class VeeringFlipSequence(object):
         elif reduced is False and any(c == PURPLE for c in start._colouring):
             raise ValueError("wrong usage of 'reduced'")
 
-        self._start = start.copy(mutable=True)
+        self._start = start.copy(mutable=True, cls=VeeringTriangulation)
         if reduced:
             self._start.forgot_forward_flippable_colour()
         self._end = self._start.copy(mutable=True)
@@ -118,6 +118,20 @@ class VeeringFlipSequence(object):
                 self.append_flip(e, col)
         if relabelling is not None:
             self.append_relabelling(relabelling)
+
+    def apply(self, x):
+        if x.constellation() != self._start:
+            raise ValueError
+        for e, col_after, col_before in self._flips:
+            x.flip(e, col_after)
+        x.relabel(self._relabelling)
+
+    def apply_back(self, x):
+        if x.constellation() != self._end:
+            raise ValueError
+        x.relabel(perm_invert(self._relabelling))
+        for e, col_after, col_before in reversed(self._flips):
+            x.flip_back(e, col_before)
 
     def __iter__(self):
         r"""
@@ -452,18 +466,29 @@ class VeeringFlipSequence(object):
             return False
         return not self.unflipped_edges()
 
-    def train_track_polytope(self, slope=VERTICAL, backend='ppl'):
+    def train_track_polytope(self, slope=VERTICAL, low_bound=0, backend=None):
+        r"""
+        Deprecated method.
+        """
+        if low_bound:
+            raise NotImplementedError
+
+        from warnings import warn
+        warn('train_track_polytope is deprecated; use cone instead')
+        return self.cone(slope=slope, backend=backend)
+
+    def cone(self, slope=VERTICAL, backend='ppl'):
         r"""
         EXAMPLES::
 
             sage: from veerer import VeeringTriangulation, VeeringFlipSequence
             sage: F = VeeringFlipSequence(VeeringTriangulation("(0,3,4)(1,~3,5)(2,6,~4)", "BRBBRRB"), "0B 1B")
-            sage: F.train_track_polytope()
+            sage: F.cone()
             Cone of dimension 4 in ambient dimension 7 made of 5 facets (backend=ppl)
         """
         # TODO: make this function support various polytope backends
         if slope == HORIZONTAL:
-            return self._start.train_track_polytope(HORIZONTAL)
+            return self._start.cone(HORIZONTAL)
         else:
             from sage.modules.free_module_element import vector
             from sage.rings.integer_ring import ZZ
@@ -474,7 +499,7 @@ class VeeringFlipSequence(object):
                 raise NotImplementedError
 
             wm = self.inverse().matrix() # matrix: widths_end -> widths_start
-            P = self._end.train_track_polytope(VERTICAL, backend='ppl')._cone
+            P = self._end.cone(VERTICAL, backend='ppl')._cone
             rays = [wm * vector(ZZ, r.coefficients()) for r in P.generators() if r.is_ray()]
             return Cone_ppl(ZZ, rays_to_ppl_cone(rays))
 
@@ -506,11 +531,11 @@ class VeeringFlipSequence(object):
         # TODO: make this function support various polytope backends
         n = self._start.num_edges()
 
-        PV = self.train_track_polytope(VERTICAL, backend='ppl')._cone
+        PV = self.cone(VERTICAL, backend='ppl')._cone
         x = [g.coefficients() for g in PV.generators() if g.is_ray()]
         x = vector(ZZ, [sum(v[i] for v in x) for i in range(n)])
 
-        PH = self.train_track_polytope(HORIZONTAL, backend='ppl')._cone
+        PH = self.cone(HORIZONTAL, backend='ppl')._cone
         y = [g.coefficients() for g in PH.generators() if g.is_ray()]
         y = vector(ZZ, [sum(v[i] for v in y) for i in range(n)])
 
