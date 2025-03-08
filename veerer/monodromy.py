@@ -67,10 +67,10 @@ class SeparatrixMonodromy:
         sage: separatrices_image = [monodromy.vertex_separatrix_transport(path, h, a) for (h, a) in separatrices]
         sage: separatrices_target = end.vertex_separatrices()
         sage: assert set(separatrices_image) == set(separatrices_target)
-        sage: folded_half_edges = [2 * e for e in start.folded_edges()]
+        sage: folded_half_edges = list(start.folded_half_edges())
         sage: folded_half_edges_image = [monodromy.folded_half_edge_transport(path, h) for h in folded_half_edges]
-        sage: folded_half_edges_target = [2 * e for e in end.folded_edges()]
-        sage: assert set(folded_half_edges_image) == set(folded_half_edges_target)
+        sage: folded_half_edges_target = list(end.folded_half_edges())
+        sage: assert set(folded_half_edges_image) == set(folded_half_edges_target), (folded_half_edges_image, folded_half_edges_target)
     """
     def __init__(self, graph):
         self._graph = graph
@@ -386,7 +386,7 @@ class SeparatrixMonodromy:
             reverse = i < 0
 
             # TODO: remove check
-            assert half_edge % 2 == 0 and source._fp[half_edge + 1] == -1
+            assert half_edge % 2 == 0 and source._fp[half_edge + 1] == -1, (half_edge, list(source.folded_half_edges()))
 
             kind = transition[0]
             if kind == "flip" or kind == "rotate":

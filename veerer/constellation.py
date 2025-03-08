@@ -887,16 +887,16 @@ class Constellation:
         """
         return any(self._vp[2 * i + 1] == -1 for i in range(self._ne))
 
-    def folded_edges(self):
+    def folded_half_edges(self):
         r"""
         Iterate through half-edges on a folded edge.
 
         EXAMPLES::
 
             sage: from veerer import Triangulation
-            sage: list(Triangulation("(0,1,2)(~0,~1,~2)").folded_edges())
+            sage: list(Triangulation("(0,1,2)(~0,~1,~2)").folded_half_edges())
             []
-            sage: list(Triangulation("(0,1,2)").folded_edges())
+            sage: list(Triangulation("(0,1,2)").folded_half_edges())
             [0, 2, 4]
         """
         vp = self._vp
