@@ -1182,7 +1182,12 @@ class IrreducibleRealLinearSubvariety:
                     oldmvt = mvt.copy(mutable=True)
                     oldmvt.replace_veering_triangulation(level, component, vt, vt_framing, root_framing)
                     newmvt = oldmvt.degeneration(level, component, edges_low=edges_low, edges_up=edges_up)
+                    new_vt = newmvt._veering_triangulations[level][component]
                     newmvt = newmvt.prime_decomposition(level, component)
+                    newmvt = newmvt.copy(mutable=True)
+                    for i in range(len(new_vt.prime_decomposition())):
+                        newmvt.set_canonical_labels(level, component + i)
+                    newmvt.set_immutable()
                     new_subvariety = IrreducibleRealLinearSubvariety(new_levels, newmvt)
                     assert new_subvariety.projective_dimension() == self.projective_dimension() - 1
                     assert new_subvariety.num_levels() == self.num_levels()
@@ -1268,8 +1273,16 @@ class IrreducibleRealLinearSubvariety:
                     oldmvt = mvt.copy(mutable=True)
                     oldmvt.replace_veering_triangulation(level, component, vt, vt_framing, root_framing)
                     newmvt = oldmvt.degeneration(level, component, edges_low=edges_low, edges_up=edges_up)
+                    new_vt1 = newmvt._veering_triangulations[level][component]
+                    new_vt2 = newmvt._veering_triangulations[level + 1][0]
                     newmvt = newmvt.prime_decomposition(level, component)
-                    newmvt = newmvt.prime_decomposition(level + 1, 0)
+                    newmvt = newmvt.prime_decomposition(level + 1, 0)                    
+                    newmvt = newmvt.copy(mutable=True)
+                    for i in range(len(new_vt1.prime_decomposition())):
+                        newmvt.set_canonical_labels(level, component + i)
+                    for i in range(len(new_vt2.prime_decomposition())):
+                        newmvt.set_canonical_labels(level + 1, i)
+                    newmvt.set_immutable()
                     new_subvariety = IrreducibleRealLinearSubvariety(new_levels, newmvt)
                     assert new_subvariety.num_levels() == self.num_levels() + 1, (new_subvariety.num_levels(), self.num_levels())
                     assert new_subvariety.projective_dimension() == self.projective_dimension() - 1
@@ -1309,6 +1322,10 @@ class MultiscaleCompactification:
         3 components in codimension 1
         5 components in codimension 2
         3 components in codimension 3
+        sage: d = M.projective_dimension()
+        sage: for codim in range(d):
+        ....:   for component in M.components(codim):
+        ....:      assert component.ambient_stratum() == L.ambient_stratum()
 
     Equivalently in Q(1,-1^5)::
 
@@ -1332,6 +1349,10 @@ class MultiscaleCompactification:
         11 components in codimension 2
         14 components in codimension 3
         6 components in codimension 4
+        sage: d = M.projective_dimension()
+        sage: for codim in range(d):
+        ....:   for component in M.components(codim):
+        ....:      assert component.ambient_stratum() == L.ambient_stratum()
 
     Equivalently in Q(2,-1^6)::
 
