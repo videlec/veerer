@@ -1364,6 +1364,14 @@ class MultiscaleCompactification:
         11 components in codimension 2
         13 components in codimension 3
         6 components in codimension 4
+
+    A meromorphic example H(2,-2)::
+
+        sage: vt = VeeringTriangulation("(0:1,1:1,~0:1,~1:1)", "RB")
+        sage: L = vt.linear_subvariety()
+        sage: L.multiscale_compactification()
+        MultiscaleCompactification of Irreducible real linear subvariety of projective dimension 1 in [[H_1(2, -2)]] made of
+        2 components in codimension 1
     """
     def __init__(self, L):
         self._L = L
@@ -1375,10 +1383,13 @@ class MultiscaleCompactification:
         d = L.projective_dimension()
 
         # vertical degenerations
-        for codim in range(d - 1):
+        for codim in range(d):
             for comp in self._components[codim, 0]:
                 for comp_deg in comp.codimension_one_vertical_degenerations(degeneration_helper=self._degeneration_helper):
                     self._components[codim + 1, 0].add(comp_deg)
+            if not self._components[codim + 1, 0]:
+                # NOTE: sometimes full vertical degeneration are not possible, eg H(2)
+                break
 
         for codim in range(d):
             sys.stdout.flush()
