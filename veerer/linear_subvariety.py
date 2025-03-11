@@ -1407,14 +1407,61 @@ class MultiscaleCompactification:
     def projective_dimension(self):
         return self._L.projective_dimension()
 
-    def components(self, codim):
-        if codim < 0 or codim > self._L.projective_dimension():
-            raise ValueError("invalid codimension")
+    # TODO: in the literature these are called "strata" rather than "components"
+    def components(self, *args):
+        r"""
+        Return components of this multiscale compactification.
+
+        With no argument, return all components.  With a single argument
+        ``codimension``, returns the list of components with the given
+        codimension. With two arguemtns ``vertical_codimension``,
+        ``horizontal_codimension`` return the list of components with the given
+        vertical and horizontal components.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,6,~5)(~0,~4,5)(1,8,~7)(~1,~8,3)(2,7,~6)(~2,~3,4)", "RRRBBBBBB")
+            sage: L = vt.linear_subvariety()
+            sage: M = L.multiscale_compactification()
+            sage: len(M.components())
+            12
+            sage: sorted(M.components(1))  # optional - surface_dynamics
+            [Irreducible real linear subvariety of projective dimension 2 in [[H_1(0)], [H_1(2, -2)]],
+             Irreducible real linear subvariety of projective dimension 2 in [[H_1(2, -1^2)]],
+             Irreducible real linear subvariety of projective dimension 2 in [[H_1(0^2)], [H_0(2, -2^2)]]]
+            sage: sorted(M.components(2))  # optional - surface_dynamics
+            [Irreducible real linear subvariety of projective dimension 1 in [[H_0(0, -1^2)], [H_1(2, -2)]],
+             Irreducible real linear subvariety of projective dimension 1 in [[H_0(0^2, -1^2)], [H_0(2, -2^2)]],
+             Irreducible real linear subvariety of projective dimension 1 in [[H_0(2, -1^4)]],
+             Irreducible real linear subvariety of projective dimension 1 in [[H_1(0)], [H_0(0^2, -2)], [H_0(2, -2^2)]],
+             Irreducible real linear subvariety of projective dimension 1 in [[H_1(0)], [H_0(2, -1^2, -2)]]]
+            sage: M.components(2, 1)  # optional - surface_dynamics
+            [Irreducible real linear subvariety of projective dimension 0 in [[H_0(0, -1^2)], [H_0(0^2, -2)], [H_0(2, -2^2)]]]
+            sage: M.components(3, 0)  # optional - surface_dynamics
+            []
+        """
         ans = []
-        for i in range(codim + 1):
-            j = codim - i
-            if (i, j) in self._components:
-                ans.extend(self._components[i, j])
+        if len(args) == 0:
+            for comps in self._components.values():
+                ans.extend(comps)
+        elif len(args) == 1:
+            codim, = args
+            if not isinstance(codim, numbers.Integral) or codim < 0 or codim > self._L.projective_dimension():
+                raise ValueError("invalid codimension")
+            ans = []
+            for i in range(codim + 1):
+                j = codim - i
+                if (i, j) in self._components:
+                    ans.extend(self._components[i, j])
+        elif len(args) == 2:
+            vert_codim, horiz_codim = args
+            if not isinstance(vert_codim, numbers.Integral) or not isinstance(horiz_codim, numbers.Integral) or vert_codim < 0 or horiz_codim < 0 or vert_codim + horiz_codim > self._L.projective_dimension():
+                raise ValueError("invalid codimensions")
+            ans.extend(self._components[vert_codim, horiz_codim])
+        else:
+            raise ValueError("invalid specification of codimension")
+
         return ans
 
     def __repr__(self):
