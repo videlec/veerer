@@ -42,9 +42,6 @@ from .polyhedron import *
 from .labelled_digraph import *
 from .monodromy import *
 
-
-# TODO: Store the data of horizontal and vertical nodes in terms of LabeleddDiGraph
-
 def str_to_label(h):
     r"""
     Turn a string into the label of the half-edge
@@ -206,7 +203,7 @@ class NodalLabelledDiGraph(LabelledDiGraph):
         ....:                       ((1, 0, 5, 2), (2, 0, 3, 7)),
         ....:                       ((0, 0, 2, 6), (2, 0, 3, 2))])
         sage: N
-        Multiscale veering triangulation nodal graph with prime decomposition (1, 1, 2), 3 horizontal and 3 vertical nodes
+        Multiscale veering triangulation nodal graph with 3 horizontal and 3 vertical nodes
         
         sage: list(N.vertices(0))  # vertices at level 0
         [0]
@@ -234,8 +231,6 @@ class NodalLabelledDiGraph(LabelledDiGraph):
 
         - ``vertical_nodes`` -- a list of vertical node data ``((l1, pc1, h1, a1), (l2, pc2, h2, a2))``
         """
-        # TODO: remove this attribute
-        self._prime_decomposition = tuple(prime_decomposition)
 
         digraph = DiGraph(loops=True, multiedges=True)
         digraph.add_vertices([(l, pc)
@@ -272,11 +267,10 @@ class NodalLabelledDiGraph(LabelledDiGraph):
 
     def copy(self):
         ans = LabelledDiGraph.copy(self)
-        ans._prime_decomposition = self._prime_decomposition[:]
         return ans
 
     def __repr__(self):
-        return "Multiscale veering triangulation nodal graph with prime decomposition {}, {} horizontal and {} vertical nodes".format(self._prime_decomposition, sum(self.vertex_level(self.edge_source(e)) == self.vertex_level(self.edge_target(e)) for e in range(self.num_edges())), sum(self.vertex_level(self.edge_source(e)) != self.vertex_level(self.edge_target(e)) for e in range(self.num_edges())))
+        return "Multiscale veering triangulation nodal graph with {} horizontal and {} vertical nodes".format(sum(self.vertex_level(self.edge_source(e)) == self.vertex_level(self.edge_target(e)) for e in range(self.num_edges())), sum(self.vertex_level(self.edge_source(e)) != self.vertex_level(self.edge_target(e)) for e in range(self.num_edges())))
 
     def vertex_level(self, vertex):
         return self._vertices[vertex][0]
@@ -294,8 +288,9 @@ class NodalLabelledDiGraph(LabelledDiGraph):
                 raise ValueError("invalid input")
             return range(self.num_verts())
         elif prime_component is None:
-            for prime_component in range(self._prime_decomposition[level]):
-                yield self._vertex_index[(level, prime_component)]
+            for v, label in enumerate(self._vertices):
+                if label[0] == level:
+                    yield v
         else:
             yield self._vertex_index[(level, prime_component)]
 
@@ -1627,8 +1622,6 @@ class MultiscaleVeeringTriangulation:
 
         self._veering_triangulations[level][component] = veering_triangulation
 
-    # TODO: this should be done inplace and not return anything as it is the case
-    # with every other classes in veerer
     def set_canonical_labels(self, level, comp):
         r"""
         Return the multi-scale veering triangulation with the veering triangulation at ``(level, comp)`` set the canonical label.
@@ -1808,8 +1801,4 @@ class MultiscaleVeeringTriangulation:
         l_vert = l2
         
         mvt = MultiscaleVeeringTriangulation(vts,l_horiz,l_vert)
-        #for i in range(len(l)):
-        #    mvt = mvt.copy(mutable=True)
-        #    mvt.set_canonical_labels(level, component + i)
-        #mvt.set_immutable()
         return mvt
