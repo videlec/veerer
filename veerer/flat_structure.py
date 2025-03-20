@@ -449,7 +449,7 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
             sage: from veerer import *
             sage: T = VeeringTriangulation("(0,1,2)(~0,~1,3)", "BRRR")
             sage: F = T.flat_structure_min()
-            sage: F.plot()
+            sage: F.plot()  # random - matplotlib warnings
             Graphics object consisting of ... graphics primitives
         """
         layout = self.layout()
