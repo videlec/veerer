@@ -33,9 +33,11 @@ Note:
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 # ****************************************************************************
 
+import collections
 import math
 import itertools
 
+from sage.misc import prandom
 from sage.categories.fields import Fields
 from sage.rings.all import RDF
 from sage.modules.free_module import FreeModule
@@ -500,20 +502,65 @@ class FlatVeeringTriangulationLayout(object):
         """
         return [e for e in self.connected_components()[1] if not self.creates_overlap(e)]
 
-    def greedy_gluing(self):
+    def greedy_gluing(self, root_face=0, algorithm="BFS"):
         r"""
-        While it is possible, pick the first edge that could be glued and glue it.
+        Try to aggregate other components to the given ``root_face``.
+
+        INPUT:
+
+        - ``root_face`` -- optional integer, default to ``0``
+
+        - ``algorithm`` -- either ``"BFS"`` for breadth-first search or
+          ``"DFS"`` for depth-first search or ``"random"`` for randomized
+
+        EXAMPLES::
+
+            sage: from veerer import *
+            sage: faces = "(0,1,2)(~1,11,~3)(3,4,5)(~2,~5,12)(~4,13,14)(~13,~16,~17)(17,~0,~15)(15,16,~14)(~8,~10,~11)(6,7,8)(~7,~12,~9)(9,~6,10)"
+            sage: colours = "RBRRRBRBRRBBBBRBBR"
+            sage: fs = VeeringTriangulation(faces, colours).flat_structure_min()
+
+            sage: layout = fs.layout()
+            sage: layout.greedy_gluing(0, "BFS")
+            sage: layout
+            FlatVeeringTriangulationLayout(FlatVeeringTriangulation(..., [0, 1, 2, 3, 8, 10, 11, 12, 14, 15, 17])
+
+            sage: layout = fs.layout()
+            sage: layout.greedy_gluing(0, "DFS")
+            sage: layout
+            FlatVeeringTriangulationLayout(..., [0, 1, 2, 5, 7, 9, 10, 12, 13, 15, 17])
+
+            sage: layout = VeeringTriangulation(faces, colours).flat_structure_min().layout()
+            sage: layout.greedy_gluing(0, "random")
+            sage: layout
+            FlatVeeringTriangulationLayout(...)
         """
-        while True:
-            e_found = None
-            for e in self.connected_components()[1]:
-                if not self.creates_overlap(e):
-                    e_found = e
-                    break
-            if e_found is not None:
-                self.glue(e_found)
+        if algorithm not in ["BFS", "DFS", "random"]:
+            raise ValueError("invalid algorithm")
+
+        fp = self._triangulation._fp
+        ep = self._triangulation._ep
+
+        ccs, _ = self.connected_components()
+        todo = collections.deque([i for i in range(len(self._faces)) if ccs.find(i) == ccs.find(root_face)])
+        while todo:
+            if algorithm == "BFS":
+                i = todo.popleft()
+            elif algorithm == "DFS":
+                i = todo.pop()
             else:
-                return
+                k = prandom.randrange(0, len(todo))
+                todo[k], todo[-1] = todo[-1], todo[k]
+                i = todo.pop()
+            for h in self._faces[i]:
+                j = ccs.find(self._half_edge_to_face[ep(h)])
+                if self._forest[h // 2] or ccs.find(self._half_edge_to_face[h]) == j:
+                    continue
+                e = h // 2
+                if not self.creates_overlap(e):
+                    self.glue(e)
+                    ccs.union(i, j)
+                    todo.append(j)
 
     # TODO
     # def glue_cylinders(self)
