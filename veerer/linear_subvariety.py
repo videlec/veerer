@@ -1323,7 +1323,7 @@ class MultiscaleCompactification:
         5 components in codimension 2
         3 components in codimension 3
         sage: d = M.projective_dimension()
-        sage: for codim in range(d):
+        sage: for codim in range(d):  # optional - surface_dynamics
         ....:   for component in M.components(codim):
         ....:      assert component.ambient_stratum() == L.ambient_stratum()
 
@@ -1350,7 +1350,7 @@ class MultiscaleCompactification:
         14 components in codimension 3
         6 components in codimension 4
         sage: d = M.projective_dimension()
-        sage: for codim in range(d):
+        sage: for codim in range(d):  # optional - surface_dynamics
         ....:   for component in M.components(codim):
         ....:      assert component.ambient_stratum() == L.ambient_stratum()
 
@@ -1369,7 +1369,7 @@ class MultiscaleCompactification:
 
         sage: vt = VeeringTriangulation("(0:1,1:1,~0:1,~1:1)", "RB")
         sage: L = vt.linear_subvariety()
-        sage: L.multiscale_compactification()
+        sage: L.multiscale_compactification()  # optional - surface_dynamics
         MultiscaleCompactification of Irreducible real linear subvariety of projective dimension 1 in [[H_1(2, -2)]] made of
         2 components in codimension 1
     """
