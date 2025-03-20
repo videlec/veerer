@@ -1414,7 +1414,7 @@ class MultiscaleCompactification:
 
         With no argument, return all components.  With a single argument
         ``codimension``, returns the list of components with the given
-        codimension. With two arguemtns ``vertical_codimension``,
+        codimension. With two arguments ``vertical_codimension``,
         ``horizontal_codimension`` return the list of components with the given
         vertical and horizontal components.
 
