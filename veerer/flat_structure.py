@@ -427,6 +427,21 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
         vectors = makeVectors((x[e], y[e]) for e in range(self._ne))
         return make_surface(verts, vectors)
 
+    def layout(self):
+        r"""
+        Return a layout for this flat veering triangulation that could be used for
+        fine tuned plots.
+
+        EXAMPLES::
+
+            sage: from veerer import *
+            sage: T = VeeringTriangulation("(0,1,2)(~0,~1,3)", "BRRR")
+            sage: T.flat_structure_min().layout()
+            FlatVeeringTriangulationLayout(FlatVeeringTriangulation("(0,1,2)(~0,~1,3)", "BRRR", (1, 1, 2, 2), (1, 2, 1, 1)), [])
+        """
+        from .layout import FlatVeeringTriangulationLayout
+        return FlatVeeringTriangulationLayout(self)
+
     def plot(self, *args, **kwds):
         r"""
         EXAMPLES::
@@ -434,29 +449,12 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
             sage: from veerer import *
             sage: T = VeeringTriangulation("(0,1,2)(~0,~1,3)", "BRRR")
             sage: F = T.flat_structure_min()
-            sage: F.plot()  # optional - sage_flatsurf
+            sage: F.plot()
             Graphics object consisting of ... graphics primitives
         """
-        from .flatsurf_conversion import flat_structure_to_sage_flatsurf
-        S, m = flat_structure_to_sage_flatsurf(self)
-        edge_labels = {v: self._half_edge_string(h) for h, v in enumerate(m) if v is not None}
-        options = {BLUE: {"color": "blue"},
-                   RED: {"color": "red"},
-                   GREEN: {"color": "green"},
-                   PURPLE: {"color": "purple"}}
-        edge_options = {v: options[self._colouring[h // 2]] for h, v in enumerate(m) if v is not None}
-        for h, v in enumerate(m):
-            if self._bdry[h]:
-                edge_options[v]["thickness"] = 3
-        G = S.graphical_surface(edge_labels=edge_labels,
-                                edge_label_options={"color": "black"},
-                                edge_options=edge_options,
-                                self_glued_edge_options={},
-                                polygon_labels=False)
-        G.will_plot_adjacent_edge_labels = True
-        G.will_plot_self_glued_edge_labels = True
-        G.will_plot_non_adjacent_edge_labels = True
-        return G.plot()
+        layout = self.layout()
+        layout.greedy_gluing()
+        return layout.plot(*args, **kwds)
 
     def flip(self, e, col=None, check=True):
         r"""
