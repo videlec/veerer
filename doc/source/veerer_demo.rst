@@ -18,7 +18,7 @@ Veering triangulation demo
 triangulations. It is written by
 `Mark Bell <https://markcbell.github.io>`_,
 `Vincent Delecroix <https://www.labri.fr/perso/vdelecro/>`_ and
-`Saul Schleimer <https://homepages.warwick.ac.uk/~masgar/>`_. It is
+`Saul Schleimer <https://sschleimer.warwick.ac.uk>`_. It is
 part of a project that also involve
 `Vaibhav Gadre <https://www.maths.gla.ac.uk/~vgadre/>`_ and
 `Rodolfo Gutiérrez-Romo <http://www.dim.uchile.cl/~rgutierrez/>`_, see
