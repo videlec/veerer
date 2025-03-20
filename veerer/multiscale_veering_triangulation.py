@@ -68,6 +68,7 @@ def track_prong(vt, r_up, r_low, prong, vertex=False, face=False):
     Note that r_up and r_low are from the method VeeringTriangulation.degeneration by setting `collapsed_half_edge_relabelling=True`.
 
     EXAMPLES::
+
         sage: from veerer import *
         sage: from veerer.multiscale_veering_triangulation import track_prong
 
@@ -105,7 +106,7 @@ def track_prong(vt, r_up, r_low, prong, vertex=False, face=False):
         vh = [r_up[e] for e in perm_orbit(vt._vp, h)]
         if min(vh) >= 0: # The vertex of h is contaiend in f_up
             return (l, c, r_up[h], ang)
-        
+
         # Otherwise the vertex prong must be contained in f_low
         a = 0
         while r_up[h] >= 0:
@@ -115,14 +116,14 @@ def track_prong(vt, r_up, r_low, prong, vertex=False, face=False):
         ang = ang + a
         assert r_low[h] >= 0
         return (l + 1, 0, r_low[h], ang) if max(r_up) >=0 else (l, c, r_low[h], ang) # Note that the degeneration might be horizontal
-    
+
     elif face:
         vt._check_face_separatrix(h, ang)
         assert vt.boundary_vector()[h] > 0
         fh = [r_low[e] for e in perm_orbit(vt._fp, h)]
         if min(fh) >= 0: #The pole of h is contaiend in f_low
             return (l + 1, 0, r_low[h], ang) if max(r_up) >=0 else (l, c, r_low[h], ang)
-        
+
         # Otherwise the face prong must be contained in f_up
         a = 0
         while r_low[h] >= 0:
@@ -132,7 +133,7 @@ def track_prong(vt, r_up, r_low, prong, vertex=False, face=False):
         ang = ang + a
         assert r_up[h] >= 0
         return (l, c, r_up[h], ang)
-    
+
     else:
         return ValueError("Missing argument of 'vertex' or 'face'.")
 
@@ -150,6 +151,7 @@ def new_prong_matching(vt, f_low, r_up, r_low, level, comp):
     Note that r_up and r_low are from the method VeeringTriangulation.degeneration by setting `collapsed_half_edge_relabelling=True`.
 
     EXAMPLES::
+
         sage: from veerer import *
         sage: from veerer.multiscale_veering_triangulation import new_prong_matching
 
@@ -196,15 +198,15 @@ class NodalLabelledDiGraph(LabelledDiGraph):
 
     EXAMPLES::
 
-        sage: from veerer.multiscale_veering_triangulation import NodalLabelledDiGraph    
-    
+        sage: from veerer.multiscale_veering_triangulation import NodalLabelledDiGraph
+
         sage: N = NodalLabelledDiGraph([1, 1, 2], [(0, 0, 7, 8), (1, 0, 3, 5), (1, 0, 2, 4)],
         ....:                      [((0, 0, 3, 3), (2, 1, 2, 2)),
         ....:                       ((1, 0, 5, 2), (2, 0, 3, 7)),
         ....:                       ((0, 0, 2, 6), (2, 0, 3, 2))])
         sage: N
         Multiscale veering triangulation nodal graph with 3 horizontal and 3 vertical nodes
-        
+
         sage: list(N.vertices(0))  # vertices at level 0
         [0]
         sage: list(N.vertices(1))  # vertices at level -1
@@ -337,12 +339,13 @@ class NodalLabelledDiGraph(LabelledDiGraph):
         r"""
         Return a list of dictionary for later check of global residue conditions.
 
-        The key `v` of each dictionary is a vertex at the `level`-th level of the nodal graph. 
-        The value of key `v` consists of the edges from the same component of the subgraph above 
-        level-`level` to the vertices in the prime component of `v`. Note the the indices of the 
+        The key `v` of each dictionary is a vertex at the `level`-th level of the nodal graph.
+        The value of key `v` consists of the edges from the same component of the subgraph above
+        level-`level` to the vertices in the prime component of `v`. Note the the indices of the
         edges refer to the indices in the level graph.
 
         EXAMPLES::
+
             sage: from veerer import *
 
             sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[VeeringTriangulationLinearFamily("(0:1)(~0:1)(1:1)(~1:1)(2:1)(~2:1)(3:1)(~3:1)", "RRRR", [(1, 1, 1, 1)])],[VeeringTriangulationLinearFamily("(0:3)(~0:3)(1:3)(~1:3)", "RR", [(1, 1)])]],horizontal_nodes=[[[(0, 2), (1, 4), (3, 5), (6, 7)]], [[]]],prong_matchings=[((0, 0, 0, 0), (1, 0, 0, 1)), ((0, 0, 4, 0), (1, 0, 3, 1))])
@@ -350,7 +353,6 @@ class NodalLabelledDiGraph(LabelledDiGraph):
             sage: g.vertical_edges_for_GRC(mvt, 1)
             [defaultdict(<class 'list'>, {1: [2, 4]}), defaultdict(<class 'list'>, {})]
         """
-        
         level_g = self.level_graph(mvt)
         subd = self.subgraph_above_level(mvt, level)
         components = subd.connected_components(sort=False)
@@ -362,7 +364,7 @@ class NodalLabelledDiGraph(LabelledDiGraph):
             targets = []
             for e in l:
                 lvl, c,_ = level_g._vertices[level_g.edge_target(e)]
-                targets.append(self.vertex_index((lvl,c))) 
+                targets.append(self.vertex_index((lvl,c)))
             from collections import defaultdict
             dic_groups = defaultdict(list)
             for index, v in enumerate(targets):
@@ -754,6 +756,7 @@ class MultiscaleVeeringTriangulation:
         Check the global residue condition.
 
         EXAMPLES::
+
             sage: from veerer import *
 
             sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[VeeringTriangulationLinearFamily("(0:1)(~0:1)(1:1)(~1:1)(2:1)(~2:1)(3:1)(~3:1)", "RRRR", [(1, 1, 1, 1)])],[VeeringTriangulationLinearFamily("(0:3)(~0:3)(1:3)(~1:3)", "RR", [(1, 1)])]],horizontal_nodes=[[[(0, 2), (1, 4), (3, 5), (6, 7)]], [[]]],prong_matchings=[((0, 0, 0, 0), (1, 0, 0, 1)), ((0, 0, 4, 0), (1, 0, 3, 1))])
@@ -789,7 +792,7 @@ class MultiscaleVeeringTriangulation:
                     assert lvl == level
                     vt = self._veering_triangulations[lvl][c]
                     _, oris_vt = vt.is_abelian(certificate=True)
-                
+
                     base_ring = vt.base_ring()
                     orig_constraints_matrix = vt.constraints_matrix()
                     orig_gens = orig_constraints_matrix.right_kernel_matrix()
@@ -800,14 +803,14 @@ class MultiscaleVeeringTriangulation:
                     bdry = vt.boundary_faces()
                     nf = len(bdry)
                     r1 = vt.residue_matrix()
-                    
+
                     global_oris_vt = global_oris[level][c]
                     ne = vt._ne
                     modify_oris = matrix.identity(ne)
                     for edge in range(ne):
                         if oris_vt[2 * edge] != global_oris_vt[2 * edge]:
                             modify_oris[edge, edge] = - 1
-                    
+
                     rr1 = matrix(ZZ, 1, nf)
                     for e in group:
                         _, _, h, _ = edge_labels[e] # Note that the indices of edges in g and level_g are different
@@ -836,12 +839,13 @@ class MultiscaleVeeringTriangulation:
 
     def __repr__(self):
         return str(self)
-    
+
     def __lt__(self, mvt):
         r"""
         EXAMPLES::
+
             sage: from veerer import *
-            
+
             sage: vt0 = VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)(3,4,5)(~3,~4,~5)", "RBBRBR", [(1, 0, -1, 0, 0, 0), (0, 1, 1, 0, 0, 0), (0, 0, 0, 1, 0, 1), (0, 0, 0, 0, 1, -1)])
             sage: vt1 = VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])
             sage: mvt0 = MultiscaleVeeringTriangulation(veering_triangulations=[[vt0],[vt1]],prong_matchings=[((0, 0, 1, 0), (1, 0, 0, 1)), ((0, 0, 10, 0), (1, 0, 4, 0))])
@@ -874,6 +878,7 @@ class MultiscaleVeeringTriangulation:
         Return whether ``self`` and ``other`` are equal.
 
         EXAMPLES::
+
             sage: from veerer import *
             sage: vt0 = VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)(3,4,5)(~3,~4,~5)", "RBBRBR", [(1, 0, -1, 0, 0, 0), (0, 1, 1, 0, 0, 0), (0, 0, 0, 1, 0, 1), (0, 0, 0, 0, 1, -1)])
             sage: vt1 = VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])
@@ -894,6 +899,7 @@ class MultiscaleVeeringTriangulation:
         Return whether ``self`` and ``other`` are different.
 
         EXAMPLES::
+
             sage: from veerer import *
             sage: vt0 = VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)(3,4,5)(~3,~4,~5)", "RBBRBR", [(1, 0, -1, 0, 0, 0), (0, 1, 1, 0, 0, 0), (0, 0, 0, 1, 0, 1), (0, 0, 0, 0, 1, -1)])
             sage: vt1 = VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])
@@ -1021,12 +1027,13 @@ class MultiscaleVeeringTriangulation:
     def linear_subvariety(self):
         r"""
         Return the linear subvariety generated by this multiscale veering triangulation.
-        
+
         EXAMPLES::
+
             sage: from veerer import *
-            
+
             sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[VeeringTriangulationLinearFamily("(0,5,~4)(~0,~3,4)(1,~2,~5)(~1,2,3)", "RRBBBB", [(1, 0, 0, 0, -1, 0), (0, 1, 0, -1, -1, -1), (0, 0, 1, 1, 1, 1)])],[VeeringTriangulationLinearFamily("(0:2,1:1,~1:2,~0:1)", "RR", [(1, 0), (0, 1)])]],horizontal_nodes=[[[]], [[]]],prong_matchings=[((0, 0, 1, 0), (1, 0, 3, 0))])
-            sage: mvt.linear_subvariety()
+            sage: mvt.linear_subvariety()  # optional - surface_dynamics
             Irreducible real linear subvariety of projective dimension 3 in [[H_1(0^2)], [H_0(0^3, -2)]]
         """
         from .linear_subvariety import PrimeDegenerations, IrreducibleRealLinearSubvariety
@@ -1098,12 +1105,12 @@ class MultiscaleVeeringTriangulation:
 
     def without_prescribed_poles(self, level, comp):
         r"""
-        Return True if every boundary face in the component is adjacent to either a horizontal or vertical node. 
+        Return True if every boundary face in the component is adjacent to either a horizontal or vertical node.
         Otherwise, return False.
-        
+
         EXAMPLES::
             sage: from veerer import *
-            
+
             sage: vt = VeeringTriangulation("(~0,~3,4)(~1,~4,~2)(0:3,1:1,2:3,3:1)", "RBRBB")
             sage: mvt = MultiscaleVeeringTriangulation([vt])
             sage: mvt1 = list(mvt.codimension_one_vertical_degenerations())[1]
@@ -1112,16 +1119,15 @@ class MultiscaleVeeringTriangulation:
             sage: mvt1.without_prescribed_poles(1,0)
             True
         """
-        
         level = self._check_level(level)
         g = self._nodal_digraph
         vertex_labels = g._vertices
         edge_labels = g._edges
         vt = self._veering_triangulations[level][comp]
-        
+
         v = vertex_labels.index((level, comp))
-        edges = set(g.adjacent_edges(v))    
-        
+        edges = set(g.adjacent_edges(v))
+
         for f in vt.boundary_faces():
             skip = False
             for e in edges:
@@ -1187,9 +1193,9 @@ class MultiscaleVeeringTriangulation:
         vertex_labels = g._vertices
         edge_labels = g._edges
         vertices = set(range(len(vertex_labels)))
-        
+
         while vertices:
-            #propagete the orientation in the connected component containing the vertex v. 
+            #propagete the orientation in the connected component containing the vertex v.
             v0 = vertices.pop()
             l0 = g.adjacent_edges(v0)
             lv = {v0} #the vertices visited so far
@@ -1203,7 +1209,7 @@ class MultiscaleVeeringTriangulation:
                 level2, s2, c2 = vertex_labels[v2]
                 vt1 = self._veering_triangulations[level1][s1]
                 vt2 = self._veering_triangulations[level2][s2]
-                
+
                 #horizontal node
                 if len(label_e) == 2:
                     assert level1 == level2 and s1 == s2 and vt1 == vt2
@@ -1211,7 +1217,7 @@ class MultiscaleVeeringTriangulation:
                     assert h1 < h2
                     lo = oris[level1][s1]
                     o1, o2 = lo[h1], lo[h2]
-                    
+
                     # check coherence
                     if o1 == o2:
                         if v1 == v2 or ((v1 in lv) and (v2 in lv)):
@@ -1225,7 +1231,7 @@ class MultiscaleVeeringTriangulation:
                                 if h // 2 in vt1.connected_components()[c2]:
                                     lo[h] = not lo[h]
                     oris[level1][s1] = lo
-                
+
                 #vertical node
                 else:
                     h1, ang1, h2, ang2 = edge_labels[e]
@@ -1234,7 +1240,7 @@ class MultiscaleVeeringTriangulation:
                     # Adjust the prong orientation based on the angle
                     o1 = not lo1[h1] if (ang1 % 2 == 1) else lo1[h1]
                     o2 = not lo2[h2] if (ang2 % 2 == 1) else lo2[h2]
-                    
+
                     if o1 != o2:
                         if (v1 in lv) and (v2 in lv):
                             return (False, None) if certificate else False
@@ -1248,7 +1254,7 @@ class MultiscaleVeeringTriangulation:
                                     lo2[h] = not lo2[h]
                     oris[level1][s1] = lo1
                     oris[level2][s2] = lo2
-                
+
                 lv.update([v1, v2])
                 v_next = v2 if v1 == v0 else v1 # determine the next vertex
                 if v_next in vertices:
@@ -1266,7 +1272,7 @@ class MultiscaleVeeringTriangulation:
         r"""
         Return the ambient stratum of the multi-scale veering triangulation.
 
-        If ``multiscale_structure`` is True, return the stratum for each vertex of the level graph. Otherwise, return the stratum of the veering triangulation by collapsing all the nodes of the multi-scale veering triangulation.  
+        If ``multiscale_structure`` is True, return the stratum for each vertex of the level graph. Otherwise, return the stratum of the veering triangulation by collapsing all the nodes of the multi-scale veering triangulation.
 
         EXAMPLES::
 
@@ -1334,7 +1340,7 @@ class MultiscaleVeeringTriangulation:
                 return Stratum([(a - 2) // 2 for a in angles], 1)
             else:
                 return Stratum([(a - 2) for a in angles], 2)
-        
+
         l = []
         N = self.num_levels()
         for level in range(N):
@@ -1627,6 +1633,7 @@ class MultiscaleVeeringTriangulation:
         Return the multi-scale veering triangulation with the veering triangulation at ``(level, comp)`` set the canonical label.
 
         EXAMPLES::
+
             sage: from veerer import *
 
             sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RBB", [(1, 0, -1), (0, 1, 1)]), VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RBR", [(1, 0, 1), (0, 1, -1)])],[VeeringTriangulationLinearFamily("(~0,~3,~4)(~1,~2,4)(0:2,1:2)(2:2,3:2)", "RRBBB", [(1, 1, 0, 0, -1), (0, 0, 1, 1, 1)])]],horizontal_nodes=[[[], []], [[]]],prong_matchings=[((0, 0, 0, 0), (1, 0, 0, 0)), ((0, 1, 4, 0), (1, 0, 4, 0))])
@@ -1646,11 +1653,11 @@ class MultiscaleVeeringTriangulation:
             raise ValueError
 
         level = self._check_level(level)
-        
+
         vt = self._veering_triangulations[level][comp]
         mapping = vt.set_canonical_labels(mapping=True)
         self._veering_triangulations[level][comp] = vt
-        
+
         #change the labels of the edges of the nodal graph
         D = self._nodal_digraph
         for e, label in enumerate(D._edges):
@@ -1683,6 +1690,7 @@ class MultiscaleVeeringTriangulation:
         Return the multi_scale veering triangulation by transport the veering triangulation at ``(level, component)`` along its Delaunay-Strebel graph to the root.
 
         EXAMPLES::
+
             sage: from veerer import *
 
             sage: mvt = MultiscaleVeeringTriangulation(veering_triangulations=[[VeeringTriangulationLinearFamily("(0,5,~4)(~0,~3,4)(1,~2,~5)(~1,2,3)", "RRBBBB", [(1, 0, 0, 0, -1, 0), (0, 1, 0, -1, -1, -1), (0, 0, 1, 1, 1, 1)])],[VeeringTriangulationLinearFamily("(0:2,1:1,~1:2,~0:1)", "RR", [(1, 0), (0, 1)])]],horizontal_nodes=[[[]], [[]]],prong_matchings=[((0, 0, 1, 0), (1, 0, 3, 0))])
@@ -1707,13 +1715,13 @@ class MultiscaleVeeringTriangulation:
         mvt.set_canonical_labels(level, component)
         original_vt = mvt._veering_triangulations[level][component]
         original_vt.set_immutable()
-        original_framing = ds_graph.framing(ds_graph.vertex_index(original_vt))   
+        original_framing = ds_graph.framing(ds_graph.vertex_index(original_vt))
         vt = ds_graph.root()
         vt_framing = ds_graph.framing(0)
         mvt.replace_veering_triangulation(level, component, vt, framing=vt_framing, original_framing=original_framing)
         mvt.set_immutable()
         return mvt
-    
+
     # TODO: prime_decomposition should not call set_canonical_labels
     def prime_decomposition(self, level, component):
         r"""
@@ -1799,6 +1807,6 @@ class MultiscaleVeeringTriangulation:
                 p2 = (level, c2 + len(l_vts) - 1, h2, ang2)
             l2.append([p1,p2])
         l_vert = l2
-        
+
         mvt = MultiscaleVeeringTriangulation(vts,l_horiz,l_vert)
         return mvt
