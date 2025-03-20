@@ -359,7 +359,7 @@ class Triangulation(Constellation):
             sage: Triangulation("(0,1,~2)")
             Traceback (most recent call last):
             ...
-            ValueError: inconsistent permutation data
+            ValueError: missing half-edge 2
 
             sage: Triangulation("(0)")
             Traceback (most recent call last):
