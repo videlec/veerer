@@ -129,7 +129,7 @@ def face_boundary_init(faces, boundary=None):
 
         for e in neg:
             if ~e not in pos:
-                raise ValueError("inconsistent permutation data")
+                raise ValueError(f"missing half-edge {~e}")
 
         pos.sort()
         neg.sort(reverse=True)
@@ -137,12 +137,12 @@ def face_boundary_init(faces, boundary=None):
             raise ValueError("missing half-edge 0")
         for i in range(len(pos) - 1):
             if pos[i] == pos[i+1]:
-                raise ValueError("repeated half-edge {}".format(pos[i]))
+                raise ValueError(f"repeated half-edge {pos[i]}")
             elif pos[i + 1] != pos[i] + 1:
-                raise ValueError("missing half-edge {}".format(pos[i] + 1))
+                raise ValueError(f"missing half-edge {pos[i] + 1}")
         for i in range(len(neg) - 1):
             if neg[i] == neg[i+1]:
-                raise ValueError("repeated half-edge ~{}".format(~neg[i]))
+                raise ValueError(f"repeated half-edge ~{~neg[i]}")
 
         # number of half edges
         ne = len(pos)
@@ -166,14 +166,14 @@ def face_boundary_init(faces, boundary=None):
             boundary = array('i', [0] * (2 * ne))
         elif isinstance(boundary, (tuple, list, array)):
             if len(boundary) != 2 * ne:
-                raise ValueError('invalid input argument')
+                raise ValueError("invalid input argument")
             boundary = array('i', boundary)
         elif isinstance(boundary, dict):
             output = array('i', [0] * (2 * ne))
             for e, v in boundary.items():
                 if isinstance(e, str):
                     if not e:
-                        raise ValueError('keys must be valid edges, got {!r}'.format(e))
+                        raise ValueError(f"keys must be valid edges, got {e}")
                     elif e[0] == '~':
                         e = ~int(e[1:])
                     else:
@@ -181,7 +181,7 @@ def face_boundary_init(faces, boundary=None):
                 elif isinstance(e, numbers.Integral):
                     e = int(e)
                 if e not in pos and e not in neg:
-                    raise ValueError('keys in the bdry dictionary must be valid half-edges, got {!r}'.format(e))
+                    raise ValueError(f"keys in the bdry dictionary must be valid half-edges, got {e}")
                 output[to_half_edge(e)] = v
             boundary = output
         else:
