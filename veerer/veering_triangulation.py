@@ -1378,7 +1378,7 @@ class VeeringTriangulation(Triangulation):
             return (False, None) if certificate else False
 
         # The code attempt to give a coherent holonomy with signs for each half
-        # edge. For that purpose, it is enough to store a boolean for each edge:
+        # edge. For that purpose, it is enough to store a boolean for each half-edge:
         #   True: (+, +) or (+,-)
         #   False: (-,-) or (-,+)
         # In other words, the half edge is stored with True if its x-coordinate
@@ -4153,7 +4153,7 @@ class VeeringTriangulation(Triangulation):
 
             sage: F = CT.flat_structure_min(True)                 # optional - surface_dynamics
             sage: F                                               # optional - surface_dynamics
-            FlatVeeringTriangulation("(0,18,~17)(~0,19,~18)...(~7,~23,8)", ... 7, 4, 3, 2, 1, 0))
+            FlatVeeringTriangulation("(0,18,~17)(~0,19,~18)...(~7,~23,8)", "RRRRRRRRBBBBBBBBBBBBBBBB", (0, 0, ..., 1), (0, 0, ..., 1))
             sage: F.constellation()                               # optional - surface_dynamics
             VeeringTriangulation("(0,18,~17)(~0,19,~18)...(~7,~23,8)", "RRRRRRRRBBBBBBBBBBBBBBBB")
         """
