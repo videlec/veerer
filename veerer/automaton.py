@@ -2,11 +2,12 @@ r"""
 Flip automata.
 
 We consider various automata related to edge flip in graphs on surfaces, namely
-- triangulations and more generally flip automaton of combinatorial maps with fixed face degrees
-- train-track splitting
-- core veering triangulations of Abelian and quadratic differentials
-- (L-infinity) Delaunay triangulations of Abelian and quadratic differentials
-- Delaunay-Strebel for meromorphic
+
+* triangulations and more generally flip automaton of combinatorial maps with fixed face degrees
+* train-track splitting
+* core veering triangulations of Abelian and quadratic differentials
+* (L-infinity) Delaunay triangulations of Abelian and quadratic differentials
+* Delaunay-Strebel for meromorphic
 
 In order to avoid confusion with graph terminology (that might refer to the
 underlying triangulation), the flip graphs are considered as automata.
@@ -1379,8 +1380,6 @@ class DelaunayAutomaton(Automaton):
 # transitions from Strebel graphs to Delauany triangulations
 class DelaunayStrebelAutomaton(Automaton):
     r"""
-    for vt in veering_triangulations:
-        # compute outgoing edges and record Strebel so that we deduce the Strebel -> veering
     Delaunay-Strebel automaton.
 
     The states of the Delaunay-Strebel automaton are Delaunay triangulations,

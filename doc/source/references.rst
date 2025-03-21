@@ -8,17 +8,25 @@ References
    William Jaco’s 70th birthday.  American Mathematical Society (AMS).
    Contemporary Mathematics 560, 1-17 (2011).
 
+.. [BeDeGaGuSc] M. Bell, V. Delecroix, V. Gadre, R. Gutiérrez-Romo, S. Schleimer
+   "Coding Teichmüller flow using veering triangulations"
+   `<https://arxiv.org/abs/1909.00890>`_
+
 .. [CaFeZa11] J. Cassaigne,  S. Ferenczi, L. Zamboni
    "Combinatorial trees arising in the study of interval exchange transformations"
-   Eur. J. Comb. 32, No. 8, 1428-1444 (2011). 
+   Eur. J. Comb. 32, No. 8, 1428-1444 (2011).
+
+.. [DeUl15] V. Delecroix, C. Ulcigrai
+   "Diagonal changes for surfaces in hyperelliptic components"
+   Geom. Dedicata 176, 117-174 (2015). 
 
 .. [FeZa10] S. Ferenczi, L. Zamboni
    "Structure of K-interval exchange transformations: induction, trajectories, and distance theorems"
    J. Anal. Math. 112, 289-328 (2010).  
 
-.. [DeUl15] V. Delecroix, C. Ulcigrai
-   "Diagonal changes for surfaces in hyperelliptic components"
-   Geom. Dedicata 176, 117-174 (2015). 
+.. [FuDeZy] K. Fu, V. Delecroix, B. Zykoski
+   "Computing the multi-scale boundary of real linear subvarieties in the moduli space of Abelian differentials"
+   In progress.
 
 .. [Gu09] F. Guéritaud
    "Triangulated cores of punctured-torus groups"
@@ -32,6 +40,6 @@ References
    "Geometry of the mapping class groups. I: Boundary amenability"
    Invent. Math. 175, No. 3, 545-609 (2009).
 
-.. [BeDeGaGuSc] M. Bell, V. Delecroix, V. Gadre, R. Gutiérrez-Romo, S. Schleimer
-   "Coding Teichmüller flow using veering triangulations"
-   `<https://arxiv.org/abs/1909.00890>`_
+.. [Zy] B. Zykoski
+   "The L-infinity-isodelaunay decomposition of strata of abelian differentials"
+   `<https://arxiv.org/abs/2206.04143>`_.

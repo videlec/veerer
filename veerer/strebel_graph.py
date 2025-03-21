@@ -1059,11 +1059,14 @@ class StrebelGraph(Constellation):
 
         A *framing* for an Abelian or a quadratic differential is an ordered
         list containing
-        - a vertical separatrix for each singularity of positive angle
+
+        * a vertical separatrix for each singularity of positive angle
           (equivalently, degree greater or equal than -1)
-        - a vertical separatrix for each singularity of negative angle
+
+        * a vertical separatrix for each singularity of negative angle
           (equivalently, degree less or equal than -3)
-        - the infinite cylinders (equivalently, degree equal to -2)
+
+        * the infinite cylinders (equivalently, degree equal to -2)
 
         As in a veering triangulation, folded edges are allowed (in which case
         the middle of the edge is a singularity of degree -1), the folded edges

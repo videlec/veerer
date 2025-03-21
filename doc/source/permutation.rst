@@ -1,0 +1,4 @@
+Permutations
+============
+
+.. automodule:: veerer.permutation

@@ -1,8 +1,8 @@
 .. -*- coding: utf-8 -*-
 .. linkall
 
-Veering triangulations
-======================
+Background
+==========
 
 Geometry
 --------
@@ -14,8 +14,3 @@ pseudo-Anosov mapping classes.
 
 The veerer library implements most of the tools from [BeDeGaGuSc]_ which
 shares a lot of ideas with [Ha09]_.
-
-- Embedded graphs
-- Veering triangulation, Strebel graph and parametrization of Abelian and quadratic differentials
-- Linear subvarieties and Veering-Strebel flip graph
-- Degenerations and multiscale compactification

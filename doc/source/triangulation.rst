@@ -1,0 +1,4 @@
+Triangulations
+==============
+
+.. automodule:: veerer.triangulation

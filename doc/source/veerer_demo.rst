@@ -4,7 +4,6 @@
 Veering triangulation demo
 ==========================
 
-
 :Authors:
     - Vincent Delecroix
     - Saul Schleimer

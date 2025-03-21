@@ -42,6 +42,12 @@ extensions = [
     'sphinx.ext.mathjax',
 ]
 
+autodoc_default_options = {
+    'members': True,
+    'undoc-members': True,
+    'show-inheritance': True
+}
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = [os.path.join(SAGE_DOC_SRC, 'common', 'templates'), '_templates']
 

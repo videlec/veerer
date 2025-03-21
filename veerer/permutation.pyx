@@ -1099,7 +1099,7 @@ def perm_on_list(l, array.array p, int n=-1, swap=None):
     r"""
     Inplace permutation action on list like objects.
 
-    EXAMPLES::
+    EXAMPLES:
 
     Permutation action on matrix rows::
 

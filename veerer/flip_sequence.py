@@ -1,12 +1,6 @@
 r"""
 Dynamical forward flip sequences (and relabeling) in veering triangulations.
 
-.. TODO::
-
-    It would be convenient to have backward and forward flip (ie a point
-    in the middle of an induction) so that we get non-trivial widths and
-    heights.
-
 EXAMPLES:
 
 The golden mean pseudo-Anosov realized on the sphere::

@@ -1,0 +1,4 @@
+Constellations
+==============
+
+.. automodule:: veerer.constellation

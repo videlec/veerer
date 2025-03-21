@@ -5133,8 +5133,13 @@ class VeeringTriangulation(Triangulation):
         This corresponds to a a two levels degeneration in the BCGGM compactification.
 
         The output is a 4-tuple ``(f_up, f_low, relabelling_up, relabelling_low)`` where
-        - ``f_up`` and ``f_low`` are ``VeeringTriangulationLinearFamily``s
-        - ``relabelling_up``, ``relabelling_low`` are partial maps from the half-edges of this
+
+        * ``f_up`` and ``f_low`` is either a pair of
+          ``VeeringTriangulationLinearFamily`` (in the case of vertical
+          degeneration) or ``None`` and a ``VeeringTriangulationLinearFamily`` (in the case
+          of horizontal degeneration)
+
+        * ``relabelling_up``, ``relabelling_low`` are partial maps from the half-edges of this
           veering triangulation to the half-edges in respectively ``f_up`` and ``f_low``
 
         EXAMPLES::
@@ -5593,7 +5598,7 @@ class VeeringTriangulation(Triangulation):
             sage: sorted(vt.vertical_degeneration_low_edges_subsets(), key=lambda x: (len(x), x))
             [(1,), (3,), (6,), (8,), (1, 3), (1, 6), (3, 8), (6, 8)]
 
-        TESTS::
+        TESTS:
 
         An example which used to be wrong::
 
@@ -6010,11 +6015,14 @@ class VeeringTriangulation(Triangulation):
 
         A *framing* for an Abelian or a quadratic differential is an ordered
         list containing
-        - a vertical separatrix for each singularity of positive angle
+
+        * a vertical separatrix for each singularity of positive angle
           (equivalently, degree greater or equal than -1)
-        - a vertical separatrix for each singularity of negative angle
+
+        * a vertical separatrix for each singularity of negative angle
           (equivalently, degree less or equal than -3)
-        - the infinite cylinders (equivalently, degree equal to -2)
+
+        * the infinite cylinders (equivalently, degree equal to -2)
 
         As in a veering triangulation, folded edges are allowed (in which case
         the middle of the edge is a singularity of degree -1), the folded edges
