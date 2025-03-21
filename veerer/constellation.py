@@ -748,6 +748,25 @@ class Constellation:
         return T
 
     def vertex_permutation(self, copy=True):
+        r"""
+        Return the permutation encoding the vertices of ``self``.
+
+        Going counterclockwise around vertices makes a permutation of the darts
+        whose cycles in its cycle decomposition are in bijection with vertices.
+
+        EXAMPLES::
+
+            sage: from veerer import Triangulation
+            sage: sphere = Triangulation("(0,1,2)(~0,~2,~1)")
+            sage: sphere.vertex_permutation()
+            array('i', [5, 2, 1, 4, 3, 0])
+
+        If the triangulation has folded edges, then the vertex permutation is only partial::
+
+            sage: t = Triangulation("(0,1,2)(~0,3,4)")
+            sage: t.vertex_permutation()
+            array('i', [4, 8, 1, -1, 2, -1, 0, -1, 6, -1])
+        """
         if copy:
             return self._vp[:]
         else:
@@ -814,14 +833,18 @@ class Constellation:
 
     def face_permutation(self, copy=True):
         r"""
-        Return the face permutation.
+        Return the permutation encoding the faces of ``self``.
+
+        Going counterclockwise around faces makes a permutation of the
+        darts whose cycles in its cycle decomposition are in bijection with
+        vertices.
 
         EXAMPLES::
 
             sage: from veerer import Triangulation
-            sage: T = Triangulation("(0,3,5)(1,~3,2)(~2,4,~5)(~4,~1,~0)")
-            sage: T.face_permutation()
-            array('i', [6, 9, 7, 1, 2, 8, 10, 4, 11, 3, 0, 5])
+            sage: sphere = Triangulation("(0,1,2)(~0,~2,~1)")
+            sage: sphere.face_permutation()
+            array('i', [2, 5, 4, 1, 0, 3])
 
         If the triangulation has folded edges, then the face permutation is only partial::
 
@@ -1273,6 +1296,7 @@ class Constellation:
     def _extra_relabelling(self, p):
         pass
 
+    # TODO: clean documentation
     def relabel(self, p, check=True):
         r"""
         Relabel this triangulation inplace according to the permutation ``p``.
@@ -1817,6 +1841,7 @@ class Constellation:
 
             return (relabellings, fp_best, half_edges_data_best, edges_data_best) if return_all else (relabelling_best, fp_best, half_edges_data_best, edges_data_best)
 
+    # TODO: expand and clean documentation
     def set_canonical_labels(self, mapping=False):
         r"""
         Set labels in a canonical way in its automorphism class.

@@ -42,8 +42,8 @@ to the faces
     sage: torus = Triangulation("(0,1,2)(~0,~1,~2)")
 
 To recover the permutation of darts one can use the methods
-:func:`~veerer.triangulation.Triangulation.vertex_permutation` and
-:func:`~veerer.triangulation.Triangulation.face_permutation`
+:func:`~veerer.constellation.Constellation.vertex_permutation` and
+:func:`~veerer.constellation.Constellation.face_permutation`
 
 ::
 
@@ -99,7 +99,7 @@ previous section are given by
     sage: sphere.is_isomorphic(sphere3)
     True
 
-The function :func:`~veerer.triangulation.Triangulation.is_isomorphic` also detect
+The function :meth:`~veerer.constellation.Constellation.is_isomorphic` also detects
 that our ``sphere`` and ``torus`` are not isomorphic
 
 ::
@@ -108,7 +108,7 @@ that our ``sphere`` and ``torus`` are not isomorphic
     False
 
 One can apply a relabelling to a given triangulation using
-:func:`~veerer.triangulation.Triangulation.relabel`. Though the triangulation
+:meth:`~veerer.constellation.Constellation.relabel`. Though the triangulation
 it is applied to must be mutable
 
 ::
@@ -128,8 +128,9 @@ immutable triangulation will result in an error
     ...
     ValueError: immutable triangulation; use a mutable copy instead
 
-The function `is_isomorphic` can be called with an additional argument that provides
-a relabelling when the two triangulations are isomorphic::
+The function :meth:`~veerer.constellation.Constellation.is_isomorphic` can be
+called with an additional argument that provides a relabelling when the two
+triangulations are isomorphic
 
 ::
 
@@ -152,8 +153,8 @@ representative of the isomorphism class. In veerer these are called *canonical l
     sage: mutable_sphere2
     Triangulation("(0,1,2)(~0,~2,~1)")
 
-Similarly to :func:`~veerer.triangulation.Triangulation.is_isomorphic` the
-function :func:`~veerer.triangulation.Triangulation.set_canonical_labels` has
+Similarly to :func:`~veerer.constellation.Constellation.is_isomorphic` the
+function :func:`~veerer.constellation.Constellation.set_canonical_labels` has
 an optional argument ``mapping`` which makes the function return the array used
 to turn the triangulation to its canonical version.
 
