@@ -1893,7 +1893,7 @@ class Constellation:
             sage: T2 = VeeringTriangulation.from_string(s)
             sage: T == T2
             False
-            sage: T.is_isomorphic_to(T2)
+            sage: T.is_isomorphic(T2)
             True
 
         TESTS::
@@ -1933,7 +1933,26 @@ class Constellation:
 
     def is_isomorphic(self, other, certificate=False):
         r"""
-        Check whether ``self`` is isomorphic to ``other``.
+        Return whether ``self`` is isomorphic to ``other``.
+
+        INPUT:
+
+        - ``other`` - a constellation
+
+        - ``certificate`` -- optional boolean (default ``False``), whether to
+           additionally return the relabelling when ``self`` and ``other`` are
+           isomorphic
+
+        EXAMPLES::
+
+            sage: from veerer import Triangulation
+            sage: sphere = Triangulation("(0,1,2)(~0,~2,~1)")
+            sage: sphere2 = Triangulation("(0,2,1)(~0,~1,~2)")
+            sage: torus = Triangulation("(0,1,2)(~0,~1,~2)")
+            sage: sphere.is_isomorphic(sphere2)
+            True
+            sage: sphere.is_isomorphic(torus)
+            False
 
         TESTS::
 
@@ -1974,7 +1993,23 @@ class Constellation:
         else:
             return True
 
-    # TODO: deprecate
-    is_isomorphic_to = is_isomorphic
+    def is_isomorphic_to(self, *args, **kwds):
+        r"""
+        Deprecated function.
 
+        TESTS::
 
+            sage: from veerer import Triangulation
+            sage: sphere = Triangulation("(0,1,2)(~0,~2,~1)")
+            sage: torus = Triangulation("(0,1,2)(~0,~1,~2)")
+            sage: sphere.is_isomorphic_to(torus)
+            doctest:warning
+            ...
+            UserWarning: is_isomorphic_to is deprecated; use .is_isomorphic() instead
+            False
+            sage: sphere.is_isomorphic_to(torus, True)
+            (False, None)
+        """
+        import warnings
+        warnings.warn("is_isomorphic_to is deprecated; use .is_isomorphic() instead")
+        return self.is_isomorphic(*args, **kwds)

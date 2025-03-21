@@ -2758,7 +2758,7 @@ class VeeringTriangulation(Triangulation):
             F.append_relabelling(r)
 
             # TODO: remove assertion check
-            assert F.start() == F.end(), (F.start(), F.end(), F.start().is_isomorphic_to(F.end(), certificate=True))
+            assert F.start() == F.end(), (F.start(), F.end(), F.start().is_isomorphic(F.end(), certificate=True))
 
             twists.append(F)
 

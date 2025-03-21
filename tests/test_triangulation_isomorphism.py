@@ -34,8 +34,8 @@ def test_non_isomorphic():
          for S2 in T:
              if S1 == S2:
                  continue
-             assert S1.is_isomorphic_to(S2) is False
-             assert S1.is_isomorphic_to(S2,True) == (False, None)
+             assert S1.is_isomorphic(S2) is False
+             assert S1.is_isomorphic(S2,True) == (False, None)
 
 def test_veering_non_isomorphic():
     V1 = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
@@ -46,8 +46,8 @@ def test_veering_non_isomorphic():
         for W2 in V:
             if W1 == W2:
                 continue
-            assert W1.is_isomorphic_to(W2) is False
-            assert W1.is_isomorphic_to(W2, True) == (False, None)
+            assert W1.is_isomorphic(W2) is False
+            assert W1.is_isomorphic(W2, True) == (False, None)
 
 @pytest.mark.parametrize("fp, repeat",
     [("(0,5,1)(~0,4,2)(~1,~2,~4)(3,6,~5)", 10),
@@ -59,8 +59,8 @@ def test_isomorphism(fp, repeat):
         U = T.copy(mutable=True)
         p = perm_random_centralizer(U.edge_permutation(copy=False))
         U.relabel(p)
-        assert U.is_isomorphic_to(T) is True
-        ans, cert = U.is_isomorphic_to(T, True)
+        assert U.is_isomorphic(T) is True
+        ans, cert = U.is_isomorphic(T, True)
         assert ans is True
         U.relabel(cert)
         assert T == U
@@ -77,8 +77,8 @@ def test_veering_isomorphism(fp, cols, repeat):
         W = V.copy(mutable=True)
         p = perm_random_centralizer(W.edge_permutation(copy=False))
         W.relabel(p)
-        assert W.is_isomorphic_to(V) is True
-        ans, cert = W.is_isomorphic_to(V, True)
+        assert W.is_isomorphic(V) is True
+        ans, cert = W.is_isomorphic(V, True)
         assert ans is True
         W.relabel(cert)
         assert V == W

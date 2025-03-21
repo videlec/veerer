@@ -664,7 +664,7 @@ class VeeringFlipSequence(object):
             sage: fp.find_closure()
             array('i', [4, 5, 0, 1, 2, 3])
         """
-        ans, r = self._end.is_isomorphic_to(self._start, certificate=True)
+        ans, r = self._end.is_isomorphic(self._start, certificate=True)
         return r if ans else None
 
     def append_relabelling(self, r, check=True):
