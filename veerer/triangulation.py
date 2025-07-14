@@ -64,6 +64,11 @@ def face_boundary_init(faces, boundary=None):
         sage: face_boundary_init([0, 2, 4, 5, 1, 6, 3, 7], [0, 1, 3, 0, 0, 2, 0, 0])
         (array('i', [0, 2, 4, 5, 1, 6, 3, 7]), array('i', [0, 1, 3, 0, 0, 2, 0, 0]))
 
+        sage: from array import array
+        sage: fp = array('i', [0, 2, 4, 5, 1, 6, 3, 7])
+        sage: face_boundary_init(fp)
+        (array('i', [0, 2, 4, 5, 1, 6, 3, 7]), array('i', [0, 0, 0, 0, 0, 0, 0, 0]))
+
     TESTS:
 
     Check that the edge permutation does not depend on the details of faces::
@@ -161,31 +166,32 @@ def face_boundary_init(faces, boundary=None):
 
         fp = perm_init(fp, partial=True)
 
-        # construct the boundary
-        if boundary is None:
-            boundary = array('i', [0] * (2 * ne))
-        elif isinstance(boundary, (tuple, list, array)):
-            if len(boundary) != 2 * ne:
-                raise ValueError("invalid input argument")
-            boundary = array('i', boundary)
-        elif isinstance(boundary, dict):
-            output = array('i', [0] * (2 * ne))
-            for e, v in boundary.items():
-                if isinstance(e, str):
-                    if not e:
-                        raise ValueError(f"keys must be valid edges, got {e}")
-                    elif e[0] == '~':
-                        e = ~int(e[1:])
-                    else:
-                        e = int(e)
-                elif isinstance(e, numbers.Integral):
+    # construct the boundary
+    ne = len(fp) // 2
+    if boundary is None:
+        boundary = array('i', [0] * (2 * ne))
+    elif isinstance(boundary, (tuple, list, array)):
+        if len(boundary) != 2 * ne:
+            raise ValueError("invalid input argument")
+        boundary = array('i', boundary)
+    elif isinstance(boundary, dict):
+        output = array('i', [0] * (2 * ne))
+        for e, v in boundary.items():
+            if isinstance(e, str):
+                if not e:
+                    raise ValueError(f"keys must be valid edges, got {e}")
+                elif e[0] == '~':
+                    e = ~int(e[1:])
+                else:
                     e = int(e)
-                if e not in pos and e not in neg:
-                    raise ValueError(f"keys in the bdry dictionary must be valid half-edges, got {e}")
-                output[to_half_edge(e)] = v
-            boundary = output
-        else:
-            raise TypeError('invalid boundary data')
+            elif isinstance(e, numbers.Integral):
+                e = int(e)
+            if e not in pos and e not in neg:
+                raise ValueError(f"keys in the bdry dictionary must be valid half-edges, got {e}")
+            output[to_half_edge(e)] = v
+        boundary = output
+    else:
+        raise TypeError('invalid boundary data')
 
     return fp, boundary
 
@@ -319,6 +325,12 @@ class Triangulation(Constellation):
         ...
         ValueError: invalid boundary data array('i', [0, 1, 0, 1, 0, 0])
 
+    Initialization from an array::
+
+        sage: from array import array
+        sage: fp = array('i', [2, -1, 4, -1, 0, -1, 8, -1, 10, -1, 6, -1])
+        sage: Triangulation(fp)
+        Triangulation("(0,1,2)(3,4,5)")
     """
     __slots__ = ['_bdry']
 
