@@ -1450,6 +1450,7 @@ class VeeringTriangulationLinearFamilies:
 
     @staticmethod
     def L_shaped_surface(a1, a2, b1, b2, t1=0, t2=0):
+        from .veering_triangulation import VeeringTriangulations
         vt, s, t = VeeringTriangulations.L_shaped_surface(a1, a2, b1, b2, t1, t2)
         return VeeringTriangulationLinearFamily(vt, matrix([s, t]))
 
