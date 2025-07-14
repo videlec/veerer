@@ -198,10 +198,28 @@ class VeeringTriangulation(Triangulation):
         return (half_edge, angle)
 
     def _normalize_face_separatrix(self, half_edge, angle):
+        r"""
+        TESTS::
+
+            sage: from veerer import *
+            sage: vt = VeeringTriangulation("(0,1,2)(~0:1, ~2:1 , ~1:2)", "BRR")
+
+            sage: vt._normalize_face_separatrix(1, 0)
+            (3, 0)
+            sage: vt._normalize_face_separatrix(5, 0)
+            (5, 0)
+            sage: vt._normalize_face_separatrix(5, 1)
+            (3, 0)
+            sage: vt._normalize_face_separatrix(3, 0)
+            (3, 0)
+            sage: vt._normalize_face_separatrix(3, 1)
+            (5, 0)
+        """
         if self.face_angle(half_edge) == 0:
+            # infinite cylinder case
             return (min(perm_orbit(self._fp, half_edge)), angle)
 
-        last_angle = self.half_edge_num_separatrices(half_edge) - 1 # the valid range is between 1 and the number of separatrices
+        last_angle = self.half_edge_num_separatrices(half_edge) - 1
         while angle == last_angle:
             half_edge = self.previous_in_face(half_edge)
             angle = 0
@@ -223,7 +241,7 @@ class VeeringTriangulation(Triangulation):
             sage: vt._check_face_separatrix(1, 2)
             Traceback (most recent call last):
             ...
-            ValueError: angle (=2) out of range for separatrix at half_edge=1; must be >= 0 and <= 1
+            ValueError: angle (=2) out of range for separatrix at half_edge=1; must be >= 0 and < 1
         """
         half_edge = self._check_half_edge(half_edge)
         if not isinstance(angle, numbers.Integral):
@@ -233,7 +251,7 @@ class VeeringTriangulation(Triangulation):
         if self._bdry[half_edge] == 0:
             raise ValueError("not a face separatrix")
         if angle < 0 or angle >= num_seps:
-            raise ValueError(f"angle (={angle}) out of range for separatrix at half_edge={half_edge}; must be >= 0 and <= {num_seps}")
+            raise ValueError(f"angle (={angle}) out of range for separatrix at half_edge={half_edge}; must be >= 0 and < {num_seps}")
         return self._normalize_face_separatrix(half_edge, angle)
 
     def _check_infinite_cylinder(self, half_edge):
