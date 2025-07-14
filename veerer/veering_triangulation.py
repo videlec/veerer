@@ -1431,6 +1431,16 @@ class VeeringTriangulation(Triangulation):
         r"""
         Return the orientation double cover of this veering triangulation.
 
+        INPUT:
+
+        - ``mutable`` -- (boolean, default ``False``) whether the return value
+          is mutable or not
+        - ``involution_and_quotient`` -- (boolean, default ``False``) whether
+          to return a triple ``(vt_cov, inv, quot)`` consisting of the
+          veering triangulation ``vt_cov`` corresponding to the double
+          cover, ``inv`` the involution acting on half-edges and ``quot`` the map
+          to the quotient.
+
         EXAMPLES::
 
             sage: from veerer import VeeringTriangulation
@@ -1469,6 +1479,16 @@ class VeeringTriangulation(Triangulation):
             Q_0(1^2, -2^3)
             sage: V.abelian_cover().stratum()  # optional - surface_dynamics
             H_0(2^2, -1^6)
+
+        Testing the involution and quotient map::
+
+            sage: vt = VeeringTriangulation("(0,2,3)(1,4,~0)(5,6,~1)", "BRRBBBB")
+            sage: vt_cov, inv, quot = vt.abelian_cover(involution_and_quotient=True)
+            sage: for h in range(18):
+            ....:     assert inv[h] != h and inv[inv[h]] == h
+            ....:     assert quot[h] == quot[inv[h]]
+            ....:     assert vt._vp[quot[h]] == quot[vt_cov._vp[h]]
+            ....:     assert vt._fp[quot[h]] == quot[vt_cov._fp[h]]
         """
         # As in the method is_abelian we propagate the orientation of half-edges around
         # vertices and (possibly folded) edges. We use the following conventions in
@@ -1489,6 +1509,7 @@ class VeeringTriangulation(Triangulation):
             quot[2 * e] = 2 * e
             if self._vp[2 * e + 1] == -1:
                 inv[2 * e] = 2 * e + 1
+                inv[2 * e + 1] = 2 * e
                 bdry_cov[2 * e] = bdry_cov[2 * e + 1] = self._bdry[2 * e]
                 cols_cov[e] = cols[e]
                 quot[2 * e + 1] = 2 * e
@@ -1496,7 +1517,9 @@ class VeeringTriangulation(Triangulation):
                 bdry_cov[2 * e] = bdry_cov[j + 1] = self._bdry[2 * e]
                 bdry_cov[2 * e + 1] = bdry_cov[j] = self._bdry[2 * e + 1]
                 inv[2 * e] = j + 1
+                inv[j + 1] = 2 * e
                 inv[2 * e + 1] = j
+                inv[j] = 2 * e + 1
                 cols_cov[e] = cols_cov[j // 2] = cols[e]
                 quot[2 * e + 1] = 2 * e + 1
                 quot[j] = 2 * e + 1

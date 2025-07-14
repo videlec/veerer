@@ -778,24 +778,28 @@ class LinearFamily:
             sage: from veerer.linear_family import VeeringTriangulationLinearFamilies, StrebelGraphLinearFamily
 
             sage: X9 = VeeringTriangulationLinearFamilies.prototype_H1_1(0, 2, 1, -1)
-            sage: Y9 = X9.abelian_cover() # not tested
-            sage: Y9.dimension() == X9.dimension() # not tested
+            sage: Y9 = X9.abelian_cover()
+            sage: Y9.dimension() == X9.dimension()
             True
-            sage: Y9.stratum()  # optional - surface_dynamics # not tested
+            sage: Y9.stratum()  # optional - surface_dynamics
             H_2(1^2)
 
             sage: F = StrebelGraphLinearFamily("(0,1:1,~0,~1:1)", [[2, 1]])
-            sage: Fab = F.abelian_cover() # not tested
-            sage: Fab # not tested
+            sage: Fab = F.abelian_cover()
+            sage: Fab
             StrebelGraphLinearFamily("(0,~2:1,~0,2:1)(1:1,3,~1:1,~3)", [(2, 1, 1, 2)])
-            sage: print(F.stratum(), Fab.stratum())  # optional - surface_dynamics # not tested
+            sage: print(F.stratum(), Fab.stratum())  # optional - surface_dynamics
             H_1(2, -2) (H_1(2, -2), H_1(2, -2))
         """
-        t, inv, quot = self._constellation_class.abelian_cover(self, involution_and_quotient=True)
-        assert t.num_edges() == 2 * self._ne - self.num_folded_edges()
-        nr = self._subspace.nrows() + self.num_edges() - self.num_folded_edges()
-        # TODO: we have equations coming from the quotient and equations coming from the involution
-        raise NotImplementedError
+        cov, inv, quot = self._constellation_class.abelian_cover(self, involution_and_quotient=True)
+        assert cov.num_edges() == 2 * self._ne - self.num_folded_edges()
+        nr = self._subspace.nrows()
+        nc = 2 * self.num_edges() - self.num_folded_edges()
+        subspace = matrix(self._subspace.base_ring(), nr, nc)
+        for i, v in enumerate(self._subspace):
+            for j in range(nc):
+                subspace[i, j] = self._subspace[i, quot[2 * j] // 2]
+        return self.__class__(cov, subspace)
 
     def quotient(self, blocks, mapping=False, mutable=False, check=True):
         r"""
