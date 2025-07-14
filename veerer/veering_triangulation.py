@@ -264,7 +264,7 @@ class VeeringTriangulation(Triangulation):
         """
         EXAMPLES::
 
-            sage: from veerer import VeeringTriangulation
+            sage: from veerer import Triangulation, VeeringTriangulation
             sage: V = VeeringTriangulation("(0,1,2)", "GBR")
             Traceback (most recent call last):
             ...
