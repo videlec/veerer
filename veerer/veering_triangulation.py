@@ -2022,20 +2022,15 @@ class VeeringTriangulation(Triangulation):
             raise ValueError('immutable veering triangulation; use a mutable copy instead')
 
         ep = self._ep
-        recolour = []
         cols = [BLUE, RED]
         for e, col in enumerate(self._colouring):
             if col == GREEN or col == PURPLE:
-                E = ep[e]
                 shuffle(cols)
                 oldcol = self._colouring[e]
-                self._colouring[e] = self._colouring[E] = cols[0]
+                self._colouring[e] = cols[0]
                 if not self.edge_has_curve(e):
-                    self._colouring[e] = self._colouring[E] = cols[1]
+                    self._colouring[e] = cols[1]
                     assert self.edge_has_curve(e)
-                recolour.append((e, oldcol))
-                if e != E:
-                    recolour.append((E, oldcol))
 
     def set_colour(self, col):
         r"""
