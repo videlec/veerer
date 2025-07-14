@@ -790,8 +790,10 @@ class Constellation:
             e = self._check_half_edge(e)
         return self._vp[e]
 
-    def previous_at_vertex(self, e, check=True):
+    def previous_at_vertex(self, h, check=True):
         r"""
+        Return the half-edge before ``h`` around the corresponding vertex.
+
         EXAMPLES::
 
             sage: from veerer import Triangulation
@@ -805,11 +807,13 @@ class Constellation:
             11
         """
         if check:
-            e = self._check_half_edge(e)
-        return self._fp[self._ep(e)]
+            h = self._check_half_edge(h)
+        return self._fp[self._ep(h)]
 
     def edge_permutation(self, copy=True):
         r"""
+        Return the edge permutation.
+
         EXAMPLES::
 
             sage: from veerer import Triangulation
@@ -819,17 +823,20 @@ class Constellation:
             sage: Triangulation("(0,1,2)").edge_permutation()
             array('i', [0, -1, 2, -1, 4, -1])
         """
-        return array('i', [self._ep(e) for e in range(2 * self._ne)])
+        return array('i', [self._ep(h) for h in range(2 * self._ne)])
 
-    def next_in_edge(self, e, check=True):
+    def next_in_edge(self, h, check=True):
+        r"""
+        Return the next half-edge in the edge.
+        """
         if check:
-            self._check_half_edge(e)
-        return self._ep(e)
+            self._check_half_edge(h)
+        return self._ep(h)
 
-    def previous_in_edge(self, e, check=True):
+    def previous_in_edge(self, h, check=True):
         if check:
-            self._check_half_edge(e)
-        return self._vp[self._fp[e]]
+            self._check_half_edge(h)
+        return self._ep(h)
 
     def face_permutation(self, copy=True):
         r"""
@@ -857,12 +864,30 @@ class Constellation:
         else:
             return self._fp
 
-    def next_in_face(self, e, check=True):
-        if check:
-            e = self._check_half_edge(e)
-        return self._fp[e]
+    def next_in_face(self, h, check=True):
+        r"""
+        Return the half-edge after ``h`` in the corresponding face.
 
-    def previous_in_face(self, e, check=True):
+        EXAMPLES::
+
+            sage: from veerer import Triangulation
+            sage: t = Triangulation("(0,1,2)(~1,3,4)")
+            sage: t.next_in_face(0)
+            2
+            sage: t.next_in_face(2)
+            4
+            sage: t.next_in_face(4)
+            0
+            sage: t.next_in_face(1)
+            Traceback (most recent call last):
+            ...
+            ValueError: invalid half-edge h=1; the underlying edges is folded
+        """
+        if check:
+            h = self._check_half_edge(h)
+        return self._fp[h]
+
+    def previous_in_face(self, h, check=True):
         r"""
         EXAMPLES::
 
@@ -877,10 +902,19 @@ class Constellation:
             16
         """
         if check:
-            e = self._check_half_edge(e)
-        return self._ep(self._vp[e])
+            h = self._check_half_edge(h)
+        return self._ep(self._vp[h])
 
     def half_edges(self):
+        r"""
+        Iterate through the half-edges of this constellation.
+
+        EXAMPLES::
+
+            sage: from veerer import Triangulation
+            sage: list(Triangulation("(0,1,2)(~1,3,4)").half_edges())
+            [0, 2, 3, 4, 6, 8]
+        """
         for e in range(self._ne):
             yield 2 * e
             if self._vp[2 * e + 1] != -1:
@@ -896,7 +930,7 @@ class Constellation:
             sage: Triangulation("(0,1,2)(~1,3,4)").num_half_edges()
             6
         """
-        return sum(self._vp[i] != -1 for i in range(2 * self._ne))
+        return self._ne + sum(self._vp[i] != -1 for i in range(1, 2 * self._ne, 2))
 
     def has_folded_edge(self):
         r"""
