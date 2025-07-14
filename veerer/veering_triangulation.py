@@ -577,8 +577,8 @@ class VeeringTriangulation(Triangulation):
         r = s.r_tuple()
         u = s.u_tuple()
         # ep used to be i <-> 6n-1-i
-        fp = [None] * (6*n)
-        N = 6*n - 1
+        fp = [None] * (6 * n)
+        N = 6 * n - 1
         for i in range(0, n):
             # bottom triangle
             ii = 6*i
@@ -594,10 +594,10 @@ class VeeringTriangulation(Triangulation):
             fp[k] = l
             fp[l] = j
 
-        colouring = [None] * (3*n)
-        colouring[::3] = [RED]*n
-        colouring[2::3] = [BLUE]*n
-        colouring[1::3] = [col]*n
+        colouring = [None] * (3 * n)
+        colouring[::3] = [RED] * n    # right sides
+        colouring[2::3] = [BLUE] * n  # left sides
+        colouring[1::3] = [col] * n   # diagonals
 
         fp = array('i', fp)
         colouring = array('i', colouring)
@@ -713,7 +713,7 @@ class VeeringTriangulation(Triangulation):
 
         nseps = c.nseps()
 
-        colours = [RED] * nseps + [BLUE] * (2*nseps)
+        colours = [RED] * nseps + [BLUE] * (2 * nseps)
         return VeeringTriangulation(triangles, colours, mutable=mutable, check=check)
 
     @classmethod
