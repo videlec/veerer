@@ -251,6 +251,12 @@ class VeeringTriangulation(Triangulation):
             Traceback (most recent call last):
             ...
             ValueError: invalid triangle (0, 1, 2) with colours (green, blue, red)
+
+            sage: sphere = Triangulation("(0,1,2)(~0,~2,~1)")
+            sage: VeeringTriangulation(sphere, "BRR")
+            Traceback (most recent call last):
+            ...
+            ValueError: monochromatic vertex [3, 4] of colour red
         """
         Triangulation._check(self, error)
         ne = self._ne
@@ -315,7 +321,7 @@ class VeeringTriangulation(Triangulation):
             while i < len(v) and cols[v[i] // 2] == col and not bdry[v[i]]:
                 i += 1
             if i == len(v):
-                raise error('monochromatic vertex {} of colour {}'.format(v, colour_to_string(cols[v[0]])))
+                raise error('monochromatic vertex {} of colour {}'.format(v, colour_to_string(cols[v[0] // 2])))
 
     def base_ring(self):
         return ZZ
@@ -2242,7 +2248,7 @@ class VeeringTriangulation(Triangulation):
 
             e = self._check_edge(e)
             if not self.is_forward_flippable(e, check=False):
-                raise ValueError("half-edge e={} is not forward flippable".format(e))
+                raise ValueError("edge e={} is not forward flippable".format(e))
 
         h = 2 * e
 
