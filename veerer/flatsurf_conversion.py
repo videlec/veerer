@@ -21,9 +21,9 @@ Conversions from pyflatsurf and sage-flatsurf to veerer.
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 # ****************************************************************************
 
-
 from array import array
 
+from sage.rings.rational_field import QQ
 from sage.matrix.constructor import matrix
 
 from .constants import RED, BLUE
@@ -121,68 +121,11 @@ def oriented_slope(a, rotate=1):
     raise ValueError("invalid argument rotate={}".format(rotate))
 
 
-def flat_structure_to_sage_flatsurf(flat_structure):
-    r"""
-    Construct a sage-flatsurf surface associated to the given veerer flat structure.
-
-    Return a pair ``(surface, mapping_of_half_edges)``.
-
-    EXAMPLES::
-
-        sage: from veerer import VeeringTriangulation
-        sage: from veerer.flatsurf_conversion import flat_structure_to_sage_flatsurf
-
-        sage: T = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "BRR")
-        sage: F = T.flat_structure_min()
-        sage: flat_structure_to_sage_flatsurf(F)  # optional - sage_flatsurf
-        (Translation Surface in H_1(0) built from 2 isosceles triangles,
-         [(0, 0), (1, 0), (0, 1), (1, 1), (0, 2), (1, 2)])
-
-        sage: T = VeeringTriangulation("(0,1,2)", "BRR")
-        sage: F = T.flat_structure_min()
-        sage: flat_structure_to_sage_flatsurf(F)  # optional - sage_flatsurf
-        (Half-Translation Surface in Q_0(-1^4) built from an isosceles triangle,
-         [(0, 0), None, (0, 1), None, (0, 2), None])
-    """
-    sage_flatsurf_feature.require()
-    import flatsurf
-
-    ep = flat_structure._ep
-    vp = flat_structure._vp
-    bdry = flat_structure._bdry
-    ne = flat_structure.num_edges()
-    vecs = flat_structure.vectors()
-
-    base_ring = flat_structure._x.base_ring()
-    half_edge_to_face = [None] * (2 * ne)
-    half_edge_to_pos = [None] * (2 * ne)
-    S = flatsurf.MutableOrientedSimilaritySurface(base_ring)
-    for i, t in enumerate(flat_structure.triangles()):
-        for j, h in enumerate(t):
-            half_edge_to_face[h] = i
-            half_edge_to_pos[h] = j
-        S.add_polygon(flatsurf.Polygon(edges=[vecs[t[0]], vecs[t[1]], vecs[t[2]]]))
-    for e in range(ne):
-        if not bdry[2 * e] and not bdry[ep(2 * e)]:
-            S.glue((half_edge_to_face[2 * e], half_edge_to_pos[2 * e]),
-                   (half_edge_to_face[ep(2 * e)], half_edge_to_pos[ep(2 * e)]))
-    S.set_immutable()
-
-    m = [None] * (2 * ne)
-    for h in range(2 * ne):
-        if vp[h] == -1:
-            continue
-        label = half_edge_to_face[h]
-        e = half_edge_to_pos[h]
-        m[h] = (label, e)
-    return S, m
-
-
 def pyflatsurf_surface_to_veerer_veering_triangulation(surface):
     r"""
     Convert a pyflatsurf surface in a veering triangulation.
 
-    Note that the flat structure is lost in the process.
+    Note that the flatstructure is lost in the process.
 
     EXAMPLES::
 
@@ -196,16 +139,15 @@ def pyflatsurf_surface_to_veerer_veering_triangulation(surface):
         True
         sage: S3 = S2.pyflatsurf().codomain().flat_triangulation()  # optional - sage_flatsurf pyflatsurf
         sage: pyflatsurf_surface_to_veerer_veering_triangulation(S3)  # optional - sage_flatsurf pyflatsurf
-        (VeeringTriangulation("(0,1,2)(~0,3,4)(~1,5,6)(~2,7,8)(~3,10,9)(~4,11,~8)(~5,12,13)(~6,14,15)(~7,~9,~14)(~10,16,~11)(~12,17,18)(~13,19,20)(~15,~18,~20)(~16,~17,~19)", "BRRRRRBRBBBRBRRRRRBBR"),
-        [-1, -1, ..., -1])
+        (VeeringTriangulation("(0,1,2)(~0,3,4)(~1,5,6)(~2,7,8)(~3,10,9)(~4,11,~8)(~5,12,13)(~6,14,15)(~7,~9,~14)(~10,16,~11)(~12,17,18)(~13,19,20)(~15,~18,~20)(~16,~17,~19)", "BRRRRRBRBBBRBRRRRRBBR"), [-1, -1, 1, 1, -1, -1, 1, 1, -1, -1, 1, -1, -1, -1, -1, 1, -1, 1, -1, -1, -1])
     """
     pyflatsurf_feature.require()
 
     faces = surface.faces()
     n = 3 * faces.size()
     fp = array('i', [-1] * n)
-    slopes = [-1] * (n // 2)
-    orientations = [None] * (n // 2)
+    colouring = array('i', [-1] * (n // 2))
+    x_orientation = [None] * (n // 2)
     for face in faces:
         a, b, c = face
         va = surface.fromHalfEdge(a)
@@ -218,38 +160,32 @@ def pyflatsurf_surface_to_veerer_veering_triangulation(surface):
         b = b.id()
         c = c.id()
         if a < 0 :
-            a = 2 * (-a - 1) + 1
+            a = -2 * a - 1
         elif a > 0:
-            a = 2 * (a - 1)
+            a = 2 * a - 2
         if b < 0:
-            b = 2 * (-b - 1) + 1
+            b = -2 * b - 1
         elif b > 0:
-            b = 2 * (b - 1)
+            b = 2 * b - 2
         if c < 0:
-            c = 2 * (-c - 1) + 1
+            c = -2 * c - 1
         elif c > 0:
-            c = 2 * (c - 1)
+            c = 2 * c - 2
         fp[a] = b
         fp[b] = c
         fp[c] = a
-        if a % 2:
-            orientations[a // 2] = -sa[0]
-        else:
-            orientations[a // 2] = sa[0]
-        slopes[a // 2] = sa[0] * sa[1]
-        if b % 2:
-            orientations[b // 2] = -sb[0]
-        else:
-            orientations[b // 2] = sb[0]
-        slopes[b // 2] = sb[0] * sb[1]
-        if c % 2:
-            orientations[c // 2] = -sc[0]
-        else:
-            orientations[c // 2] = sc[0]
-        slopes[c // 2] = sc[0] * sc[1]
+        if a % 2 == 0:
+            x_orientation[a // 2] = sa[0]
+        colouring[a // 2] = RED if sa[0] * sa[1] == 1 else BLUE
+        if b % 2 == 0:
+            x_orientation[b // 2] = sb[0]
+        colouring[b // 2] = RED if sb[0] * sb[1] == 1 else BLUE
+        if c % 2 == 0:
+            x_orientation[c // 2] = sc[0]
+        colouring[c // 2] = RED if sc[0] * sc[1] == 1 else BLUE
 
-    colouring = array('i', [RED if x == 1 else BLUE for x in slopes])
-    return VeeringTriangulation.from_permutations(None, fp, (array('i', [0] * n),), (colouring,)), orientations 
+    t = Triangulation(fp)
+    return VeeringTriangulation(t, colouring), x_orientation
 
 
 def sage_flatsurf_orbit_closure_to_veerer_linear_family(orbit_closure):
@@ -260,7 +196,20 @@ def sage_flatsurf_orbit_closure_to_veerer_linear_family(orbit_closure):
 
         sage: from veerer.flatsurf_conversion import sage_flatsurf_orbit_closure_to_veerer_linear_family
 
-        sage: from flatsurf import Polygon, similarity_surfaces, GL2ROrbitClosure  # optional - sage_flatsurf pyflatsurf
+        sage: from flatsurf import Polygon, translation_surfaces, similarity_surfaces, GL2ROrbitClosure  # optional - sage_flatsurf pyflatsurf
+
+        sage: S = translation_surfaces.square_torus()  # optional - sage_flatsurf pyflatsurf
+        sage: O = GL2ROrbitClosure(S)  # optional - sage_flatsurf pyflatsurf
+        sage: F = sage_flatsurf_orbit_closure_to_veerer_linear_family(O)  # optional - sage_flatsurf pyflatsurf
+        sage: F  # optional - sage_flatsurf pyflatsurf
+        VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RBR", [(1, 0, 1), (0, 1, -1)])
+
+        sage: S = translation_surfaces.mcmullen_L(1, 1, 1, 1)  # optional - sage_flatsurf pyflatsurf
+        sage: O = GL2ROrbitClosure(S)  # optional - sage_flatsurf pyflatsurf
+        sage: F = sage_flatsurf_orbit_closure_to_veerer_linear_family(O)  # optional - sage_flatsurf pyflatsurf
+        sage: F  # optional - sage_flatsurf pyflatsurf
+        VeeringTriangulationLinearFamily("(0,1,2)(~0,4,3)(~1,5,6)(~2,7,8)(~3,~7,~4)(~5,~6,~8)", "RBRRBRRRB", [(1, 0, 1, 1, 0, 1, 1, 1, 0), (0, 1, -1, -1, 1, -1, 0, 0, 1)])
+
         sage: P = Polygon(angles=(1,1,1,7), lengths=(3, 2))  # optional - sage_flatsurf pyflatsurf
         sage: S1 = similarity_surfaces.billiard(P).minimal_cover("translation").erase_marked_points()  # optional - sage_flatsurf pyflatsurf
         sage: S2 = S1.l_infinity_delaunay_triangulation()  # optional - sage_flatsurf pyflatsurf
@@ -277,15 +226,19 @@ def sage_flatsurf_orbit_closure_to_veerer_linear_family(orbit_closure):
     """
     sage_flatsurf_feature.require()
 
-    vt, orientations = pyflatsurf_surface_to_veerer_veering_triangulation(orbit_closure._surface)
+    vt, x_orientation = pyflatsurf_surface_to_veerer_veering_triangulation(orbit_closure._surface)
 
     # build generators for the tangent space
-    phi = orbit_closure.V2.base_ring().coerce_embedding()
-    K = phi.codomain()
+    if orbit_closure.V2.base_ring() is QQ:
+        phi = lambda x: x
+        K = QQ
+    else:
+        phi = orbit_closure.V2.base_ring().coerce_embedding()
+        K = phi.codomain()
     subspace = []
     for i in range(orbit_closure._U_rank):
         v = orbit_closure.lift(orbit_closure._U[i])
-        v = [orientations[j] * phi(v[j]) for j in range(len(v))]
+        v = [x_orientation[j] * phi(v[j]) for j in range(len(v))]
         subspace.append(v)
 
     R = orbit_closure.field_of_definition()
