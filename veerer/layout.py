@@ -297,6 +297,8 @@ class FlatVeeringTriangulationLayout(object):
             s = (-signs[h][0], signs[h][1])
         elif self._triangulation._colouring[h // 2] == BLUE:
             s = (signs[h][0], -signs[h][1])
+        else:
+            raise ValueError("can not propagate signs with PURPLE or GREEN colour")
 
         if hh in signs:
             assert signs[hh] == s
@@ -431,7 +433,7 @@ class FlatVeeringTriangulationLayout(object):
             False
         """
         if check:
-            e = self._triangulation._check_half_edge(e)
+            e = self._triangulation._check_edge(e)
 
         fp = self._triangulation._fp
         pos0 = self.signs_and_positions(2 * e)[1]
@@ -557,7 +559,7 @@ class FlatVeeringTriangulationLayout(object):
                 if self._forest[h // 2] or ccs.find(self._half_edge_to_face[h]) == j:
                     continue
                 e = h // 2
-                if not self.creates_overlap(e):
+                if fp[2 * e + 1] != -1 and not self.creates_overlap(e):
                     self.glue(e)
                     ccs.union(i, j)
                     todo.append(j)
@@ -654,7 +656,7 @@ class FlatVeeringTriangulationLayout(object):
             output.write('\\draw mid +(.1,.1) -- (-.1,-.1);\n')
             output.write('\\draw mid +(-.1,.1) -- (.1,-.1);\n')
 
-    def _plot_half_edge_label(self, a, pos, **opts):
+    def _plot_half_edge_label(self, a, pos, color="black", fontsize="medium", **opts):
         fp = self._triangulation._fp
         ep = self._triangulation._ep
 
@@ -695,7 +697,7 @@ class FlatVeeringTriangulationLayout(object):
                 angle *= -1.0
             angle *= 180 / math.pi
 
-        return text(lab, pos, rotation=angle, color='black')
+        return text(lab, pos, rotation=angle, color=color, fontsize=fontsize)
 
     def _tikz_face(self, output, a,
             red='red!20', blue='blue!20', neutral='gray!20', tikz_face_options=None):
@@ -792,9 +794,49 @@ class FlatVeeringTriangulationLayout(object):
     def _tikz_train_track(self, slope):
         raise NotImplementedError
 
+    def positions(self, xshift=None, yshift=None, root_positions=None):
+        ep = self._triangulation._ep
+        fp = self._triangulation._fp
+        colouring = self._triangulation._colouring
+        if xshift is None:
+            xshift = 0.0
+        else:
+            xshift = float(xshift)
+        if yshift is None:
+            yshift = 0.0
+        else:
+            yshift = float(yshift)
+        xcur = 0.0
+        shift = 0.5
+        V2 = VectorSpace(RDF, 2)
+        pos = {}
+        for cc in self.connected_components()[0]:
+            if root_positions is None:
+                _, local_pos = self.signs_and_positions(self._faces[cc[0]][0])
+                xmin = min(x for x, y in local_pos.values())
+                xmax = max(x for x, y in local_pos.values())
+                ymin = min(y for x, y in local_pos.values())
+                ymax = max(y for x, y in local_pos.values())
+                for h, (x, y) in local_pos.items():
+                    pos[h] = V2((xshift + xcur - xmin + x, yshift + y - ymin))
+                xcur += xmax - xmin + shift
+            else:
+                i = None
+                for j in root_positions:
+                    if self._half_edge_to_face[j] in cc:
+                        i = j
+                        break
+                if i is None:
+                    raise ValueError(f"no root position for component {cc}")
+                v0 = V2(root_positions[j])
+                _, local_pos = self.signs_and_positions(i)
+                for h, (x, y) in local_pos.items():
+                    pos[h] = v0 + V2((x, y))
+        return pos
+
     # TODO: For edges whose two faces are plotted adjacent we should have an option to not display
     # the label
-    def plot(self, horizontal_train_track=False, vertical_train_track=False, edge_labels=True, fill=True):
+    def plot(self, horizontal_train_track=False, vertical_train_track=False, edge_labels=True, inner_edge_labels=True, outer_edge_labels=True, fill=True, xshift=None, yshift=None, root_positions=None):
         r"""
         Return a graphics.
 
@@ -829,37 +871,37 @@ class FlatVeeringTriangulationLayout(object):
         xcur = 0.0
         shift = 0.5
         V2 = VectorSpace(RDF, 2)
-        for cc in self.connected_components()[0]:
-            _, pos = self.signs_and_positions(self._faces[cc[0]][0])
-            xmin = min(x for x, y in pos.values())
-            xmax = max(x for x, y in pos.values())
-            ymin = min(y for x, y in pos.values())
-            ymax = max(y for x, y in pos.values())
-            pos = {h: V2((xcur - xmin + x, y - ymin)) for h, (x, y) in pos.items()}
-            xcur += xmax - xmin + shift
-            for i in cc:
-                a, b, c = self._faces[i]
-                G += polygon2d([pos[h] for h in self._faces[i]], color='gray', alpha=0.2)
-                for h in self._faces[i]:
-                    edge_colour = 'red' if colouring[h // 2] == RED else 'blue'
-                    if h % 2 == 0 and fp[h + 1] == -1:
-                        # folded edge
-                        G += line2d([pos[h], pos[fp[h]]], color=edge_colour)
-                        G += point2d([(pos[h] + pos[fp[h]]) / 2], color='black', marker='x', pointsize=100)
-                    elif ep(h) not in pos or pos[fp[h]] != pos[ep(h)]:
-                        # unglued edge
-                        G += line2d([pos[h], pos[fp[h]]], color=edge_colour)
-                    elif h % 2 == 0:
-                        # edge in the forest (that we avoid plotting twice)
-                        G += line2d([pos[h], pos[fp[h]]], linestyle='dotted', color=edge_colour)
+        pos = self.positions(xshift=xshift, yshift=yshift, root_positions=root_positions)
+        for i in range(self._triangulation.num_triangles()):
+            a, b, c = self._faces[i]
+            G += polygon2d([pos[h] for h in self._faces[i]], color='gray', alpha=0.2)
+            for h in self._faces[i]:
+                edge_colour = 'red' if colouring[h // 2] == RED else 'blue'
+                if h % 2 == 0 and fp[h + 1] == -1:
+                    # folded edge
+                    folded = True
+                    G += line2d([pos[h], pos[fp[h]]], color=edge_colour)
+                    # TODO: here matplotlib emit a warning, but it does not seem possible to set a markerfacecolor
+                    G += point2d([(pos[h] + pos[fp[h]]) / 2], color='black', marker='x', pointsize=100)
+                    if edge_labels and outer_edge_labels:
+                        G += self._plot_half_edge_label(h, pos, fontsize="x-small")
+                elif ep(h) not in pos or pos[fp[h]] != pos[ep(h)]:
+                    # unglued edge
+                    glued = False
+                    G += line2d([pos[h], pos[fp[h]]], color=edge_colour)
+                    if edge_labels and outer_edge_labels:
+                        G += self._plot_half_edge_label(h, pos, fontsize="x-small")
+                elif h % 2 == 0:
+                    # edge in the forest (that we avoid plotting twice)
+                    G += line2d([pos[h], pos[fp[h]]], linestyle='dotted', color=edge_colour)
+                    if edge_labels and inner_edge_labels:
+                        G += self._plot_half_edge_label(h, pos, fontsize="x-small")
 
-                    G += self._plot_half_edge_label(h, pos)
+        if horizontal_train_track:
+            G += self._plot_train_track(HORIZONTAL, pos)
 
-            if horizontal_train_track:
-                G += self._plot_train_track(HORIZONTAL, pos)
-
-            if vertical_train_track:
-                G += self._plot_train_track(VERTICAL, pos)
+        if vertical_train_track:
+            G += self._plot_train_track(VERTICAL, pos)
 
         G.set_aspect_ratio(1)
         G.axes(False)
