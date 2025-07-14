@@ -658,16 +658,22 @@ class LinearExpressions(UniqueRepresentation, Parent):
 
     def variable(self, i):
         r"""
+        Return the variable with index ``i``.
+
+        INPUT:
+
+        - ``i`` -- non-negative integer
+
         EXAMPLES::
 
-        sage: from veerer.polyhedron import LinearExpressions
-        sage: L = LinearExpressions(QQ)
-        sage: L.variable(0)
-        x0
-        sage: L.variable(1)
-        x1
-        sage: 5 * L.variable(2) - 3 * L.variable(7)
-        5*x2 - 3*x7
+            sage: from veerer.polyhedron import LinearExpressions
+            sage: L = LinearExpressions(QQ)
+            sage: L.variable(0)
+            x0
+            sage: L.variable(1)
+            x1
+            sage: 5 * L.variable(2) - 3 * L.variable(7)
+            5*x2 - 3*x7
         """
         return self.element_class(self, {int(i): self.base_ring().one()})
 
