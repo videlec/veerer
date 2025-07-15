@@ -1,5 +1,6 @@
 .. -*- coding: utf-8 -*-
 .. linkall
+.. _triangulation-tutorial:
 
 Embedded graphs and triangulations
 ==================================
@@ -23,9 +24,9 @@ derived classes
 
 * :class:`~veerer.triangulation.Triangulation`: for triangulation of surfaces that we present in this section
 
-* :class:`~veerer.veering_triangulation.VeeringTriangulation`: TODO make ref to section
+* :class:`~veerer.veering_triangulation.VeeringTriangulation`: see :ref:`veering triangulation and Strebel graph section <veering triangulation and strebel graph tutorial>`
 
-* :class:`~veerer.strebel_graph.StrebelGraph`: TODO make ref to section
+* :class:`~veerer.strebel_graph.StrebelGraph`: see :ref:`veering triangulation and Strebel graph section <veering triangulation and strebel graph tutorial>`
 
 Building triangulations
 -----------------------
@@ -136,9 +137,9 @@ triangulations are isomorphic
 
     sage: sphere2.is_isomorphic(sphere3, certificate=True)
     (True, array('i', [0, 1, 5, 4, 3, 2]))
-    sage: sphere2_mutable = sphere2.copy(mutable=True)
-    sage: sphere2_mutable.relabel([0, 1, 5, 4, 3, 2])
-    sage: sphere2_mutable == sphere3
+    sage: mutable_sphere2 = sphere2.copy(mutable=True)
+    sage: mutable_sphere2.relabel([0, 1, 5, 4, 3, 2])
+    sage: mutable_sphere2 == sphere3
     True
 
 When handling a set of isomorphism classes, it is convenient to use a canonical
@@ -195,3 +196,57 @@ of two triangles and its boundary is a quadrilateral
     [[3, 9, 7, 5]]
 
 Notice that dart weights are specified using colons in the face permutation.
+
+Flip graph TODO: OR FLIP AUTOMATON?
+----------
+
+TODO: references
+
+Given a triangulation, the *flip* is the local operation that consists in
+rotating the edge between two adjacent triangles.
+
+::
+
+    sage: sphere_copy = sphere.copy(mutable=True)
+    sage: sphere_copy.flip(0)
+    sage: sphere_copy
+    Triangulation("(0,2,~2)(~0,~1,1)")
+
+Be aware that flipping twice a given edge does not give you back the same
+triangulation, but an isomorphic one where the given edge has opposite
+orientation
+
+::
+
+    sage: sphere_copy.flip(0)
+    sage: sphere_copy
+    Triangulation("(0,~2,~1)(~0,1,2)")
+    sage: sphere
+    Triangulation("(0,1,2)(~0,~2,~1)")
+    sage: sphere_copy.relabel("(0,~0)")
+    sage: sphere == sphere_copy
+    True
+
+TODO: what do we know in the presence of boundary?
+
+The *flip graph* is graph showe vertices are the isomorphism classes of
+triangulations and there is an edge between two triangulations that differ by a
+flip. It is easy to see that the number of triangles and the genus are
+invariant under flip. It is a result of TODO REF that all triangulations
+with fixed genus and fixed number of triangles can be obtained from one
+another by a sequence of edge flip.
+
+In the following snippet we build the small flip graphs in genus zero
+
+::
+
+    sage: from veerer.automaton import FlipGraph
+    sage: A = FlipGraph()
+    sage: A.add_seed(sphere)
+    1
+    sage: A.run()
+    0
+    sage: A
+    Triangulation automaton with 2 states
+
+known (TODO) that the connected components of this graph

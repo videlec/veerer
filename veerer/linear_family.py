@@ -784,10 +784,17 @@ class LinearFamily:
             sage: Y9.stratum()  # optional - surface_dynamics
             H_2(1^2)
 
+            sage: F = StrebelGraphLinearFamily("(0,1:1,~0)", [[2, 1]])
+            sage: Fab = F.abelian_cover()
+            sage: Fab
+            StrebelGraphLinearFamily("(0,~1:1,~0,~2,1:1,2)", [(2, 1, 2)])
+            sage: print(F.stratum(), Fab.stratum())  # optional - surface_dynamics
+            Q_0(1, -1^2, -3) H_1(2, 0, -2)
+
             sage: F = StrebelGraphLinearFamily("(0,1:1,~0,~1:1)", [[2, 1]])
             sage: Fab = F.abelian_cover()
             sage: Fab
-            StrebelGraphLinearFamily("(0,~2:1,~0,2:1)(1:1,3,~1:1,~3)", [(2, 1, 1, 2)])
+            StrebelGraphLinearFamily("(0,~3:1,~0,3:1)(1:1,2,~1:1,~2)", [(2, 1, 2, 1)])
             sage: print(F.stratum(), Fab.stratum())  # optional - surface_dynamics
             H_1(2, -2) (H_1(2, -2), H_1(2, -2))
         """
