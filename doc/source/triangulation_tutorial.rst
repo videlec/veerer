@@ -58,7 +58,7 @@ Note that veerer uses arrays (from the standard Python library `array
 permutations. These behave similarly to the more standard lists but can only
 contain integer values.
 
-There are many functions to recover topological informations
+There are many functions to recover topological information
 
 ::
 
