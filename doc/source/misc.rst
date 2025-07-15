@@ -1,4 +1,4 @@
-Miscellaneous tools
-===================
+Miscellaneous tools (``misc.py``)
+=================================
 
 .. automodule:: veerer.misc

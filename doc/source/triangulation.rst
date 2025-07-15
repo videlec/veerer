@@ -1,4 +1,4 @@
-Triangulations
-==============
+Triangulations (``triangulation.py``)
+=====================================
 
 .. automodule:: veerer.triangulation

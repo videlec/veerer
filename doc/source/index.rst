@@ -31,15 +31,22 @@ Installation
 To install veerer on your computer, we refer to the `installation section of
 sage-flatsurf <https://flatsurf.github.io/sage-flatsurf>`_.
 
-Tutorials
+Tutorial
 ---------
 
 .. toctree::
    :maxdepth: 1
-   :caption: Contents:
 
    background
    triangulation_tutorial
+   veering_triangulation_and_strebel_graph_tutorial
+
+Thematic demo
+--------------
+
+.. toctree::
+   :maxdepth: 1
+
    veerer_demo
    ferenczi_zamboni
    references
@@ -48,7 +55,7 @@ Module documentation
 --------------------
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    automaton
    constants
@@ -68,6 +75,9 @@ Module documentation
    monodromy
    multiscale_veering_triangulation
    permutation
+   polyhedron_cone
+   polyhedron_linear_algebra
+   polyhedron_linear_expression
    strebel_graph
    tatami_decomposition
    triangulation

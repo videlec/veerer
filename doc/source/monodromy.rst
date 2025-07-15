@@ -1,4 +1,4 @@
-Monodromy in a linear subvariety
-================================
+Monodromy in a linear subvariety (``monodromy.py``)
+===================================================
 
 .. automodule:: veerer.monodromy

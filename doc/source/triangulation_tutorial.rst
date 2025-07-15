@@ -24,9 +24,9 @@ derived classes
 
 * :class:`~veerer.triangulation.Triangulation`: for triangulation of surfaces that we present in this section
 
-* :class:`~veerer.veering_triangulation.VeeringTriangulation`: see :ref:`veering triangulation and Strebel graph section <veering triangulation and strebel graph tutorial>`
+* :class:`~veerer.veering_triangulation.VeeringTriangulation`: see :ref:`veering triangulation and Strebel graph section <veering-triangulation-and-strebel-graph-tutorial>`
 
-* :class:`~veerer.strebel_graph.StrebelGraph`: see :ref:`veering triangulation and Strebel graph section <veering triangulation and strebel graph tutorial>`
+* :class:`~veerer.strebel_graph.StrebelGraph`: see :ref:`veering triangulation and Strebel graph section <veering-triangulation-and-strebel-graph-tutorial>`
 
 Building triangulations
 -----------------------
@@ -197,8 +197,8 @@ of two triangles and its boundary is a quadrilateral
 
 Notice that dart weights are specified using colons in the face permutation.
 
-Flip graph TODO: OR FLIP AUTOMATON?
-----------
+Flip automaton
+--------------
 
 TODO: references
 
