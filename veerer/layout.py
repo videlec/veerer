@@ -140,7 +140,8 @@ class FlatVeeringTriangulationLayout(object):
 
     A layout is determined by a rooted forest of the dual graph of the
     triangulation, together with a choice of position and orientation for each
-    root (triangles in :class:`FlatVeeringTriangulation` are defined up to
+    root (recall that triangles in a
+    :class:`~veerer.flat_structure.FlatVeeringTriangulation` are defined up to
     translation and multiplication by +/- 1).
 
     EXAMPLES:

@@ -84,7 +84,7 @@ class FlatStructure:
             raise TypeError("invalid class")
         self._constellation_class = bases[1]
 
-    def __init__(self, *args, mutable=False, check=False):
+    def __init__(self, *args, mutable=False, check=True):
         self._constellation_class_init()
         if len(args) < 3:
             raise ValueError("require at least three arguments")
@@ -180,6 +180,11 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
             raise error("invalid coordinates")
         if self._mutable != x.is_mutable() or self._mutable != y.is_mutable():
             raise error("incoherent mutability state: self._mutable={}, x.is_mutable()={}, y.is_mutable()={}".format(self._mutable, x.is_mutable(), y.is_mutable()))
+
+        if any(value < 0 for value in x):
+            raise ValueError("negative value in x")
+        if any(value < 0 for value in y):
+            raise ValueError("negative value in y")
 
         self._set_subspace_constraints(lambda c: self._constraint_check(c, error), x, VERTICAL)
         self._set_subspace_constraints(lambda c: self._constraint_check(c, error), y, HORIZONTAL)

@@ -255,6 +255,25 @@ class VeeringTriangulation(Triangulation):
         return self._normalize_face_separatrix(half_edge, angle)
 
     def _check_infinite_cylinder(self, half_edge):
+        r"""
+        TESTS::
+
+            sage: from veerer import *
+            sage: vt = VeeringTriangulation("(0:1, 1:1)(~0:1, ~1:1)", "RR")
+            sage: vt._check_infinite_cylinder(0)
+            0
+            sage: vt._check_infinite_cylinder(1)
+            1
+            sage: vt._check_infinite_cylinder(2)
+            0
+            sage: vt._check_infinite_cylinder(3)
+            1
+
+            sage: vt._check_infinite_cylinder(4)
+            Traceback (most recent call last):
+            ...
+            ValueError: half-edge number out of range h=4
+        """
         half_edge = self._check_half_edge(half_edge)
         if self._bdry[half_edge] == 0 or self.face_angle(half_edge) != 0:
             raise ValueError("not a cylinder half-edge")
@@ -1679,7 +1698,7 @@ class VeeringTriangulation(Triangulation):
                 # NOTE: the code below could be called by a VeeringTriangulationLinearFamily
                 # for which the subgraph code is broken
                 # see https://github.com/flatsurf/veerer/issues/54
-                G = VeeringTriangulation.subgraph(self.constellation(), comp)
+                G = self._constellation_class.subgraph(self.constellation(), comp)
                 ans += 2 * G.genus() - 2 + (G.is_holomorphic() and G.is_abelian())
         return ans
 
