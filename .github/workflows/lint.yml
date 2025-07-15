@@ -22,4 +22,4 @@ jobs:
       - name: run codespell
         shell: bash -l {0}
         run: |
-          codespell `git ls-files`
+          codespell -L Parma `git ls-files`
