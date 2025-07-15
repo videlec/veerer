@@ -182,6 +182,8 @@ class LinearFamily:
 
     The subspace is given by generators.
     """
+    # NOTE: VeeringTriangulation and StrebelGraph now holds a _constellation_class attribute
+    # but this is required before this has been initialized!
     def _constellation_class_init(self):
         bases = self.__class__.__bases__
         if len(bases) != 2 or bases[0] != LinearFamily:

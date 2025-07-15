@@ -211,9 +211,12 @@ class StrebelGraph(Constellation):
         sage: StrebelGraph("(0,~0:1)")
         StrebelGraph("(0,~0:1)")
     """
-    __slots__ = ['_excess']
+    __slots__ = ['_constellation_class', '_excess']
 
     def __init__(self, faces, excess=None, mutable=False, check=True):
+        # TODO: this should not be necessary but is required for compatibility with LinearFamily
+        _constellation_class = StrebelGraph
+
         if isinstance(faces, StrebelGraph):
             fp = faces.face_permutation(copy=True)
             ep = faces.edge_permutation(copy=True)
