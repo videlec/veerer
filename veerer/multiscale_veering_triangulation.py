@@ -97,6 +97,11 @@ def track_prong(vt, r_up, r_low, prong, vertex=False, face=False):
         sage: prong = (1, 3, 2, 1)
         sage: track_prong(vt, r_up, r_low, prong, face=True)
         (1, 3, 2, 1)
+
+        sage: vt = VeeringTriangulation("(0:1,1:2,~0:1,~1:4)(2:1,3:2,~2:1,~3:4)", "RRRR")
+        sage: _, _, r_up, r_low = vt.degeneration(edges_low=(1, 3), edges_up=(0, 2), collapsed_half_edge_relabelling=True)
+        sage: track_prong(vt, r_up, r_low, (1, 0, 7, 2), face=True)
+        (1, 0, 2, 2)
     """
     l, c, h, ang = prong
     l = abs(l)
@@ -127,7 +132,7 @@ def track_prong(vt, r_up, r_low, prong, vertex=False, face=False):
         # Otherwise the face prong must be contained in f_up
         a = 0
         while r_low[h] >= 0:
-            h = vt.previous_in_face(h)
+            h = vt.next_in_face(h)
             b = vt.half_edge_num_separatrices(h)
             a = a + b - 1
         ang = ang + a
