@@ -45,7 +45,7 @@ def one_edge_completion(t, angle_excess, colouring):
 
     INPUT:
 
-    - ``t`` -- a :class:`Triangulation` (with boundary)
+    - ``t`` -- a :class:`~veerer.triangulation.Triangulation` (with boundary)
 
     - ``angle_excess`` -- an array of angle excess
 
@@ -211,9 +211,12 @@ class StrebelGraph(Constellation):
         sage: StrebelGraph("(0,~0:1)")
         StrebelGraph("(0,~0:1)")
     """
-    __slots__ = ['_excess']
+    __slots__ = ['_constellation_class', '_excess']
 
     def __init__(self, faces, excess=None, mutable=False, check=True):
+        # TODO: this should not be necessary but is required for compatibility with LinearFamily
+        _constellation_class = StrebelGraph
+
         if isinstance(faces, StrebelGraph):
             fp = faces.face_permutation(copy=True)
             ep = faces.edge_permutation(copy=True)
@@ -259,6 +262,16 @@ class StrebelGraph(Constellation):
         if angle < 0 or angle >= num_seps:
             raise ValueError("angle (={}) out of range for separatrix at half_edge={}; must be >= 0 and <= {}".format(angle, half_edge, num_seps))
         return self._normalize_face_separatrix(half_edge, angle)
+
+    def genus(self):
+        r"""
+        Return the genus of this Strebel graph.
+        """
+        if not self.is_connected():
+            raise NotImplementedError
+
+        # chi = 2 - 2g - n
+        return (2 - self.euler_characteristic() - self.num_boundary_faces()) // 2
 
     def boundary_half_edges(self):
         return self.half_edges()
@@ -346,6 +359,28 @@ class StrebelGraph(Constellation):
                 e, f = f, vp[f]
 
         return (True, oris) if certificate else True
+
+    def is_holomorphic(self):
+        return False
+
+    def dimension(self):
+        r"""
+        Return the dimension of the ambient stratum of Abelian or quadratic differential.
+        """
+        # each folded edge gives a simple pole
+        ans = self.num_boundary_faces() + self.num_vertices() + self.num_folded_edges()
+        if self.is_connected():
+            ans += 2 * self.genus() - 2
+        else:
+            for comp in self.connected_components():
+                # NOTE: the code below could be called by a StrebelGraphLinearFamily
+                # for which the subgraph code is broken
+                # see https://github.com/flatsurf/veerer/issues/54
+                G = self._constellation_class.subgraph(self.constellation(), comp)
+                ans += 2 * G.genus() - 2
+        return ans
+
+    stratum_dimension = dimension
 
     def vertex_separatrices(self, h=None, a=None, flat=True):
         r"""

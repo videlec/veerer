@@ -118,9 +118,13 @@ class VeeringTriangulation(Triangulation):
         sage: VeeringTriangulation("(0,1,2)(~1:1,~2:1)", colouring="RBR")
         VeeringTriangulation("(0,1,2)(~1:1,~2:1)", "RBR")
     """
-    __slots__ = ['_colouring', '_delaunay_cone']
+    __slots__ = ['_constellation_class', '_colouring', '_delaunay_cone']
+
 
     def __init__(self, *args, triangulation=None, boundary=None, colouring=None, mutable=False, check=True):
+        # TODO: this should not be necessary but is required for compatibility with LinearFamily
+        self._constellation_class = VeeringTriangulation
+
         if len(args) == 3:
             if triangulation is not None or boundary is not None or colouring is not None:
                 raise ValueError('invalid data in constructor')
@@ -255,6 +259,25 @@ class VeeringTriangulation(Triangulation):
         return self._normalize_face_separatrix(half_edge, angle)
 
     def _check_infinite_cylinder(self, half_edge):
+        r"""
+        TESTS::
+
+            sage: from veerer import *
+            sage: vt = VeeringTriangulation("(0:1, 1:1)(~0:1, ~1:1)", "RR")
+            sage: vt._check_infinite_cylinder(0)
+            0
+            sage: vt._check_infinite_cylinder(1)
+            1
+            sage: vt._check_infinite_cylinder(2)
+            0
+            sage: vt._check_infinite_cylinder(3)
+            1
+
+            sage: vt._check_infinite_cylinder(4)
+            Traceback (most recent call last):
+            ...
+            ValueError: half-edge number out of range h=4
+        """
         half_edge = self._check_half_edge(half_edge)
         if self._bdry[half_edge] == 0 or self.face_angle(half_edge) != 0:
             raise ValueError("not a cylinder half-edge")
@@ -1659,6 +1682,12 @@ class VeeringTriangulation(Triangulation):
             sage: vt.stratum().dimension()  # optional - surface_dynamics # not tested (not yet in surface_dynamics)
             1
 
+        An example with a disconnected veering triangulation::
+
+            sage: vt = VeeringTriangulation("(1,3,~2)(2,6,~3)(4,~6,~5)(7,~11,~8)(8,9,10)(11,~20,~12)(13,~17,~14)(14,15,16)(17,~19,~18)(19,~15,~16)(20,~9,~10)(~4,~1,~0)", boundary="(0:1)(5:1)(12:1,~13:1)(18:1,~7:1)", colouring="RRRBBRRRRBRBRRRBRBRRR")
+            sage: vt.stratum_dimension()
+            9
+
         An example with a disconnected linear family::
 
             sage: from veerer import VeeringTriangulation, VeeringTriangulationLinearFamily, DelaunayStrebelAutomaton
@@ -1679,7 +1708,7 @@ class VeeringTriangulation(Triangulation):
                 # NOTE: the code below could be called by a VeeringTriangulationLinearFamily
                 # for which the subgraph code is broken
                 # see https://github.com/flatsurf/veerer/issues/54
-                G = VeeringTriangulation.subgraph(self.constellation(), comp)
+                G = self._constellation_class.subgraph(self.constellation(), comp)
                 ans += 2 * G.genus() - 2 + (G.is_holomorphic() and G.is_abelian())
         return ans
 

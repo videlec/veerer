@@ -1,7 +1,8 @@
 r"""
 Constellations (possibly with boundary data)
 
-Common base claas for class:~veerer.triangulation.Triangulations and :class:~veerer.strebel_graph.StrebelGraph
+Common base claas for class:`~veerer.triangulation.Triangulations` and
+:class:`~veerer.strebel_graph.StrebelGraph`
 """
 # ****************************************************************************
 #  This file is part of veerer
@@ -163,7 +164,7 @@ class Constellation:
             raise ValueError("half_edges_data must be a tuple")
         for l in self._half_edges_data:
             if not isinstance(l, array) or l.typecode != 'i' or len(l) != 2 * ne:
-                raise ValueError("each half edge data must be an array of length twice the number of edges: got a {} of length {}".format(type(l).__name__, len(l)))
+                raise ValueError("each half edge data must be an array of length twice the number of edges: got {}".format(type(l)))
             for i in range(2 * ne):
                 if self._vp[i] == -1:
                     if l[i]:

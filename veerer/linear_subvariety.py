@@ -507,7 +507,7 @@ class NodesCanonicalizer:
                 cyls.append(min(face))
         return tuple(cyls)
 
-    # TODO: this should be moved to VeeringTriangualtion
+    # TODO: this should be moved to VeeringTriangulation
     def double_pole_residues(self, level, component):
         vt = self._levels[level][component].root()
         ne = vt._ne
@@ -846,9 +846,10 @@ class NodesCanonicalizer:
 
         INPUT:
 
-        - ``mvt`` - a :class:`MultiscaleVeeringTriangulation` whose veering
-          triangulations and level structure coincide with the levels provided as
-          input to this canonicalizer.
+        - ``mvt`` - a
+          :class:`~veerer.multiscale_veering_triangulation.MultiscaleVeeringTriangulation`
+          whose veering triangulations and level structure coincide with the
+          levels provided as input to this canonicalizer.
         """
         P = self.libgap_group()
         enc = self.multiscale_structure_libgap_encoding(mvt)

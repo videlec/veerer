@@ -106,6 +106,30 @@ def subspace_are_equal(subspace1, subspace2, check=True):
 
 
 def subspace_cmp(subspace1, subspace2, check=True):
+    r"""
+    Comparison function for subspaces.
+
+    INPUT:
+
+    - ``subspace```, ``subspace2`` -- full rank matrices with the same number
+      of columns
+
+    TESTS::
+
+        sage: from veerer.linear_family import subspace_cmp
+
+        sage: m0 = matrix(ZZ, 0, 3, [])
+        sage: m1 = matrix(ZZ, 1, 3, [[1, 1, 0]])
+        sage: m2 = matrix(ZZ, 1, 3, [[1, 0, 1]])
+        sage: m3 = matrix(ZZ, 2, 3, [[1, 0, 0], [0, 1, 1]])
+        sage: sample = [m0, m1, m2, m3]
+        sage: for a in sample:
+        ....:     for b in sample:
+        ....:         c1 = subspace_cmp(a, b)
+        ....:         c2 = subspace_cmp(b, a)
+        ....:         assert (c1 == 0) == (c2 == 0) == (a == b)
+        ....:         assert c1 == -c2
+    """
     if check:
         if subspace1.ncols() != subspace2.ncols():
             raise ValueError('subspace1 and subspace2 of different ambient dimensions')
@@ -114,9 +138,11 @@ def subspace_cmp(subspace1, subspace2, check=True):
         if subspace2.rank() != subspace2.nrows():
             raise ValueErrror('subspace2 not full rank')
 
-    n = subspace1.nrows()
-    if n != subspace2.nrows():
-        return False
+    nr1 = subspace1.nrows()
+    nr2 = subspace2.nrows()
+    c = (nr1 > nr2) - (nr1 < nr2)
+    if c:
+        return c
 
     base_ring = cm.common_parent(subspace1.base_ring(), subspace2.base_ring())
     # subspace1 = subspace1.echelon_form()
@@ -156,6 +182,8 @@ class LinearFamily:
 
     The subspace is given by generators.
     """
+    # NOTE: VeeringTriangulation and StrebelGraph now holds a _constellation_class attribute
+    # but this is required before this has been initialized!
     def _constellation_class_init(self):
         bases = self.__class__.__bases__
         if len(bases) != 2 or bases[0] != LinearFamily:
