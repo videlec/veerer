@@ -211,7 +211,7 @@ class StrebelGraph(Constellation):
         sage: StrebelGraph("(0,~0:1)")
         StrebelGraph("(0,~0:1)")
     """
-    __slots__ = ['_constellation_class', '_excess']
+    __slots__ = ['_excess']
 
     def __init__(self, faces, excess=None, mutable=False, check=True):
         # TODO: this should not be necessary but is required for compatibility with LinearFamily

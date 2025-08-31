@@ -89,7 +89,8 @@ def check_relabelling(arg, ne):
 
 
 class Constellation:
-    __slots__ = ['_mutable',  # mutability flag
+    __slots__ = ['_constellation_class',  # subclass of Constellation
+                 '_mutable',  # mutability flag
                  '_ne',  # number of edges
                  '_vp',  # vertex permutation
                  '_fp',  # face permutation
@@ -98,6 +99,10 @@ class Constellation:
                 ]
 
     def __init__(self, ne, vp, fp, half_edges_data, edges_data, mutable=False, check=True):
+        try:
+            cls = self._constellation_class
+        except AttributeError:
+            self._constellation_class = Constellation
         self._ne = ne
 
         if vp is None:
@@ -519,6 +524,7 @@ class Constellation:
                     ii = (vp[i] ^ 1) if vp[vp[i] ^ 1] != -1 else vp[i]
                     fp[ii] = i
 
+        C._constellation_class = cls
         C._ne = n // 2
         C._vp = vp
         C._fp = fp
@@ -730,6 +736,7 @@ class Constellation:
                 return self
             else:
                 T = cls.__new__(cls)
+                T._constellation_class = cls
                 T._ne = self._ne
                 T._fp = self._fp
                 T._vp = self._vp
@@ -738,6 +745,7 @@ class Constellation:
                 T._mutable = mutable
         else:
             T = cls.__new__(cls)
+            T._constellation_class = cls
             T._ne = self._ne
             T._fp = self._fp[:]
             T._vp = self._vp[:]

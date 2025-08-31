@@ -118,7 +118,7 @@ class VeeringTriangulation(Triangulation):
         sage: VeeringTriangulation("(0,1,2)(~1:1,~2:1)", colouring="RBR")
         VeeringTriangulation("(0,1,2)(~1:1,~2:1)", "RBR")
     """
-    __slots__ = ['_constellation_class', '_colouring', '_delaunay_cone']
+    __slots__ = ['_colouring', '_delaunay_cone']
 
 
     def __init__(self, *args, triangulation=None, boundary=None, colouring=None, mutable=False, check=True):
