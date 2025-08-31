@@ -38,88 +38,191 @@ class DelaunayCone:
     r"""
     The Delaunay cone of a veering triangulation.
 
+    The cone is embedded in `R^{2 ne}` where `ne` is the number of edges of the
+    underlying veering triangulation. The first ``ne`` coordinates indexed by
+    ``0, 1, ..., ne-1`` are the horizontal or `x`-coordinates while the last
+    ``ne`` coordinates index by ``ne, ne+1, ..., 2ne-1``.
+
+    This class is usally not constructed via its constructor but via the function
+    :meth:`~veerer.veering_triangulation.delaunay_cone`.
+
     EXAMPLES::
 
         sage: from veerer import VeeringTriangulation, VeeringTriangulationLinearFamily
 
         sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "RRBBRBBBR")
-        sage: vt.delaunay_cone()
-        8-dimensional Delaunay cone of VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "RRBBRBBBR") made of
+        sage: C = vt.delaunay_cone()
+        sage: C
+        DelaunayCone(VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "RRBBRBBBR"))
+        sage: C.info()
+        8-dimensional Delaunay cone made of
          2 forward-flip facets
          2 backward-flip facets
          5 x-degeneration facets
          4 y-degeneration facets
 
         sage: vt = VeeringTriangulation("(0,1,2)(3,4,5)(6,7,8)(~0,~7,~5)(~3,~4,~2)(~6,~1,~8)", "RRBRRBRRB")
-        sage: vt.delaunay_cone()
-        8-dimensional Delaunay cone of VeeringTriangulation("(0,1,2)(~0,~7,~5)(~1,~8,~6)(~2,~3,~4)(3,4,5)(6,7,8)", "RRBRRBRRB") made of
+        sage: C = vt.delaunay_cone()
+        sage: C
+        DelaunayCone(VeeringTriangulation("(0,1,2)(~0,~7,~5)(~1,~8,~6)(~2,~3,~4)(3,4,5)(6,7,8)", "RRBRRBRRB"))
+        sage: C.info()
+        8-dimensional Delaunay cone made of
          2 forward-flip facets
          3 backward-flip facets
          5 x-degeneration facets
          4 y-degeneration facets
 
         sage: vt = VeeringTriangulation("(0,1,2)(3,4,5)(6,7,8)(~0,~1,~5)(~3,~7,~8)(~6,~4,~2)", "RRBRRBRBB")
-        sage: vt.delaunay_cone()
-        8-dimensional Delaunay cone of VeeringTriangulation("(0,1,2)(~0,~1,~5)(~2,~6,~4)(3,4,5)(~3,~7,~8)(6,7,8)", "RRBRRBRBB") made of
+        sage: C = vt.delaunay_cone()
+        sage: C
+        DelaunayCone(VeeringTriangulation("(0,1,2)(~0,~1,~5)(~2,~6,~4)(3,4,5)(~3,~7,~8)(6,7,8)", "RRBRRBRBB"))
+        sage: C.info()
+        8-dimensional Delaunay cone made of
          3 forward-flip facets
          2 backward-flip facets
          4 x-degeneration facets
          4 y-degeneration facets
     """
     def __init__(self, vt, cone):
+        r"""
+        INPUT:
+
+        - ``vt`` -- veering triangulation or veering triangulation family
+
+        - ``cone`` -- a :class:`~veerer.polyhedron.cone.Cone`
+        """
         self._vt = vt
         self._cone = cone
         self._V = FreeModule(vt.base_ring(), 2 * self._vt._ne)
 
-    @cached_method
-    def facets_kind_and_data(self):
-        kinds = [None] * len(self.facets())
-        data = [[] for _ in range(len(self.facets()))]
+    def __repr__(self):
+        r"""
+        TESTS::
 
-        for face, edges in self.x_vanishing_facets():
-            for i in face.ambient_H_indices():
-                kinds[i] = 'x'
-                data[i] = edges
-        for face, edges in self.y_vanishing_facets():
-            for i in face.ambient_H_indices():
-                kinds[i] = 'y'
-                data[i] = edges
-        for face, edges in self.forward_delaunay_facets():
-            for i in face.ambient_H_indices():
-                kinds[i] = 'f'
-                data[i] = edges
-        for face, edges in self.backward_delaunay_facets():
-            for i in face.ambient_H_indices():
-                kinds[i] = 'b'
-                data[i] = edges
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: repr(vt.delaunay_cone())  # indirect doctest
+            'DelaunayCone(VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB"))'
+        """
+        return "DelaunayCone({})".format(self._vt)
 
-        assert not any(v is None for v in kinds)
-        return tuple(kinds), tuple(data)
+    def info(self):
+        r"""
+        TESTS::
 
-    @cached_method
-    def rays(self):
-        ans = list(map(self._V, self._cone.rays()))
-        for r in ans:
-            r.set_immutable()
-        return ans
-
-    def eqns(self):
-        return self._cone.eqns()
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: vt.delaunay_cone().info()
+            4-dimensional Delaunay cone made of
+             1 forward-flip facet
+             1 backward-flip facet
+             2 x-degeneration facets
+             2 y-degeneration facets
+        """
+        nf = len(self.forward_delaunay_facets())
+        nb = len(self.backward_delaunay_facets())
+        nx = len(self.x_vanishing_facets())
+        ny = len(self.y_vanishing_facets())
+        s = "{}-dimensional Delaunay cone made of\n".format(self.affine_dimension())
+        s += " {} forward-flip facet{}\n".format(nf, "s" if nf >= 2 else "")
+        s += " {} backward-flip facet{}\n".format(nb, "s" if nb >= 2 else "")
+        s += " {} x-degeneration facet{}\n".format(nx, "s" if nx >= 2 else "")
+        s += " {} y-degeneration facet{}".format(ny, "s" if ny >= 2 else "")
+        print(s)
 
     def space_dimension(self):
+        r"""
+        Return the ambient dimension of the cone which is twice the number of
+        edges of the underlying veering triangulation.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: vt.delaunay_cone().space_dimension()
+            6
+        """
         return 2 * self._vt._ne
 
     @cached_method
-    def facets(self):
+    def rays(self):
+        r"""
+        Return the rays of this cone.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: vt.delaunay_cone().rays()
+            ((1, 1, 0, 1, 1, 0),
+             (2, 2, 0, 1, 0, 1),
+             (1, 1, 0, 1, 0, 1),
+             (0, 1, 1, 2, 0, 2),
+             (0, 2, 2, 1, 0, 1),
+             (0, 1, 1, 1, 1, 0),
+             (0, 1, 1, 2, 2, 0))
+        """
+        ans = list(map(self._V, self._cone.rays()))
+        for r in ans:
+            r.set_immutable()
+        return tuple(ans)
+
+    def eqns(self):
+        r"""
+        Return a basis of equations for this cone.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: vt.delaunay_cone().eqns()
+            ((0, 0, 0, 1, -1, -1), (1, -1, 1, 0, 0, 0))
+        """
+        ans = list(map(self._V, self._cone.eqns()))
+        for r in ans:
+            r.set_immutable()
+        return tuple(ans)
+
+    @cached_method
+    def ieqs(self):
+        r"""
+        Return the inequations defining this cone.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: vt.delaunay_cone().ieqs()
+            ((0, -1, 0, 2, -1, 0),
+             (0, 0, 0, 1, -1, 0),
+             (0, 0, 0, 0, 1, 0),
+             (-1, 1, 0, 0, 0, 0),
+             (1, 0, 0, 0, 0, 0),
+             (-1, 2, 0, -1, 0, 0))
+        """
         ans = list(map(self._V, self._cone.ieqs()))
         for f in ans:
             f.set_immutable()
-        return ans
+        return tuple(ans)
 
-    ieqs = facets
+    facets = ieqs
 
     @cached_method
     def affine_dimension(self):
+        r"""
+        Return the affine dimension of this cone.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: vt.delaunay_cone().affine_dimension()
+            4
+        """
         return self._cone.affine_dimension()
 
     @cached_method
@@ -140,6 +243,16 @@ class DelaunayCone:
     def x_vanishing_face(self, e):
         r"""
         Return the x-vanishing face of the edge ``e``.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: C = vt.delaunay_cone()
+            sage: C.x_vanishing_face(0)
+            A 2-dimensional face of a 3-dimensional combinatorial polyhedron
+            sage: C.x_vanishing_face(1)
+            A -1-dimensional face of a 3-dimensional combinatorial polyhedron
         """
         CP = self.combinatorial_polyhedron()
         Vrep = [i for i, r in enumerate(self.rays()) if r[e] == 0]
@@ -148,6 +261,16 @@ class DelaunayCone:
     def y_vanishing_face(self, e):
         r"""
         Return the y-vanishing face of the edge ``e``.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: C = vt.delaunay_cone()
+            sage: C.y_vanishing_face(0)
+            A -1-dimensional face of a 3-dimensional combinatorial polyhedron
+            sage: C.y_vanishing_face(1)
+            A 2-dimensional face of a 3-dimensional combinatorial polyhedron
         """
         CP = self.combinatorial_polyhedron()
         ne = self._vt._ne
@@ -157,6 +280,16 @@ class DelaunayCone:
     def vanishing_face(self, e):
         r"""
         Return the vanishing face of the edge ``e``.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: C = vt.delaunay_cone()
+            sage: C.vanishing_face(0)
+            A -1-dimensional face of a 3-dimensional combinatorial polyhedron
+            sage: C.vanishing_face(1)
+            A -1-dimensional face of a 3-dimensional combinatorial polyhedron
         """
         CP = self.combinatorial_polyhedron()
         return CP.meet_of_Hrep(*self.x_vanishing_face(e).ambient_H_indices(),
@@ -166,7 +299,16 @@ class DelaunayCone:
         r"""
         Return the forward Delaunay face of the edge ``e``.
 
-        The edge ``e`` must be a forward flippable edge.
+        The edge ``e`` must be a forward flippable edge. The return face is
+        a face of the corresponding combinatorial polyhedron.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: C = vt.delaunay_cone()
+            sage: C.forward_delaunay_face(1)
+            A 2-dimensional face of a 3-dimensional combinatorial polyhedron
         """
         # x[e] = y[a] + y[d]
         if check and not self._vt.is_forward_flippable(e):
@@ -182,6 +324,14 @@ class DelaunayCone:
         Return the backward Delaunay face of the edge ``e``.
 
         The edge ``e`` must be a backward flippable edge.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: C = vt.delaunay_cone()
+            sage: C.backward_delaunay_face(0)
+            A 2-dimensional face of a 3-dimensional combinatorial polyhedron
         """
         # y[e] = x[a] + x[d]
         if check and not self._vt.is_backward_flippable(e):
@@ -200,31 +350,115 @@ class DelaunayCone:
                 Hrep = face.ambient_H_indices()
                 ans[Hrep].append(e)
                 facets[Hrep] = face
-        return [(facets[Hrep], ans[Hrep]) for Hrep in facets]
+        return [(facets[Hrep], tuple(ans[Hrep])) for Hrep in facets]
 
     def x_vanishing_facets(self):
+        r"""
+        Return the list of x-vanishing facets as a list of pairs ``(face, x_vanishing_edges)``.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: C = vt.delaunay_cone()
+            sage: C.x_vanishing_facets()
+            [(A 2-dimensional face of a 3-dimensional combinatorial polyhedron, (0,)),
+             (A 2-dimensional face of a 3-dimensional combinatorial polyhedron, (2,))]
+        """
         return self._filter_facets((e, self.x_vanishing_face(e)) for e in range(self._vt._ne))
 
     def y_vanishing_facets(self):
+        r"""
+        Return the list of y-vanishing facets as a list of pairs ``(face, y_vanishing_edges)``.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: C = vt.delaunay_cone()
+            sage: C.y_vanishing_facets()
+            [(A 2-dimensional face of a 3-dimensional combinatorial polyhedron, (1,)),
+             (A 2-dimensional face of a 3-dimensional combinatorial polyhedron, (2,))]
+        """
         return self._filter_facets((e, self.y_vanishing_face(e)) for e in range(self._vt._ne))
 
     def forward_delaunay_facets(self):
+        r"""
+        Return the list of forward Delaunay facets as a list of pairs ``(face, flipped_edges)``.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: C = vt.delaunay_cone()
+            sage: C.forward_delaunay_facets()
+            [(A 2-dimensional face of a 3-dimensional combinatorial polyhedron, (1,))]
+        """
         return self._filter_facets((e, self.forward_delaunay_face(e)) for e in self._vt.forward_flippable_edges())
 
     def backward_delaunay_facets(self):
+        r"""
+        Return the list of backward Delaunay facets as a list of pairs ``(face, flipped_edges)``.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: C = vt.delaunay_cone()
+            sage: C.backward_delaunay_facets()
+            [(A 2-dimensional face of a 3-dimensional combinatorial polyhedron, (0,))]
+        """
         return self._filter_facets((e, self.backward_delaunay_face(e)) for e in self._vt.backward_flippable_edges())
 
-    def __repr__(self):
-        s = "{}-dimensional Delaunay cone of {} made of\n"
-        s += " {} forward-flip facets\n"
-        s += " {} backward-flip facets\n"
-        s += " {} x-degeneration facets\n"
-        s += " {} y-degeneration facets"
-        return s.format(self.affine_dimension(), self._vt,
-                        len(self.forward_delaunay_facets()),
-                        len(self.backward_delaunay_facets()),
-                        len(self.x_vanishing_facets()),
-                        len(self.y_vanishing_facets()))
+    @cached_method
+    def facets_kind_and_data(self):
+        r"""
+        Return two list containing geometric information about the facets of this cone.
+
+        This function mostly gathers the output of :meth:`x_vanishing_facets`,
+        meth:`y_vanishing_facets`, meth:`forward_delaunay_facets` and
+        :meth:`backward_delaunay_facets`.  The output is a pair of tuples
+        ``(kinds, data)`` whose lengths are the number of facets of this cone.
+        ``kinds[i]`` is the type of the ``i`-th facet of this cone (``'x'`` for
+        x-vanishing, ``'y'`` for y-vanishing, ``'f'`` for forward Delaunay and
+        ``'b'`` for backward Delaunay) and ``data[i]`` are the corresponding edges
+        (either vanishing edges for x-vanishing or y-vanishing edges or flipped
+        edges for forward Delaunay or backward Delaunay).
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: C = vt.delaunay_cone()
+            sage: C.facets_kind_and_data()
+            (('f', 'y', 'y', 'x', 'x', 'b'), ((1,), (2,), (1,), (2,), (0,), (0,)))
+        """
+        kinds = [None] * len(self.facets())
+        data = [[] for _ in range(len(self.facets()))]
+
+        for face, edges in self.x_vanishing_facets():
+            i, = face.ambient_H_indices()
+            assert kinds[i] is None
+            kinds[i] = 'x'
+            data[i] = edges
+        for face, edges in self.y_vanishing_facets():
+            i, = face.ambient_H_indices()
+            assert kinds[i] is None
+            kinds[i] = 'y'
+            data[i] = edges
+        for face, edges in self.forward_delaunay_facets():
+            i, = face.ambient_H_indices()
+            assert kinds[i] is None
+            kinds[i] = 'f'
+            data[i] = edges
+        for face, edges in self.backward_delaunay_facets():
+            i, = face.ambient_H_indices()
+            assert kinds[i] is None
+            kinds[i] = 'b'
+            data[i] = edges
+
+        assert not any(v is None for v in kinds)
+        return tuple(kinds), tuple(data)
 
 
 def incidence_matrix(facets, rays, mutable=False):

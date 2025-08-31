@@ -2139,27 +2139,15 @@ class VeeringTriangulation(Triangulation):
         Forward and backward delaunay flips are interchanged under a rotation::
 
             sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "RRBBRBBBR", mutable=True)
-            sage: vt.delaunay_cone()
-            8-dimensional Delaunay cone of VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "RRBBRBBBR") made of
-             2 forward-flip facets
-             2 backward-flip facets
-             5 x-degeneration facets
-             4 y-degeneration facets
             sage: sorted(vt.delaunay_flips())
-            [([1], 1), ([1], 2), ([5, 6], 1), ([5, 6], 2)]
+            [((1,), 1), ((1,), 2), ((5, 6), 1), ((5, 6), 2)]
             sage: sorted(vt.backward_delaunay_flips())
-            [([0], 1), ([0], 2), ([7], 1), ([7], 2)]
+            [((0,), 1), ((0,), 2), ((7,), 1), ((7,), 2)]
             sage: vt.rotate()
-            sage: vt.delaunay_cone()
-            8-dimensional Delaunay cone of VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,~8)", "BBRRBRRRB") made of
-             2 forward-flip facets
-             2 backward-flip facets
-             4 x-degeneration facets
-             5 y-degeneration facets
             sage: sorted(vt.delaunay_flips())
-            [([0], 1), ([0], 2), ([7], 1), ([7], 2)]
+            [((0,), 1), ((0,), 2), ((7,), 1), ((7,), 2)]
             sage: sorted(vt.backward_delaunay_flips())
-            [([1], 1), ([1], 2), ([5, 6], 1), ([5, 6], 2)]
+            [((1,), 1), ((1,), 2), ((5, 6), 1), ((5, 6), 2)]
         """
         if not self._mutable:
             raise ValueError('immutable veering triangulation; use a mutable copy instead')
@@ -3852,38 +3840,38 @@ class VeeringTriangulation(Triangulation):
             sage: from veerer import *
 
             sage: T = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
-            sage: T.delaunay_cone()
-            4-dimensional Delaunay cone of VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB") made of
-             1 forward-flip facets
-             1 backward-flip facets
+            sage: T.delaunay_cone().info()
+            4-dimensional Delaunay cone made of
+             1 forward-flip facet
+             1 backward-flip facet
              2 x-degeneration facets
              2 y-degeneration facets
             sage: T.delaunay_cone(x_low_bound=1, y_low_bound=1, hw_bound=1)  # not tested
 
-            sage: T.delaunay_cone(backend='sage')
-            4-dimensional Delaunay cone of VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB") made of
-             1 forward-flip facets
-             1 backward-flip facets
+            sage: T.delaunay_cone(backend='sage').info()
+            4-dimensional Delaunay cone made of
+             1 forward-flip facet
+             1 backward-flip facet
              2 x-degeneration facets
              2 y-degeneration facets
 
             sage: T = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
-            sage: T.delaunay_cone()
-            4-dimensional Delaunay cone of VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB") made of
-             1 forward-flip facets
-             1 backward-flip facets
+            sage: T.delaunay_cone().info()
+            4-dimensional Delaunay cone made of
+             1 forward-flip facet
+             1 backward-flip facet
              2 x-degeneration facets
              2 y-degeneration facets
-            sage: T.as_linear_family().delaunay_cone(backend='ppl')
-            4-dimensional Delaunay cone of VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)]) made of
-             1 forward-flip facets
-             1 backward-flip facets
+            sage: T.as_linear_family().delaunay_cone(backend='ppl').info()
+            4-dimensional Delaunay cone made of
+             1 forward-flip facet
+             1 backward-flip facet
              2 x-degeneration facets
              2 y-degeneration facets
-            sage: T.as_linear_family().delaunay_cone(backend='sage')
-            4-dimensional Delaunay cone of VeeringTriangulationLinearFamily("(0,1,2)(~0,~1,~2)", "RRB", [(1, 0, -1), (0, 1, 1)]) made of
-             1 forward-flip facets
-             1 backward-flip facets
+            sage: T.as_linear_family().delaunay_cone(backend='sage').info()
+            4-dimensional Delaunay cone made of
+             1 forward-flip facet
+             1 backward-flip facet
              2 x-degeneration facets
              2 y-degeneration facets
 
@@ -3892,10 +3880,10 @@ class VeeringTriangulation(Triangulation):
             sage: vt, s, t = VeeringTriangulations.L_shaped_surface(1, 1, 1, 1)
             sage: f = VeeringTriangulationLinearFamily(vt, [s, t])
             sage: PG = f.delaunay_cone(backend='ppl')
-            sage: PG
-            4-dimensional Delaunay cone of VeeringTriangulationLinearFamily("(0,2,3)(~0,1,4)(~1,5,6)", "BRRBBBB", [(1, 0, 0, 1, 1, 1, 1), (0, 1, 1, 1, 1, 1, 0)]) made of
-             1 forward-flip facets
-             1 backward-flip facets
+            sage: PG.info()
+            4-dimensional Delaunay cone made of
+             1 forward-flip facet
+             1 backward-flip facet
              2 x-degeneration facets
              2 y-degeneration facets
             sage: sorted(PG.rays())
@@ -4832,9 +4820,9 @@ class VeeringTriangulation(Triangulation):
 
             sage: vt = VeeringTriangulation("(0,2,3)(1,4,~0)(5,6,~1)", "BRRBBBB")
             sage: sorted(vt.delaunay_flips())
-            [([3], 1), ([3], 2), ([4], 1), ([4], 2), ([5], 1), ([5], 2)]
+            [((3,), 1), ((3,), 2), ((4,), 1), ((4,), 2), ((5,), 1), ((5,), 2)]
             sage: sorted(vt.delaunay_flips(backend='sage'))
-            [([3], 1), ([3], 2), ([4], 1), ([4], 2), ([5], 1), ([5], 2)]
+            [((3,), 1), ((3,), 2), ((4,), 1), ((4,), 2), ((5,), 1), ((5,), 2)]
 
         L-shaped square tiled surface with 3 squares (given as a sphere with
         3 triangles). It has two geometric neighbors corresponding to simultaneous
@@ -4844,18 +4832,18 @@ class VeeringTriangulation(Triangulation):
             sage: T, s, t = VeeringTriangulations.L_shaped_surface(1, 1, 1, 1)
             sage: f = VeeringTriangulationLinearFamily(T, [s, t])
             sage: sorted(f.delaunay_flips(backend='ppl'))
-            [([3, 4, 5], 1), ([3, 4, 5], 2)]
+            [((3, 4, 5), 1), ((3, 4, 5), 2)]
             sage: sorted(f.delaunay_flips(backend='sage'))
-            [([3, 4, 5], 1), ([3, 4, 5], 2)]
+            [((3, 4, 5), 1), ((3, 4, 5), 2)]
             sage: sorted(f.delaunay_flips(backend='normaliz-QQ'))  # optional - pynormaliz
-            [([3, 4, 5], 1), ([3, 4, 5], 2)]
+            [((3, 4, 5), 1), ((3, 4, 5), 2)]
 
         To be compared with the geometric flips in the ambient stratum::
 
             sage: sorted(T.delaunay_flips())
-            [([3], 1), ([3], 2), ([4], 1), ([4], 2), ([5], 1), ([5], 2)]
+            [((3,), 1), ((3,), 2), ((4,), 1), ((4,), 2), ((5,), 1), ((5,), 2)]
             sage: sorted(T.as_linear_family().delaunay_flips())
-            [([3], 1), ([3], 2), ([4], 1), ([4], 2), ([5], 1), ([5], 2)]
+            [((3,), 1), ((3,), 2), ((4,), 1), ((4,), 2), ((5,), 1), ((5,), 2)]
 
         A more complicated example in which edge 4 have a forced colour after
         flip and where the flippable edges 0 and 3 are not part of any geometric
@@ -4866,11 +4854,11 @@ class VeeringTriangulation(Triangulation):
             sage: T.flippable_edges()
             [0, 3, 4, 5, 6]
             sage: sorted(f.delaunay_flips(backend='ppl'))
-            [([4], 2), ([5], 1), ([5], 2)]
+            [((4,), 2), ((5,), 1), ((5,), 2)]
             sage: sorted(f.delaunay_flips(backend='sage'))
-            [([4], 2), ([5], 1), ([5], 2)]
+            [((4,), 2), ((5,), 1), ((5,), 2)]
             sage: sorted(f.delaunay_flips(backend='normaliz-QQ'))  # optional - pynormaliz
-            [([4], 2), ([5], 1), ([5], 2)]
+            [((4,), 2), ((5,), 1), ((5,), 2)]
 
         TESTS::
 
@@ -4879,9 +4867,9 @@ class VeeringTriangulation(Triangulation):
             sage: cols = "RBRRRRBBR"
             sage: vt = VeeringTriangulation(fp, cols)
             sage: sorted(vt.delaunay_flips())
-            [([2], 1), ([2], 2), ([4, 8], 1), ([4, 8], 2)]
+            [((2,), 1), ((2,), 2), ((4, 8), 1), ((4, 8), 2)]
             sage: sorted(vt.as_linear_family().delaunay_flips())
-            [([2], 1), ([2], 2), ([4, 8], 1), ([4, 8], 2)]
+            [((2,), 1), ((2,), 2), ((4, 8), 1), ((4, 8), 2)]
         """
         ne = self._ne
         delaunay_cone = self.delaunay_cone()
@@ -4950,9 +4938,9 @@ class VeeringTriangulation(Triangulation):
             sage: VeeringTriangulation(fp, bdry, cols0).backward_delaunay_flips()
             []
             sage: sorted(VeeringTriangulation(fp, bdry, cols1).backward_delaunay_flips())
-            [([0], 1), ([0], 2)]
+            [((0,), 1), ((0,), 2)]
             sage: sorted(VeeringTriangulation(fp, bdry, cols2).backward_delaunay_flips())
-            [([0], 1), ([0], 2)]
+            [((0,), 1), ((0,), 2)]
 
         An example in H_0(1, 0, -1^3)::
 
@@ -5647,7 +5635,7 @@ class VeeringTriangulation(Triangulation):
         for edges in self.horizontal_degeneration_up_edges_subsets():
             yield self.degeneration(edges_up=edges, mutable=mutable, check=check)
 
-    def vertical_degeneration_low_edges_subsets(self):
+    def vertical_degeneration_low_edges_subsets(self, backend=None):
         r"""
         Iterate through subsets of admissible edge degenerations of given complex codimension ``codim``.
 
@@ -5698,7 +5686,7 @@ class VeeringTriangulation(Triangulation):
             ....:     assert fup.is_delaunay() and flow.is_delaunay()
         """
         # For each edge e compute the face corresponding to x[e] == 0 and the face to y[e] == 0 (in H-rep)
-        delaunay_cone = self.delaunay_cone()
+        delaunay_cone = self.delaunay_cone(backend=backend)
         dim = delaunay_cone.affine_dimension()
         base_ring = self.base_ring()
         ne = self._ne
