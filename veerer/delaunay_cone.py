@@ -462,10 +462,26 @@ class DelaunayCone:
 
 
 def incidence_matrix(facets, rays, mutable=False):
-        ans = matrix(ZZ, len(rays), len(facets))
-        for i, r in enumerate(rays):
-            for j, f in enumerate(facets):
-                ans[i, j] = r.dot_product(f).is_zero()
-        if not mutable:
-            ans.set_immutable()
-        return ans
+    r"""
+    Return the incidence matrix of the given ``facets`` and ``rays`` given
+    as list of vectors.
+
+    EXAMPLES::
+
+        sage: from veerer.delaunay_cone import incidence_matrix
+        sage: V = FreeModule(ZZ, 3)
+        sage: facets = [V((2, -1, 1)), V((1, 0, 1)), V((1, -2, 1)), V((4, -5, 2))]
+        sage: rays = [V((-1, -1, 1)), V((-1, 0, 2)), V((1, 0, -1)), V((1, 2, 3))]
+        sage: incidence_matrix(facets, rays)
+        [1 1 0 0]
+        [1 0 0 1]
+        [0 1 1 0]
+        [0 0 1 1]
+    """
+    ans = matrix(ZZ, len(rays), len(facets))
+    for i, r in enumerate(rays):
+        for j, f in enumerate(facets):
+            ans[i, j] = r.dot_product(f).is_zero()
+    if not mutable:
+        ans.set_immutable()
+    return ans
