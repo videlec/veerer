@@ -248,8 +248,11 @@ of the product of the two train-track polytopes.
 
     sage: print(T1.is_delaunay())
     True
-    sage: print(T1.delaunay_cone())
-    8-dimensional Delaunay cone of VeeringTriangulation("(0,~3,4)(~0,7,~6)(1,2,~7)(~1,~2,3)(~4,5,~8)(~5,8,6)", "RBRRBRBRB") made of
+    sage: C = T1.delaunay_cone()
+    sage: print(C)
+    DelaunayCone(VeeringTriangulation("(0,~3,4)(~0,7,~6)(1,2,~7)(~1,~2,3)(~4,5,~8)(~5,8,6)", "RBRRBRBRB"))
+    sage: C.info()
+    8-dimensional Delaunay cone made of
      2 forward-flip facets
      2 backward-flip facets
      5 x-degeneration facets
