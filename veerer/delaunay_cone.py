@@ -43,7 +43,7 @@ class DelaunayCone:
     ``0, 1, ..., ne-1`` are the horizontal or `x`-coordinates while the last
     ``ne`` coordinates index by ``ne, ne+1, ..., 2ne-1``.
 
-    This class is usally not constructed via its constructor but via the function
+    This class is usually not constructed via its constructor but via the function
     :meth:`~veerer.veering_triangulation.delaunay_cone`.
 
     EXAMPLES::
