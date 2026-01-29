@@ -1,5 +1,5 @@
 r"""
-Flip automata.
+Flip automata
 
 We consider various automata related to edge flip in graphs on surfaces, namely
 
@@ -127,25 +127,26 @@ CHECK = False
 
 class Automaton:
     r"""
-    Abstract class for automaton.
-
-    INPUT:
-
-    - ``backward`` -- whether to explore backward (only useful if the automaton
-      is not strongly connected)
-
-    - ``verbosity`` -- the level of verbosity (the higher the more messages
-      you get while the automaton is being computed)
-
-    - ``algorithm`` -- either ``'DFS'`` (depths first search) or ``'BFS'``
-      (breadth first search)
-
-    - ``extra_kwds`` -- additional argument that are forwarded to the method `_setup`
-      that could be overridden in subclasses
+    Base class for automata.
     """
     _name = ''
 
     def __init__(self, backward=False, method='BFS', verbosity=0, **extra_kwds):
+        r"""
+        INPUT:
+
+        - ``backward`` -- whether to explore backward (only useful if the automaton
+          is not strongly connected)
+
+        - ``verbosity`` -- the level of verbosity (the higher the more messages
+          you get while the automaton is being computed)
+
+        - ``algorithm`` -- either ``'DFS'`` (depths first search) or ``'BFS'``
+          (breadth first search)
+
+        - ``extra_kwds`` -- additional argument that are forwarded to the method `_setup`
+          that could be overridden in subclasses
+        """
         # verbosity level
         self._verbosity = int(verbosity)
 
@@ -176,22 +177,302 @@ class Automaton:
 
         self._setup(**extra_kwds)
 
-    def is_connected(self):
-        return self._graph.is_connected()
-
     def _check(self):
         r"""
         Some consistency checks.
+
+        TESTS::
+
+            sage: from veerer import VeeringTriangulation, CoreAutomaton
+            sage: vt = VeeringTriangulation("(0,6,~5)(1,8,~7)(2,7,~6)(3,~1,~8)(4,~2,~3)(5,~0,~4)", "RRRBBBBBB")
+            sage: A = CoreAutomaton()
+            sage: A.add_seed(vt)
+            1
+            sage: A.run()
+            0
+            sage: A._check()
         """
         if not (self._branch or self._backward_flip_queue or self._seeds):
             for state in self:
-                in_neighbors1 = set(self._graph.neighbors_in(state))
-                in_neighbors2 = set(x for x, label in self._in_neighbors(state))
-                assert in_neighbors2.issubset(in_neighbors1), (state, in_neighbors1, in_neighbors2)
+                if self._backward:
+                    in_neighbors1 = set(self._graph.neighbors_in(state))
+                    in_neighbors2 = set(x for x, label in self._in_neighbors(state))
+                    assert in_neighbors2.issubset(in_neighbors1), (state, in_neighbors1, in_neighbors2)
 
                 out_neighbors1 = set(self._graph.neighbors_out(state))
                 out_neighbors2 = set(x for x, label in self._out_neighbors(state))
                 assert out_neighbors1 == out_neighbors2, (state, out_neighbors1, out_neighbors2)
+
+    #########################################################################
+    # Custom methods that have to be implemented or overriden in subclasses #
+    #########################################################################
+
+    def _setup(self, **extra_kwds):
+        r"""
+        Handling of extra setup arguments (called once during ``__init__``).
+        """
+        pass
+
+    def _seed_setup(self, state):
+        r"""
+        Pre-transformation on seeds (called once in :meth:`add_seed`).
+        """
+        return state
+
+    def _out_neighbors(self, state):
+        r"""
+        Return an iterable of out-neighbors of ``state``.
+
+        Each element consists of a pair ``(new_state, edge_label)``.
+        """
+        raise NotImplementedError
+
+    def _in_neighbors(self, state):
+        r"""
+        Return an iterable of in-neighbors of ``state``.
+
+        Each element consists of a pair ``(new_state, edge_label)``.
+        """
+        raise NotImplementedError
+
+    ##################################
+    # Methods to build the automaton #
+    ##################################
+
+    def add_seed(self, state, setup=True):
+        r"""
+        Add the seed ``state`` to the search.
+
+        Return ``0`` if the state is already present in the graph and ``1``
+        otherwise. Once a seed is added, one should call the method
+        :meth:`run` in order to launch the exploration.
+        """
+        if setup:
+            state = self._seed_setup(state)
+
+        if state in self._graph:
+            if self._verbosity >= 2:
+                print('[add_seed] state=%s already in the graph' % (state,))
+            return 0
+
+        if self._verbosity >= 2:
+            print('[add_seed] adding state=%s to the list of seeds' % (state,))
+
+        self._seeds.append(state)
+        return 1
+
+    def _next_seed(self):
+        r"""
+        Return the next seed or ``None`` if there is none.
+
+        Note that this function modifies the `_seeds` and
+        `_backward_flip_queue` attributes.
+        """
+        while self._seeds or self._backward_flip_queue:
+            while self._seeds:
+                seed = self._seeds.pop()
+                if seed not in self._graph:
+                    # not explored forward yet
+                    return seed
+
+            if not self._backward_flip_queue:
+                return
+
+            state = self._backward_flip_queue.pop()
+            if self._verbosity >= 2:
+                print('[_next_seed] found state to feed backward_flip_queue %s' % (state,))
+            for back_neighbor, label in self._in_neighbors(state):
+                if self._verbosity >= 2:
+                    print('[_next_seed] add back_neighbor %s' % (back_neighbor,))
+                self.add_seed(back_neighbor, setup=False)
+
+        if self._verbosity >= 2:
+            print('[_next seed] done')
+
+    def run(self, max_size=None):
+        r"""
+        Discover new states and transitions in the automaton.
+
+        INPUT:
+
+        - ``max_size`` -- an optional bound on the number of new states to
+          compute
+
+        EXAMPLES::
+
+            sage: from veerer import *
+
+        The torus::
+
+            sage: T = VeeringTriangulation("(0,2,~1)(1,~0,~2)", "RBB")
+            sage: A = CoreAutomaton()
+            sage: A.add_seed(T)
+            1
+            sage: A.run()
+            0
+            sage: A
+            Core veering automaton with 2 states
+
+            sage: A = ReducedCoreAutomaton()
+            sage: A.add_seed(T)
+            1
+            sage: A.run()
+            0
+            sage: A
+            Reduced core veering automaton with 1 state
+
+        A more complicated surface in Q_1(1^2, -1^2)::
+
+            sage: fp = '(0,1,2)(~0,~3,~8)(3,5,4)(~4,~1,~5)(6,7,8)(~6,9,~2)'
+            sage: cols = 'BRBRBBBRBR'
+            sage: T = VeeringTriangulation(fp, cols)
+
+            sage: C = CoreAutomaton()
+            sage: C.add_seed(T)
+            1
+            sage: C.run(10)
+            1
+            sage: C
+            Partial core veering automaton with 10 states
+            sage: C.run()
+            0
+            sage: C
+            Core veering automaton with 1074 states
+
+            sage: C = ReducedCoreAutomaton()
+            sage: C.add_seed(T)
+            1
+            sage: C.run(10)
+            1
+            sage: C
+            Partial reduced core veering automaton with 10 states
+            sage: C.run()
+            0
+            sage: C
+            Reduced core veering automaton with 356 states
+
+        TESTS::
+
+            sage: from veerer import VeeringTriangulation, CoreAutomaton
+            sage: T = VeeringTriangulation("(0,2,~1)(1,~0,~2)", "RBB")
+            sage: A = CoreAutomaton()
+            sage: A.add_seed(T)
+            1
+            sage: A
+            Partial core veering automaton with 0 state
+            sage: A.run(1)
+            1
+            sage: A
+            Partial core veering automaton with 1 state
+            sage: A.run(1)
+            1
+            sage: A
+            Partial core veering automaton with 2 states
+            sage: A.run(1)
+            0
+            sage: A
+            Core veering automaton with 2 states
+        """
+        graph = self._graph
+        backward_flip_queue = self._backward_flip_queue
+        branch = collections.deque(self._branch)
+
+        count = 0
+        old_size = self._graph.num_verts()
+        while max_size is None or count < max_size:
+            if self._verbosity >= 2:
+                print('[automaton] new loop')
+                sys.stdout.flush()
+
+            while not branch:
+                # forward search is over... find a new seed
+                state = self._next_seed()
+                if state is None:
+                    # no seed available anymore
+                    if self._verbosity >= 2:
+                        print('[automaton] done')
+                        sys.stdout.flush()
+                    self._branch = []
+                    return 0
+
+                if self._verbosity >= 2:
+                    print('[automaton] seed %s' % (state,))
+                    sys.stdout.flush()
+
+                graph.add_vertex(state)
+                if self._backward:
+                    self._backward_flip_queue.append(state)
+                branch.clear()
+                branch.append(state)
+                count += 1
+
+                if max_size is not None and count >= max_size:
+                    self._branch = list(branch)
+                    return 1
+
+            # next step of forward search
+            if self._method == 'DFS':
+                state = branch.pop()
+            elif self._method == 'BFS':
+                state = branch.popleft()
+            else:
+                raise RuntimeError
+
+            if self._verbosity >= 2:
+                print('[automaton] at %s' % (state,))
+                sys.stdout.flush()
+
+            for out_neighbor, label in self._out_neighbors(state):
+                if out_neighbor not in graph:
+                    graph.add_vertex(out_neighbor)
+                    branch.append(out_neighbor)
+
+                    if self._backward:
+                        self._backward_flip_queue.append(out_neighbor)
+
+                    count += 1
+
+                graph.add_edge(state, out_neighbor, label)
+
+        self._branch = list(branch)
+        return 1
+
+    ###############################
+    # Properties of the automaton #
+    ###############################
+
+    def is_connected(self):
+        r"""
+        Return whether the automaton is connected.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation, CoreAutomaton
+            sage: vt = VeeringTriangulation("(0,6,~5)(1,8,~7)(2,7,~6)(3,~1,~8)(4,~2,~3)(5,~0,~4)", "RRRBBBBBB")
+            sage: A = CoreAutomaton()
+            sage: A.add_seed(vt)
+            1
+            sage: A.run()
+            0
+            sage: A.is_connected()
+            True
+
+        Since the automaton is built by exploring neighborhoods it should
+        always be connected, unless it is fed with more than a single seed::
+
+            sage: vt0 = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: vt1 = VeeringTriangulation("(0,1,2)", "BBR")
+            sage: A = CoreAutomaton()
+            sage: A.add_seed(vt0)
+            1
+            sage: A.add_seed(vt1)
+            1
+            sage: A.run()
+            0
+            sage: A.is_connected()
+            False
+        """
+        return self._graph.is_connected()
 
     def __str__(self):
         r"""
@@ -638,6 +919,17 @@ class Automaton:
 
     @classmethod
     def from_triangulation(cls, T, *args, **kwds):
+        r"""
+        Build an automaton from the triangulation ``T``.
+
+        EXAMPLES::
+
+            sage: from veerer import Triangulation, VeeringTriangulation, FlipGraph, CoreAutomaton
+            sage: FlipGraph.from_triangulation(Triangulation("(0,1,2)(~0,3,4)(~1,~3,5)(~5,~2,~4)"))
+            Triangulation automaton with 5 states
+            sage: CoreAutomaton.from_triangulation(VeeringTriangulation(VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")))
+            Core veering automaton with 2 states
+        """
         A = cls()
         A.add_seed(T)
         A.run(**kwds)
@@ -665,239 +957,22 @@ class Automaton:
         return self.from_triangulation(VeeringTriangulation.from_stratum(stratum), **kwds)
 
     def out_neighbors(self, state):
-        return self._graph.neighbors_out(state.copy(mutable=False))
-
-    ######################
-    # search implementation #
-    ######################
-
-    def add_seed(self, state, setup=True):
         r"""
-        Add the seed ``state`` to the search.
-
-        Return ``0`` if the state is already present in the graph and ``1``
-        otherwise. Once a seed is added, one should call the method
-        :meth:`run` in order to launch the exploration.
-        """
-        if setup:
-            state = self._seed_setup(state)
-
-        if state in self._graph:
-            if self._verbosity >= 2:
-                print('[add_seed] state=%s already in the graph' % (state,))
-            return 0
-
-        if self._verbosity >= 2:
-            print('[add_seed] adding state=%s to the list of seeds' % (state,))
-
-        self._seeds.append(state)
-        return 1
-
-    def _next_seed(self):
-        r"""
-        Return the next seed or ``None`` if there is none.
-
-        Note that this function modifies the `_seeds` and
-        `_backward_flip_queue` attributes.
-        """
-        while self._seeds or self._backward_flip_queue:
-            while self._seeds:
-                seed = self._seeds.pop()
-                if seed not in self._graph:
-                    # not explored forward yet
-                    return seed
-
-            if not self._backward_flip_queue:
-                return
-
-            state = self._backward_flip_queue.pop()
-            if self._verbosity >= 2:
-                print('[_next_seed] found state to feed backward_flip_queue %s' % (state,))
-            for back_neighbor, label in self._in_neighbors(state):
-                if self._verbosity >= 2:
-                    print('[_next_seed] add back_neighbor %s' % (back_neighbor,))
-                self.add_seed(back_neighbor, setup=False)
-
-        if self._verbosity >= 2:
-            print('[_next seed] done')
-
-    def run(self, max_size=None):
-        r"""
-        Discover new states and transitions in the automaton.
-
-        INPUT:
-
-        - ``max_size`` -- an optional bound on the number of new states to
-          compute
+        Return the out neighbors of ``state``.
 
         EXAMPLES::
 
-            sage: from veerer import *
-
-        The torus::
-
-            sage: T = VeeringTriangulation("(0,2,~1)(1,~0,~2)", "RBB")
-            sage: A = CoreAutomaton()
-            sage: A.add_seed(T)
-            1
-            sage: A.run()
-            0
-            sage: A
-            Core veering automaton with 2 states
-
-            sage: A = ReducedCoreAutomaton()
-            sage: A.add_seed(T)
-            1
-            sage: A.run()
-            0
-            sage: A
-            Reduced core veering automaton with 1 state
-
-        A more complicated surface in Q_1(1^2, -1^2)::
-
-            sage: fp = '(0,1,2)(~0,~3,~8)(3,5,4)(~4,~1,~5)(6,7,8)(~6,9,~2)'
-            sage: cols = 'BRBRBBBRBR'
-            sage: T = VeeringTriangulation(fp, cols)
-
-            sage: C = CoreAutomaton()
-            sage: C.add_seed(T)
-            1
-            sage: C.run(10)
-            1
-            sage: C
-            Partial core veering automaton with 10 states
-            sage: C.run()
-            0
-            sage: C
-            Core veering automaton with 1074 states
-
-            sage: C = ReducedCoreAutomaton()
-            sage: C.add_seed(T)
-            1
-            sage: C.run(10)
-            1
-            sage: C
-            Partial reduced core veering automaton with 10 states
-            sage: C.run()
-            0
-            sage: C
-            Reduced core veering automaton with 356 states
-
-        TESTS::
-
-            sage: from veerer import VeeringTriangulation, CoreAutomaton
-            sage: T = VeeringTriangulation("(0,2,~1)(1,~0,~2)", "RBB")
-            sage: A = CoreAutomaton()
-            sage: A.add_seed(T)
-            1
-            sage: A
-            Partial core veering automaton with 0 state
-            sage: A.run(1)
-            1
-            sage: A
-            Partial core veering automaton with 1 state
-            sage: A.run(1)
-            1
-            sage: A
-            Partial core veering automaton with 2 states
-            sage: A.run(1)
-            0
-            sage: A
-            Core veering automaton with 2 states
+            sage: from veerer import Triangulation, FlipGraph
+            sage: t = Triangulation("(0,1,2)(~0,3,4)(~1,~3,5)(~2,~4,~5)")
+            sage: A = FlipGraph.from_triangulation(t)
+            sage: A.out_neighbors(t)
+            [Triangulation("(0,1,2)(~0,3,4)(~1,~3,5)(~2,~5,~4)"),
+             Triangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,~5)")]
         """
-        graph = self._graph
-        backward_flip_queue = self._backward_flip_queue
-        branch = collections.deque(self._branch)
+        return self._graph.neighbors_out(state.copy(mutable=False))
 
-        count = 0
-        old_size = self._graph.num_verts()
-        while max_size is None or count < max_size:
-            if self._verbosity >= 2:
-                print('[automaton] new loop')
-                sys.stdout.flush()
 
-            while not branch:
-                # forward search is over... find a new seed
-                state = self._next_seed()
-                if state is None:
-                    # no seed available anymore
-                    if self._verbosity >= 2:
-                        print('[automaton] done')
-                        sys.stdout.flush()
-                    self._branch = []
-                    return 0
-
-                if self._verbosity >= 2:
-                    print('[automaton] seed %s' % (state,))
-                    sys.stdout.flush()
-
-                graph.add_vertex(state)
-                if self._backward:
-                    self._backward_flip_queue.append(state)
-                branch.clear()
-                branch.append(state)
-                count += 1
-
-                if max_size is not None and count >= max_size:
-                    self._branch = list(branch)
-                    return 1
-
-            # next step of forward search
-            if self._method == 'DFS':
-                state = branch.pop()
-            elif self._method == 'BFS':
-                state = branch.popleft()
-            else:
-                raise RuntimeError
-
-            if self._verbosity >= 2:
-                print('[automaton] at %s' % (state,))
-                sys.stdout.flush()
-
-            for out_neighbor, label in self._out_neighbors(state):
-                if out_neighbor not in graph:
-                    graph.add_vertex(out_neighbor)
-                    branch.append(out_neighbor)
-
-                    if self._backward:
-                        self._backward_flip_queue.append(out_neighbor)
-
-                    count += 1
-
-                graph.add_edge(state, out_neighbor, label)
-
-        self._branch = list(branch)
-        return 1
-
-    ############################################################
-    # Custom methods that have to be implemented in subclasses #
-    ############################################################
-
-    def _setup(self, **extra_kwds):
-        r"""
-        Handling of extra setup arguments (called once during ``__init__``).
-        """
-        pass
-
-    def _seed_setup(self, state):
-        return state
-
-    def _out_neighbors(self, state):
-        r"""
-        Return an iterable of out-neighbors of ``state``.
-
-        Each element consists of a pair ``(new_state, edge_label)``.
-        """
-        raise NotImplementedError
-
-    def _in_neighbors(self, state):
-        r"""
-        Return an iterable of in-neighbors of ``state``.
-
-        Each element consists of a pair ``(new_state, edge_label)``.
-        """
-        raise NotImplementedError
-
+# TODO: find a triangulation representative for each g,n (and possibly with boundaries)
 
 # TODO: add the examples of the triangulations of the n-gon. To match with
 # the literature, one would need to consider canonical labels where we do
@@ -908,7 +983,7 @@ class FlipGraph(Automaton):
 
     EXAMPLES::
 
-            sage: from veerer import *
+            sage: from veerer import Triangulation, FlipGraph
 
             sage: T = Triangulation([(0,1,2),(-1,-2,-3)])
             sage: A = FlipGraph()
@@ -932,12 +1007,36 @@ class FlipGraph(Automaton):
     _name = 'triangulation'
 
     def _seed_setup(self, state):
+        r"""
+        Pre-transformation on ``state``.
+
+        TESTS::
+
+            sage: from veerer import Triangulation, FlipGraph
+            sage: T = Triangulation([(0,2,1),(-1,-3,-2)])
+            sage: A = FlipGraph()
+            sage: A._seed_setup(T)
+            Triangulation("(0,1,2)(~0,~1,~2)")
+        """
         state = state.copy(mutable=True)
         state.set_canonical_labels()
         state.set_immutable()
         return state
 
     def _out_neighbors(self, state):
+        r"""
+        Iterator through out neighbors of ``state``.
+
+        TESTS::
+
+            sage: from veerer import Triangulation, FlipGraph
+            sage: T = Triangulation([(0,2,1),(-1,-3,-2)])
+            sage: A = FlipGraph()
+            sage: list(A._out_neighbors(A._seed_setup(T)))
+            [(Triangulation("(0,1,2)(~0,~1,~2)"), (0, array('i', [0, 1, 5, 4, 2, 3]))),
+             (Triangulation("(0,1,2)(~0,~1,~2)"), (1, array('i', [0, 1, 4, 5, 3, 2]))),
+             (Triangulation("(0,1,2)(~0,~1,~2)"), (2, array('i', [0, 1, 5, 4, 3, 2])))]
+        """
         for e in state.flippable_edges():
             new_state = state.copy(mutable=True)
             new_state.flip(e)
