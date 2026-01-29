@@ -213,7 +213,8 @@ class NodalLabelledDiGraph(LabelledDiGraph):
         sage: N = NodalLabelledDiGraph([1, 1, 2], [(0, 0, 7, 8), (1, 0, 3, 5), (1, 0, 2, 4)],
         ....:                      [((0, 0, 3, 3), (2, 1, 2, 2)),
         ....:                       ((1, 0, 5, 2), (2, 0, 3, 7)),
-        ....:                       ((0, 0, 2, 6), (2, 0, 3, 2))])
+        ....:                       ((0, 0, 2, 6), (2, 0, 3, 2))],
+        ....:                       [])
         sage: N
         Multiscale veering triangulation nodal graph with 3 horizontal and 3 vertical nodes
 
@@ -229,7 +230,7 @@ class NodalLabelledDiGraph(LabelledDiGraph):
         sage: list(N.vertices(2, 1))  # vertices in the second prime component at level -2
         [3]
     """
-    def __init__(self, prime_decomposition, horizontal_nodes, vertical_nodes):
+    def __init__(self, prime_decomposition, horizontal_nodes, vertical_nodes, data_genus):
         r"""
         INPUT:
 
@@ -276,6 +277,8 @@ class NodalLabelledDiGraph(LabelledDiGraph):
             raise ValueError("disconnected level graph")
 
         super().__init__(digraph)
+
+        self._data_genus = data_genus
 
     def copy(self):
         ans = LabelledDiGraph.copy(self)
@@ -381,7 +384,15 @@ class NodalLabelledDiGraph(LabelledDiGraph):
                 dic_groups[v].append(l[index])
             edges.append(dic_groups)
         return edges
-
+    
+    def is_stable_without_markings(self, v):
+        """
+        Return True if the vertex is stable when the zeros and poles are forgetten.
+        """
+        dg = self._digraph
+        n = dg.degree(v)
+        genus = self._data_genus[v]
+        return 2 - 2*genus - n < 0
 
 class MultiscaleVeeringTriangulation:
     r"""
@@ -448,16 +459,24 @@ class MultiscaleVeeringTriangulation:
     def __init__(self, veering_triangulations=None, horizontal_nodes=None, prong_matchings=None, mutable=False, check=True):
         if isinstance(veering_triangulations, list):
             self._veering_triangulations = []
-            prime_decomposition = [] # data for building nodal digraph
+            prime_decomposition = [] # data for building the vertices of nodal digraph
+            data_genus = [] # data of genus information of the vertices of nodal digraph
             for level, vts in enumerate(veering_triangulations):
                 if isinstance(vts, VeeringTriangulation):
-                    self._veering_triangulations.append([vts])
-                    prime_decomposition.append(1)
-                elif isinstance(vts, list):
+                    vts = [vts]     
+                if isinstance(vts, list):
+                    self._veering_triangulations.append([])
                     for vt in vts:
                         if not isinstance(vt, VeeringTriangulation):
                             raise TypeError(f"input must be veering triangulations; got {type(vt).__name__}")
-                    self._veering_triangulations.append(list(vts))
+                        # compute the genus of vt
+                        if vt.is_connected():
+                            g = vt.genus()
+                        else:
+                            g = sum(c.genus() for _, c in vt.connected_components_subgraphs())
+                        data_genus.append(g)
+                        self._veering_triangulations[-1].append(vt)
+                    #self._veering_triangulations.append(list(vts))
                     prime_decomposition.append(len(vts))
                 else:
                     raise ValueError(f"invalid list of veering triangulations {vts} at level-{level}")
@@ -524,7 +543,7 @@ class MultiscaleVeeringTriangulation:
         else:
             raise ValueError("The 'prong_matchings' must be a list.")
 
-        self._nodal_digraph = NodalLabelledDiGraph(prime_decomposition, data_horiz_nodes,data_vert_nodes) # build the nodal digraph. Note that the order of the loops in the digraph are inverted?
+        self._nodal_digraph = NodalLabelledDiGraph(prime_decomposition, data_horiz_nodes,data_vert_nodes, data_genus) # build the nodal digraph. Note that the order of the loops in the digraph are inverted?
 
         self._mutable = True
         if not mutable:
