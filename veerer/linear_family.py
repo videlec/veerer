@@ -369,6 +369,9 @@ class LinearFamily:
         return self._subspace.base_ring()
 
     def set_immutable(self):
+        r"""
+        Set this linear family as immutable.
+        """
         self._constellation_class.set_immutable(self)
         self._subspace.set_immutable()
 
@@ -689,6 +692,9 @@ class LinearFamily:
         return matrix(self.base_ring(), nr,  nc, [residue_matrix.solve_left(v) for v in intersection.rows()] + residue_matrix.left_kernel_matrix().rows())
 
     def stratum(self):
+        r"""
+        Return the ambient stratum of this linear family.
+        """
         return self.copy(self, cls=self._constellation_class).stratum()
 
     def relabel(self, p, check=True):
@@ -884,6 +890,20 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
         return mat
 
     def generators_matrix(self, slope=VERTICAL, mutable=None):
+        r"""
+        Return a basis of generators of edge lengths in matrix form.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: fp = "(0,1,2)(~0,~4,~2)(3,4,5)(~3,~1,~5)"
+            sage: cols = "BRRBRR"
+            sage: f = VeeringTriangulation(fp, cols).as_linear_family()
+            sage: f.generators_matrix()
+            [1 0 1 0 0 0]
+            [0 1 1 0 1 1]
+            [0 0 0 1 0 1]
+        """
         if slope == VERTICAL:
             if not self._mutable and not mutable:
                 return self._subspace
