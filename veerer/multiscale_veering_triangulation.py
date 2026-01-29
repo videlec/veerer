@@ -102,6 +102,11 @@ def track_prong(vt, r_up, r_low, prong, vertex=False, face=False):
         sage: _, _, r_up, r_low = vt.degeneration(edges_low=(1, 3), edges_up=(0, 2), collapsed_half_edge_relabelling=True)
         sage: track_prong(vt, r_up, r_low, (1, 0, 7, 2), face=True)
         (1, 0, 2, 2)
+
+        sage: vt = VeeringTriangulationLinearFamily("(0:1,1:1,2:1)(~0:1,~1:1,~2:1)", "RRR", [(1, 0, 0), (0, 1, 0), (0, 0, 1)])
+        sage: _, _, r_up, r_low = vt.degeneration(edges_low=(0,), collapsed_half_edge_relabelling=True)
+        sage: track_prong(vt, r_up, r_low, (0, 0, 1, 0), face=True)
+        (0, 0, 1, 0)
     """
     l, c, h, ang = prong
     l = abs(l)
@@ -1418,20 +1423,18 @@ class MultiscaleVeeringTriangulation:
 
         # existing horizontal nodes
         for h1, h2 in self._horizontal_nodes()[level][component]:
-            if r_up[h1] >= 0:
-                h1 = r_up[h1]
-                h2 = r_up[h2]
-                assert h2 >= 0
-                l1.append((h1, h2))
+            prong1 = (level, component, h1, 0)
+            prong2 = (level, component, h2, 0)
+            newprong1 = track_prong(vt, r_up, r_low, prong1, vertex=False, face=True)
+            newprong2 = track_prong(vt, r_up, r_low, prong2, vertex=False, face=True)
+            newh1 = newprong1[2]
+            newh2 = newprong2[2]
+            assert newprong1[0] == newprong2[0]
+            
+            if newprong1[0] == level:
+                l1.append((newh1, newh2))
             else:
-                h1 = r_low[h1]
-                h2 = r_low[h2]
-                assert h1 >= 0
-                assert h2 >= 0
-                if f_up is None:
-                    l1.append((h1, h2))
-                else:
-                    l2.append((h1, h2))
+                l2.append((newh1, newh2))
 
         # new horizontal nodes
         if f_up is None: #horizontal degeneration
