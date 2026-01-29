@@ -36,6 +36,7 @@ from .strebel_graph import StrebelGraph
 from .delaunay_strebel_graph import DelaunayStrebelGraph
 from .polyhedron.linear_algebra import is_rank_one
 from .permutation import perm_check, perm_orbit, perm_cycles
+from .labelled_digraph import DiGraph, LabelledDiGraph
 
 from sage.structure.richcmp import op_LT, op_LE, op_EQ, op_NE, op_GT, op_GE, rich_to_bool
 from sage.misc.cachefunc import cached_method
@@ -1319,10 +1320,10 @@ class MultiscaleCompactification:
         sage: L = vt.linear_subvariety()
         sage: M = L.multiscale_compactification()
         sage: M  # optional - surface_dynamics
-        MultiscaleCompactification of Irreducible real linear subvariety of projective dimension 3 in [[H_2(2)]] made of
-        3 components in codimension 1
-        5 components in codimension 2
-        3 components in codimension 3
+        MultiscaleCompactification of Irreducible real linear subvariety of projective dimension 3 in [[H_2(2)]] made of 
+        2 codimension one vertical components
+        1 codimension one horizontal components
+        12 components in total
         sage: d = M.projective_dimension()
         sage: for codim in range(d):  # optional - surface_dynamics
         ....:   for component in M.components(codim):
@@ -1346,10 +1347,9 @@ class MultiscaleCompactification:
         sage: M = L.multiscale_compactification()
         sage: M # optional - surface_dynamics
         MultiscaleCompactification of Irreducible real linear subvariety of projective dimension 4 in [[H_2(1^2)]] made of
-        5 components in codimension 1
-        11 components in codimension 2
-        14 components in codimension 3
-        6 components in codimension 4
+        4 codimension one vertical components
+        1 codimension one horizontal components
+        37 components in total
         sage: d = M.projective_dimension()
         sage: for codim in range(d):  # optional - surface_dynamics
         ....:   for component in M.components(codim):
@@ -1372,38 +1372,61 @@ class MultiscaleCompactification:
         sage: L = vt.linear_subvariety()
         sage: L.multiscale_compactification()  # optional - surface_dynamics
         MultiscaleCompactification of Irreducible real linear subvariety of projective dimension 1 in [[H_1(2, -2)]] made of
-        2 components in codimension 1
+        1 codimension one vertical components
+        1 codimension one horizontal components
+        3 components in total
     """
     def __init__(self, L):
         self._L = L
         self._degeneration_helper = PrimeDegenerations()
 
-        # at position (i, j) = i vertical and j horizontal degenerations
         self._components = collections.defaultdict(set)
         self._components[0, 0].add(L)
         d = L.projective_dimension()
+            
+        G = DiGraph(loops=False, multiedges=False)
+        G.add_vertex((0,0,L)) #(the number of vertical degenerations, the number of horizontal degenerations, component)
 
-        # vertical degenerations
+        #the edge of G corresponding to codimension one vertical/horizontal degeneration is labeled by 'V'/'H'
         for codim in range(d):
-            for comp in self._components[codim, 0]:
-                for comp_deg in comp.codimension_one_vertical_degenerations(degeneration_helper=self._degeneration_helper):
-                    self._components[codim + 1, 0].add(comp_deg)
-            if not self._components[codim + 1, 0]:
-                # NOTE: sometimes full vertical degeneration are not possible, eg H(2)
-                break
-
-        for codim in range(d):
-            sys.stdout.flush()
-            h = 0
-            has_horiz = True
-            while has_horiz:
-                sys.stdout.flush()
-                has_horiz = False
-                for comp in self._components[codim, h]:
+            for v in range(codim + 1):
+                h = codim - v
+                for comp in self._components[v, h]:
+                    #vertical degernation
+                    for comp_deg in comp.codimension_one_vertical_degenerations(degeneration_helper=self._degeneration_helper):
+                        self._components[v + 1, h].add(comp_deg)
+                        G.add_edge((v, h, comp) , (v + 1, h, comp_deg), 'V')
+                    
+                    #horizontal degeneration
                     for comp_deg in comp.codimension_one_horizontal_degenerations(degeneration_helper=self._degeneration_helper):
-                        has_horiz = True
-                        self._components[codim, h + 1].add(comp_deg)
-                h += 1
+                        self._components[v, h + 1].add(comp_deg)
+                        G.add_edge((v, h, comp) , (v, h + 1, comp_deg), 'H')
+        self._boundary_graph = LabelledDiGraph(G)
+
+        # The following way to compute the compactification does not include all the adjacency infomation of components. However, it should be possible to recover the adjacency information form the computation?
+        ## First: vertical degenerations
+        #for codim in range(d):
+        #    for comp in self._components[codim, 0]:            
+        #        for comp_deg in comp.codimension_one_vertical_degenerations(degeneration_helper=self._degeneration_helper):
+        #            self._components[codim + 1, 0].add(comp_deg)           
+        #            G.add_edge((codim, 0, comp) , (codim + 1, 0, comp_deg), 'V')
+        #    if not self._components[codim + 1, 0]:
+                # NOTE: sometimes full vertical degeneration are not possible, eg H(2)
+        #        break
+        ## Then: horizontal degenerations
+        #for codim in range(d):
+        #    sys.stdout.flush()
+        #    h = 0
+        #    has_horiz = True
+        #    while has_horiz:
+        #        sys.stdout.flush()
+        #        has_horiz = False
+        #        for comp in self._components[codim, h]:
+        #            for comp_deg in comp.codimension_one_horizontal_degenerations(degeneration_helper=self._degeneration_helper):
+        #                has_horiz = True
+        #                self._components[codim, h + 1].add(comp_deg)
+        #                G.add_edge((codim, h, comp), (codim, h + 1, comp_deg), 'H')
+        #        h += 1
 
     def projective_dimension(self):
         return self._L.projective_dimension()
@@ -1468,7 +1491,10 @@ class MultiscaleCompactification:
     def __repr__(self):
         if self.projective_dimension() == 0:
             return "MultiscaleCompactification {}".format(self._L)
-        s = ["MultiscaleCompactification of {} made of".format(self._L)]
-        for codim in range(1, self.projective_dimension() + 1):
-            s.append("{} components in codimension {}".format(len(self.components(codim)), codim))
-        return "\n".join(s)
+        s = "\n".join([
+            "MultiscaleCompactification of {} made of".format(self._L),
+            "{} codimension one vertical components".format(len(self.components(1,0))),
+            "{} codimension one horizontal components".format(len(self.components(0,1))),
+            "{} components in total".format(len(self.components()))
+            ])
+        return s
