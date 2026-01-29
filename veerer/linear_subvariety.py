@@ -479,14 +479,101 @@ class NodesCanonicalizer:
         from sage.features.gap import GapPackage
         GapPackage("images").require()
 
+    def num_levels(self):
+        r"""
+        Return the number of levels
+        """
+        return len(self._levels)
+
+    def _check_level(self, level):
+        r"""
+        Return a level as a positive integer
+        """
+        if not isinstance(level, numbers.Integral):
+            raise TypeError("level must be integral; got {}".format(type(level).__name__))
+        level = int(level)
+        if level < 0:
+            level = -level
+        if not 0 <= level < self.num_levels():
+            raise ValueError("level out of range")
+        return level
+
+    def _check_component(self, level, component):
+        level = self._check_level(level)
+        if not isinstance(component, numbers.Integral):
+            raise TypeError("component must be integral; got {}".format(type(component).__name__))
+        component = int(component)
+        if not 0 <= component < len(self._levels[level]):
+            raise ValueError("component out of range")
+        return level, component
+
+    def __repr__(self):
+        r"""
+        Return a string representation.
+
+        TESTS::
+
+            sage: from veerer import VeeringTriangulation
+            sage: from veerer.linear_subvariety import NodesCanonicalizer
+            sage: vt0 = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,9,~8)(~7,10,11)(~9,~10,~11)", "RRBBRRRBRBRR")
+            sage: vt1 = VeeringTriangulation("(0:1,1:2,~0:1,~1:4)(2:1,3:2,~2:1,~3:4)", "RRRR")
+            sage: C = NodesCanonicalizer([[vt0.delaunay_strebel_graph()], [vt1.delaunay_strebel_graph()]])
+            sage: C
+            NodesCanonicalizer with levels
+             0: [VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,~7,9)(~8,10,11)(~9,~10,~11)", "RRBBRRRRBBRR")]
+             1: [VeeringTriangulation("(0:1,1:1,~0:1,~1:3)(2:1,3:1,~2:1,~3:3)", "RBRB")]
+        """
+        return "NodesCanonicalizer with levels\n" + "\n".join(f"{i:2}: {[ds_graph.root() for ds_graph in level]}" for i, level in enumerate(self._levels))
+
+    # TODO (optimization): it would be more efficient to store rotations along vertex and face separatrix
+    # ie, we want to access in constant time to h0 + i
     def _normalize_prong_matching(self, l0, c0, h0, a0, l1, c1, h1, a1):
         r"""
         Return a normalized triple (hh0, hh1, aa1)
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation, VeeringTriangulationLinearFamily, MultiscaleVeeringTriangulation
+            sage: from veerer.linear_subvariety import NodesCanonicalizer
+
+        We consider a top level with 2 zeros of angle 4 pi and a bottom level
+        with a pole of angle -4pi (and a zero of angle 8pi)::
+
+            sage: vt0 = VeeringTriangulation("(0,1,2)(~0,~1,3)(~2,4,5)(~3,~4,6)(~5,7,8)(~6,9,~8)(~7,10,11)(~9,~10,~11)", "RRBBRRRBRBRR")
+            sage: vt1 = VeeringTriangulation("(0:1,1:2,~0:1,~1:4)", "RR")
+            sage: C = NodesCanonicalizer([[vt0.delaunay_strebel_graph()], [vt1.delaunay_strebel_graph()]])
+
+        We check that equivalent prong matchings are normalized in the same way::
+
+            sage: r0 = C._levels[0][0].root()
+            sage: r1 = C._levels[1][0].root()
+            sage: choices = set()
+            sage: for vseps in r0.vertex_separatrices(flat=False):
+            ....:      assert len(vseps) == 4, vseps
+            ....:      for fseps in r1.face_separatrices(flat=False):
+            ....:          assert len(fseps) == 4, fseps
+            ....:          for j in range(4):
+            ....:              choice = set(C._normalize_prong_matching(0, 0, *vseps[i], 1, 0, *fseps[(i + j) % 4]) for i in range(4))
+            ....:              assert len(choice) == 1
+            ....:              choice = choice.pop()
+            ....:              assert choice not in choices
+            ....:              choices.add(choice)
+            sage: assert len(choices) == 8  # 4 choices for each of the 2 zeros
         """
+        l0, c0 = self._check_component(l0, c0)
+        l1, c1 = self._check_component(l1, c1)
+        if l0 >= l1:
+            raise ValueError(f"l0 = {l0} must be a higher level than l1 = {l1}")
         vt0 = self._levels[l0][c0].root()
         vt1 = self._levels[l1][c1].root()
+        h0, a0 = vt0._check_vertex_separatrix(h0, a0)
+        h1, a1 = vt1._check_face_separatrix(h1, a1)
         h1, a1 = vt1._normalize_face_separatrix(h1, a1)
-        for (hh0, aa0), (hh1, aa1) in zip(vt0.vertex_separatrices(h0, a0), vt1.face_separatrices(h1, a1)):
+        vseps = vt0.vertex_separatrices(h0, a0)
+        fseps = vt1.face_separatrices(h1, a1)
+        if len(vseps) != len(fseps):
+            raise ValueError(f"invalid pair (l0, c0, h0, a0) = {(l0, c0, h0, a0)} and (l1, c1, h1, a1) = {(l1, c1, h1, a1)} with non-matching angles")
+        for (hh0, aa0), (hh1, aa1) in zip(vseps, fseps):
             if (hh0, aa0) < (h0, a0):
                 h0 = hh0
                 a0 = aa0
@@ -497,7 +584,9 @@ class NodesCanonicalizer:
 
     def infinite_cylinder_representatives(self, level, component):
         r"""
-        Return a sorted list of (potential) horizontal nodes as quadruples (l, c, h0, h1).
+        Return a list of (potential) horizontal nodes as a list of half-edges.
+
+        A choice of horizontal node is a pair of half-edges from this list.
         """
         ds_graph = self._levels[level][component]
         vt = ds_graph.root()
