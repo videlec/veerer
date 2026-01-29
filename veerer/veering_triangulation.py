@@ -2607,10 +2607,10 @@ class VeeringTriangulation(Triangulation):
         """
         gens = self.generators_matrix()
         mid_half_edges, rbdry, lbdry, pocket = cyl
+        bdry = set().union(rbdry, lbdry)
 
-        rbdry = gens.matrix_from_columns([i // 2 for i in rbdry])
-        lbdry = gens.matrix_from_columns([i // 2 for i in lbdry])
-        return is_rank_one(rbdry) and is_rank_one(lbdry)
+        bdry = gens.matrix_from_columns([i // 2 for i in set().union(rbdry, lbdry)])
+        return is_rank_one(bdry)
 
     def cylinder_circumference(self, cyl, x, check=True):
         r"""
@@ -5134,36 +5134,53 @@ class VeeringTriangulation(Triangulation):
 
     def parallel_cylinders(self, col=RED):
         r"""
-        Return the L-parallel cylinders.
+        Return the list of L-parallel cylinders and circumference ratio.
 
-        The output is a list of lists ``[l0, l1, ...]`` where each ``li``
-        represents a L-parallel family of cylinders, together with circumference.
+        The output is a list of lists ``([l0, l1, ...]`` where each ``li``
+        represents a L-parallel family of cylinders together with their
+        circumference ratios. More precisely, ``li = (cylinders_list, circumferences)`` where
+        ``cylinder_list`` is a list of cylinders (as given by the output of the function
+        :meth:`cylinders`) and ``circumferences`` is the generator of the one-dimensional image
+        of the list of circumferences of this family as the surface varies in the family.
 
         EXAMPLES::
 
-            sage: from veerer.linear_family import VeeringTriangulationLinearFamilies
+            sage: from veerer import VeeringTriangulationLinearFamily, VeeringTriangulationLinearFamilies
             sage: X9 = VeeringTriangulationLinearFamilies.prototype_H1_1(0, 2, 1, -1)
             sage: X9.parallel_cylinders()
             [([([14, 9, 7, 16], [4], [2, 0], True), ([10, 12], [], [1], True)], [1, 1])]
+
+        An example coming from the unfolding of the (1,1,1,9)-quadrilateral.
+        Note that the ratio of circumferences in the first family is 2::
+
+            sage: fp = "(0,1,2)(~2,3,4)(~4,5,6)(~5,7,8)(~6,9,~7)(~8,10,11)(~9,12,~11)(~10,13,14)(~12,~13,~14)"
+            sage: cols = "RRBRBRRRBBBRBRR"
+            sage: gens = [[0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+            ....:         [0, 0, 0, 2, 2, 0, 2, 1, 1, 1, 0, 1, 0, 0, 0],
+            ....:         [0, 2, 2, 0, 2, 0, 2, 1, 1, 1, 1, 0, 1, 0, 1],
+            ....:         [2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1]]
+            sage: f = VeeringTriangulationLinearFamily(fp, cols, gens)
+            sage: f.parallel_cylinders()
+            [([([0, 2], [], [4], True), ([26, 29], [21], [25], False)], [2, 1]),
+             ([([10, 14, 13], [9], [16, 18], False)], [1])]
         """
         cylinders = list(self.cylinders(col))
         if not cylinders:
-            []
+            return []
 
-        C = []  # middle edges
+        C = []  # list of indicators of transverse edges of cylinders (one list per cylinder)
         for cyl in cylinders:
-            c = [0] * self.num_edges()  # indicatrix of the middle edges
+            c = [0] * self.num_edges()
             for e in cyl[0]:
                 c[e // 2] = 1
             C.append(c)
 
-        # take intersection of the cylinder twists in the tangent space
         F = FreeModule(self.base_ring(), self.num_edges())
-        U = F.submodule(self.generators_matrix())
-        T = F.submodule(C)
+        U = F.submodule(self.generators_matrix())  # tangent space
+        T = F.submodule(C)  #  twist space (deformation obtained by twisting cylinders)
+        basis = U.intersection(T).basis_matrix()
 
         # what would be even nicer are the equations on the coefficients of C
-        basis = U.intersection(T).basis_matrix()
         twist_coeffs = []
         C = matrix(C)
         seen = set()
