@@ -521,9 +521,10 @@ class LinearFamily:
         EXAMPLES::
 
             sage: from veerer import StrebelGraphLinearFamily
-            sage: G = StrebelGraphLinearFamily("(0,1,2)(~0,~1:1,~2:2)", [(1, 1, 0), (1, 0, 1)])
-            sage: G.dimension()
+            sage: StrebelGraphLinearFamily("(0,1,2)(~0,~1:1,~2:2)", [(1, 1, 0), (1, 0, 1)]).dimension()
             2
+            sage: StrebelGraphLinearFamily("(0,~0:1)", [(1)]).dimension()
+            1
         """
         return self._subspace.nrows()
 
