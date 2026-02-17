@@ -172,7 +172,7 @@ Core vs not core
     sage: S = T1.copy(mutable=True)
     sage: print(S.is_core())
     True
-    sage: print(S.flippable_edges())
+    sage: print(S.forward_flippable_edges())
     [0, 2, 3, 7, 8]
 
 ::
@@ -180,7 +180,7 @@ Core vs not core
     sage: S.flip(3, BLUE)
     sage: print(S.is_core())
     True
-    sage: print(S.flippable_edges())
+    sage: print(S.forward_flippable_edges())
     [3, 7, 8]
 
 ::
@@ -188,7 +188,7 @@ Core vs not core
     sage: S.flip(8, BLUE)
     sage: print(S.is_core())
     True
-    sage: print(S.flippable_edges())
+    sage: print(S.forward_flippable_edges())
     [3, 4, 7, 8]
 
 ::
@@ -196,7 +196,7 @@ Core vs not core
     sage: S.flip(4, RED)
     sage: print(S.is_core())
     True
-    sage: print(S.flippable_edges())
+    sage: print(S.forward_flippable_edges())
     [4, 7]
 
 ::
