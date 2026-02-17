@@ -365,20 +365,26 @@ class StrebelGraph(Constellation):
 
     def dimension(self):
         r"""
-        Return the dimension of the ambient stratum of Abelian or quadratic differential.
+        Return the dimension of the ambient stratum of meromorpic Abelian or
+        quadratic differential.
+
+        EXAMPLES::
+
+            sage: from veerer import StrebelGraph
+
+            sage: sg = StrebelGraph("(0,~0:1)")
+            sage: sg.dimension()
+            1
+            sage: sg.stratum().dimension()
+            1
+
+            sage: sg = StrebelGraph("(0,1,2,3)(~1,~0:1,~3:2,~2:1)")
+            sage: sg.dimension()
+            4
+            sage: sg.stratum().dimension()
+            4
         """
-        # each folded edge gives a simple pole
-        ans = self.num_boundary_faces() + self.num_vertices() + self.num_folded_edges()
-        if self.is_connected():
-            ans += 2 * self.genus() - 2
-        else:
-            for comp in self.connected_components():
-                # NOTE: the code below could be called by a StrebelGraphLinearFamily
-                # for which the subgraph code is broken
-                # see https://github.com/flatsurf/veerer/issues/54
-                G = self._constellation_class.subgraph(self.constellation(), comp)
-                ans += 2 * G.genus() - 2
-        return ans
+        return self.num_edges()
 
     stratum_dimension = dimension
 
