@@ -32,7 +32,8 @@ from sage.structure.richcmp import op_LT, op_LE, op_EQ, op_NE, op_GT, op_GE, ric
 from .permutation import (perm_init, perm_check, perm_cycles, perm_dense_cycles,
                           perm_invert, perm_conjugate, perm_cycle_string, perm_cycles_lengths,
                           perm_cycles_to_string, perm_on_list, perm_relabel_on_edges,
-                          perm_num_cycles, str_to_cycles, str_to_cycles_and_data)
+                          perm_num_cycles, str_to_cycles, str_to_cycles_and_data,
+                          edge_triangulation_is_flippable)
 from .constellation import Constellation, check_relabelling
 
 
@@ -913,12 +914,7 @@ class Triangulation(Constellation):
         """
         if check:
             h = self._check_half_edge(2 * e)
-        else:
-            h = 2 * e
-        H = self._ep(h)
-        a = self._fp[h]
-        b = self._fp[a]
-        return not self._bdry[h] and not self._bdry[H] and a != H and b != H
+        return edge_triangulation_is_flippable(self._vp, self._fp, self._bdry, e)
 
     def flippable_edges(self):
         r"""

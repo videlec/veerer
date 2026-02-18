@@ -967,11 +967,23 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
         zero = L.base_ring().zero()
         if slope == VERTICAL:
             subspace = self._subspace
-            for row in subspace.right_kernel_matrix():
+            # TODO: the integer matrix class performs a saturation which is
+            # extremely slow and useless in our situation
+            if subspace.base_ring() is ZZ:
+                ker = subspace._rational_kernel_flint().transpose()
+            else:
+                ker = subspace.right_kernel_matrix()
+            for row in ker:
                 cs.insert(LinearConstraint(op_EQ, L.element_class(L, row.dict(), zero)), check=False)
         elif slope == HORIZONTAL:
             subspace = self._horizontal_subspace()
-            for row in subspace.right_kernel_matrix():
+            # TODO: the integer matrix class performs a saturation which is
+            # extremely slow and useless in our situation
+            if subspace.base_ring() is ZZ:
+                ker = subspace._rational_kernel_flint().transpose()
+            else:
+                ker = subspace.right_kernel_matrix()
+            for row in ker:
                 cs.insert(LinearConstraint(op_EQ, L.element_class(L, {key + shift: value for key, value in row.dict().items()}, zero)), check=False)
 
     def _check(self, error=ValueError):

@@ -221,6 +221,8 @@ class LinearExpression(ModuleElement):
 
     def ppl(self, dim=None):
         r"""
+        Return a PPL Linear_Expression equivalent to ``self``.
+
         EXAMPLES::
 
             sage: from veerer.polyhedron import LinearExpressions
@@ -236,13 +238,22 @@ class LinearExpression(ModuleElement):
             <class 'ppl.linear_algebra.Linear_Expression'>
         """
         from gmpy2 import mpz
-        lin = self.integral()
-        if lin._f:
-            # TODO: the line below is too costly : it accounts for 80% of the
-            # geometric automaton computation
-            l = sum(mpz(coeff) * ppl.Variable(i) for i, coeff in lin._f.items()) + mpz(lin._inhomogeneous_term)
+        f = self._f.copy()
+        rhs = self._inhomogeneous_term
+        denom = self.denominator()
+        if f:
+            if not denom.is_one():
+                for i in f:
+                    f[i] *= denom
+                rhs *= denom
+            for i in f:
+                f[i] = mpz(f[i])
+            rhs = mpz(rhs)
+            l = ppl.Linear_Expression(f, rhs)
+        elif denom.is_one():
+            l = ppl.Linear_Expression(mpz(rhs))
         else:
-            l = ppl.Linear_Expression(mpz(lin._inhomogeneous_term))
+            l = ppl.Linear_Expression(mpz(rhs.denominator()))
         if dim is not None:
             l.set_space_dimension(dim)
         return l
@@ -552,7 +563,7 @@ class ConstraintSystem:
             cs.insert(constraint.integral())
         return cs
 
-    def cone(self, backend=None):
+    def cone(self, backend=None, check=True):
         r"""
         Return the cone defined from these constraints.
 
@@ -593,7 +604,7 @@ class ConstraintSystem:
             Cone of dimension 2 in ambient dimension 3 made of 1 facets (backend=normaliz-NF)
         """
         # homogeneous case
-        if not all(constraint.is_homogeneous() for constraint in self):
+        if check and not all(constraint.is_homogeneous() for constraint in self):
             raise ValueError
 
         if backend is None:

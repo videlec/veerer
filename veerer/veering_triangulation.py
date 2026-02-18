@@ -1876,12 +1876,7 @@ class VeeringTriangulation(Triangulation):
         """
         if check:
             e = self._check_edge(e)
-        if self._colouring[e] == GREEN or not Triangulation.is_flippable(self, e, check=False):
-            return False
-        if self._colouring[e] == PURPLE:
-            return True
-        ca, cb, cc, cd = self.colours_about_half_edge(2 * e, check=False)
-        return bool(ca & (BLUE | GREEN)) and bool(cb & (RED | GREEN)) and bool(cc & (BLUE | GREEN)) and bool(cd & (RED | GREEN))
+        return edge_veering_triangulation_is_forward_flippable(self._vp, self._fp, self._bdry, self._colouring, e)
 
     def is_backward_flippable(self, e, check=True):
         r"""
@@ -3557,20 +3552,34 @@ class VeeringTriangulation(Triangulation):
         one = L.base_ring().one()
         minus_one = -one
         ne = self.num_edges()
-        for e in self.forward_flippable_edges():
-            a, _, _, d = self.square_about_half_edge(2 * e, check=False)
-            a = a // 2
-            d = d // 2
-            # y[a] + y[d] - x[e] >= 0
-            l = L.element_class(L, {ne + a: one, ne + d: one, e: minus_one}, zero)
-            cs.insert(LinearConstraint(op_GE, l), check=False)
-        for e in self.backward_flippable_edges():
-            a, _, _, d = self.square_about_half_edge(2 * e, check=False)
-            a = a // 2
-            d = d // 2
-            # x[a] + x[d] - y[e] >= 0
-            l = L.element_class(L, {a: one, d: one, ne + e: minus_one}, zero)
-            cs.insert(LinearConstraint(op_GE, l), check=False)
+        for e in range(self._ne):
+            if self.is_forward_flippable(e, check=False):
+                # unfold the call
+                # a, _, _, d = self.square_about_half_edge(2 * e, check=False)
+                h = 2 * e
+                H = self._ep(h)
+                a = self._fp[h]
+                d = self._fp[self._fp[H]]
+
+                a = a // 2
+                d = d // 2
+                # y[a] + y[d] - x[e] >= 0
+                l = L.element_class(L, {ne + a: one, ne + d: one, e: minus_one}, zero)
+                cs.insert(LinearConstraint(op_GE, l), check=False)
+
+            elif self.is_backward_flippable(e, check=False):
+                # unfold the call
+                # a, _, _, d = self.square_about_half_edge(2 * e, check=False)
+                h = 2 * e
+                H = self._ep(h)
+                a = self._fp[h]
+                d = self._fp[self._fp[H]]
+
+                a = a // 2
+                d = d // 2
+                # x[a] + x[d] - y[e] >= 0
+                l = L.element_class(L, {a: one, d: one, ne + e: minus_one}, zero)
+                cs.insert(LinearConstraint(op_GE, l), check=False)
 
     def _set_delaunay_constraints(self, insert, x, y, hw_bound=0):
         r"""
@@ -3755,7 +3764,7 @@ class VeeringTriangulation(Triangulation):
         warn('train_track_min_solution is deprecated; use cone_min instead')
         return self.cone_min(*args, **kwds)
 
-    def cone(self, slope=VERTICAL, backend=None):
+    def cone(self, slope=VERTICAL, backend=None, check=True):
         r"""
         Return the cone of coordinates for the given ``slope``.
 
@@ -3826,9 +3835,9 @@ class VeeringTriangulation(Triangulation):
             cs.insert(LinearConstraint(op_GE, L.element_class(L, {e : one}, zero)), check=False)
 
         self._set_subspace_constraints_fast(cs, L, slope, 0)
-        return cs.cone(backend)
+        return cs.cone(backend, check=check)
 
-    def delaunay_cone(self, x_low_bound=0, y_low_bound=0, hw_bound=0, backend=None):
+    def delaunay_cone(self, x_low_bound=0, y_low_bound=0, hw_bound=0, backend=None, check=True):
         r"""
         Return the geometric polytope of this veering triangulation.
 
@@ -3918,7 +3927,7 @@ class VeeringTriangulation(Triangulation):
         self._set_subspace_constraints_fast(cs, L, VERTICAL, 0)
         self._set_subspace_constraints_fast(cs, L, HORIZONTAL, ne)
         from .delaunay_cone import DelaunayCone
-        delaunay_cone = DelaunayCone(self.copy(mutable=False), cs.cone(backend))
+        delaunay_cone = DelaunayCone(self.copy(mutable=False), cs.cone(backend, check=check))
         if not self._mutable:
             try:
                 cache = self._delaunay_cone
@@ -3944,6 +3953,19 @@ class VeeringTriangulation(Triangulation):
         DS = [[component.delaunay_strebel_graph() for atom, component in self.prime_decomposition()]]
         mvt = MultiscaleVeeringTriangulation([[ds.root() for ds in level] for level in DS])
         return IrreducibleRealLinearSubvariety(DS, mvt)
+
+    def core_automaton(self, reduced=False, run=True, backward=None):
+        if reduced:
+            from .automaton import ReducedCoreAutomaton as Automaton
+        else:
+            from .automaton import CoreAutomaton as Automaton
+        if any(self._bdry):
+            backward = any(self._bdry)
+        A = Automaton()
+        A.add_seed(self)
+        if run:
+            A.run()
+        return A
 
     def delaunay_automaton(self, run=True, backward=None, backend=None):
         r"""
@@ -4872,7 +4894,7 @@ class VeeringTriangulation(Triangulation):
             [((2,), 1), ((2,), 2), ((4, 8), 1), ((4, 8), 2)]
         """
         ne = self._ne
-        delaunay_cone = self.delaunay_cone()
+        delaunay_cone = self.delaunay_cone(check=False)
         rays = delaunay_cone.rays()
         ans = []
         for facet, edges in delaunay_cone.forward_delaunay_facets():

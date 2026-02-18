@@ -2041,3 +2041,45 @@ def perm_relabel_on_edges(array.array r, int ne=-1):
         rr.data.as_ints[i] = j // 2
         ss.data.as_ints[i] = -1 if j % 2 else 1
     return rr, ss
+
+
+cdef int ep(array.array vp, int h):
+    if vp.data.as_ints[h] == -1:
+        return -1
+    elif vp.data.as_ints[h ^ 1] == -1:
+        return h
+    else:
+        return h ^ 1
+
+
+cdef int RED = 1 << 0
+cdef int BLUE = 1 << 1
+cdef int PURPLE = 1 << 2
+cdef int GREEN = 1 << 3
+
+
+def edge_triangulation_is_flippable(array.array vp, array.array fp, array.array bdry, int e):
+    cdef int h = 2 * e
+    cdef int H = ep(vp, h)
+    cdef int a = fp.data.as_ints[h]
+    cdef int b = fp.data.as_ints[a]
+    return not bdry.data.as_ints[h] and not bdry.data.as_ints[H] and a != H and b != H
+
+
+def edge_veering_triangulation_is_forward_flippable(array.array vp, array.array fp, array.array bdry, array.array colouring, int e):
+    if colouring.data.as_ints[e] == GREEN or not edge_triangulation_is_flippable(vp, fp, bdry, e):
+        return False
+    if colouring.data.as_ints[e] == PURPLE:
+        return True
+
+    cdef int h = 2 * e
+    cdef int H = ep(vp, h)
+    cdef int a = fp.data.as_ints[h]
+    cdef int b = fp.data.as_ints[a]
+    cdef int c = fp.data.as_ints[H]
+    cdef int d = fp.data.as_ints[c]
+    cdef int ca = colouring.data.as_ints[a / 2]
+    cdef int cb = colouring.data.as_ints[b / 2]
+    cdef int cc = colouring.data.as_ints[c / 2]
+    cdef int cd = colouring.data.as_ints[d / 2]
+    return bool(ca & (BLUE | GREEN)) and bool(cb & (RED | GREEN)) and bool(cc & (BLUE | GREEN)) and bool(cd & (RED | GREEN))
