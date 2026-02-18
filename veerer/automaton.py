@@ -203,9 +203,9 @@ class Automaton:
                 out_neighbors2 = set(x for x, label in self._out_neighbors(state))
                 assert out_neighbors1 == out_neighbors2, (state, out_neighbors1, out_neighbors2)
 
-    #########################################################################
-    # Custom methods that have to be implemented or overriden in subclasses #
-    #########################################################################
+    ##########################################################################
+    # Custom methods that have to be implemented or overridden in subclasses #
+    ##########################################################################
 
     def _setup(self, **extra_kwds):
         r"""
@@ -1367,18 +1367,20 @@ class DelaunayAutomaton(Automaton):
         r"""
         Run through the list of out neighbors.
         """
-        for edges, col in state.delaunay_flips(backend=self._backend):
-            assert all(state.edge_colour(e) == state.edge_colour(edges[0]) for e in edges)
+        for edges, new_col in state.delaunay_flips(backend=self._backend):
+            old_col = state.edge_colour(edges[0])
+            if CHECK:
+                assert all(state.edge_colour(e) == old_col for e in edges)
             out_neighbor = state.copy(mutable=True)
             for e in edges:
-                out_neighbor.flip(e, col, check=CHECK)
+                out_neighbor.flip(e, new_col, check=CHECK)
             if CHECK:
                 out_neighbor._check(RuntimeError)
                 if not out_neighbor.is_delaunay(backend=self._backend):
                     raise RuntimeError
-            out_neighbor.set_canonical_labels()
+            r = out_neighbor.set_canonical_labels(mapping=True)
             out_neighbor.set_immutable()
-            yield (out_neighbor, (edges, col))
+            yield (out_neighbor, (edges, old_col, new_col, r))
 
     def _in_neighbors(self, state, check=CHECK):
         """

@@ -1367,7 +1367,7 @@ class IrreducibleRealLinearSubvariety:
                     new_vt1 = newmvt._veering_triangulations[level][component]
                     new_vt2 = newmvt._veering_triangulations[level + 1][0]
                     newmvt = newmvt.prime_decomposition(level, component)
-                    newmvt = newmvt.prime_decomposition(level + 1, 0)                    
+                    newmvt = newmvt.prime_decomposition(level + 1, 0)
                     newmvt = newmvt.copy(mutable=True)
                     for i in range(len(new_vt1.prime_decomposition())):
                         newmvt.set_canonical_labels(level, component + i)
@@ -1409,7 +1409,7 @@ class MultiscaleCompactification:
         sage: L = vt.linear_subvariety()
         sage: M = L.multiscale_compactification()
         sage: M  # optional - surface_dynamics
-        MultiscaleCompactification of Irreducible real linear subvariety of projective dimension 3 in [[H_2(2)]] made of 
+        MultiscaleCompactification of Irreducible real linear subvariety of projective dimension 3 in [[H_2(2)]] made of
         2 codimension one vertical components
         1 codimension one horizontal components
         12 components in total
@@ -1472,7 +1472,7 @@ class MultiscaleCompactification:
         self._components = collections.defaultdict(set)
         self._components[0, 0].add(L)
         d = L.projective_dimension()
-            
+
         G = DiGraph(loops=False, multiedges=False)
         G.add_vertex((0,0,L)) #(the number of vertical degenerations, the number of horizontal degenerations, component)
 
@@ -1485,19 +1485,19 @@ class MultiscaleCompactification:
                     for comp_deg in comp.codimension_one_vertical_degenerations(degeneration_helper=self._degeneration_helper):
                         self._components[v + 1, h].add(comp_deg)
                         G.add_edge((v, h, comp) , (v + 1, h, comp_deg), 'V')
-                    
+
                     #horizontal degeneration
                     for comp_deg in comp.codimension_one_horizontal_degenerations(degeneration_helper=self._degeneration_helper):
                         self._components[v, h + 1].add(comp_deg)
                         G.add_edge((v, h, comp) , (v, h + 1, comp_deg), 'H')
         self._boundary_graph = LabelledDiGraph(G)
 
-        # The following way to compute the compactification does not include all the adjacency infomation of components. However, it should be possible to recover the adjacency information form the computation?
+        # The following way to compute the compactification does not include all the adjacency information of components. However, it should be possible to recover the adjacency information form the computation?
         ## First: vertical degenerations
         #for codim in range(d):
-        #    for comp in self._components[codim, 0]:            
+        #    for comp in self._components[codim, 0]:
         #        for comp_deg in comp.codimension_one_vertical_degenerations(degeneration_helper=self._degeneration_helper):
-        #            self._components[codim + 1, 0].add(comp_deg)           
+        #            self._components[codim + 1, 0].add(comp_deg)
         #            G.add_edge((codim, 0, comp) , (codim + 1, 0, comp_deg), 'V')
         #    if not self._components[codim + 1, 0]:
                 # NOTE: sometimes full vertical degeneration are not possible, eg H(2)
