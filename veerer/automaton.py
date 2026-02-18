@@ -1465,7 +1465,7 @@ class DelaunayAutomaton(Automaton):
             while todo:
                 x = todo.pop()
                 orbit.add(x)
-                for _, y, (edges, new_col) in self._graph.outgoing_edges(x):
+                for _, y, (edges, old_col, new_col, r) in self._graph.outgoing_edges(x):
                     if new_col == col and y not in orbit:
                         assert y.is_cylindrical(col)
                         orbit.add(y)
