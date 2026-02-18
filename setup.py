@@ -39,7 +39,7 @@ setup(
     packages=["veerer", "veerer.polyhedron"],
     package_data={"veerer": ["permutation.pyx"]},
     license = 'GPL 2.0+',
-    ext_modules=cythonize(extensions),
+    ext_modules=cythonize(extensions, compiler_directives={"boundscheck": False, "wraparound": False, "nonecheck": False, "overflowcheck": False, "embedsignature": True, "cdivision": True}),
     install_requires=[],
     setup_requires=["Cython"],
     classifiers=[
