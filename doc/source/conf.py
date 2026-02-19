@@ -1,4 +1,4 @@
-from veerer.version import version
+# Configuration file for the Sphinx documentation builder.
 
 # -- Path setup --------------------------------------------------------------
 
@@ -9,6 +9,8 @@ from veerer.version import version
 
 import os
 import sys
+from sage_docbuild.conf import skip_TESTS_block
+from veerer.version import version
 
 try:
     import sage.all
@@ -21,9 +23,9 @@ sys.path.append(os.path.join(SAGE_SRC, "sage_setup", "docbuild", "ext"))
 
 # -- Project information -----------------------------------------------------
 
-project = 'veerer'
-copyright = "2016-2023, Mark Bell, Vincent Delecroix, Saul Schleimer"
-author = 'Mark Bell, Vincent Delecroix, Saul Schleimer'
+project = "veerer"
+copyright = "2016-2026, the veerer authors"
+author = "the veerer authors"
 
 release = version
 
@@ -38,8 +40,10 @@ release = version
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.mathjax',
+    "sage_docbuild.ext.sage_autodoc",
+    'sphinx.ext.intersphinx',
+    "sphinx.ext.mathjax",
+    "sphinx.ext.viewcode"
 ]
 
 autodoc_default_options = {
@@ -111,57 +115,3 @@ html_static_path = []
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'veererdoc'
-
-
-# -- Options for LaTeX output ------------------------------------------------
-
-latex_elements = {
-    # The paper size ('letterpaper' or 'a4paper').
-    #
-    # 'papersize': 'letterpaper',
-
-    # The font size ('10pt', '11pt' or '12pt').
-    #
-    # 'pointsize': '10pt',
-
-    # Additional stuff for the LaTeX preamble.
-    #
-    # 'preamble': '',
-
-    # Latex figure (float) alignment
-    #
-    # 'figure_align': 'htbp',
-}
-
-# Grouping the document tree into LaTeX files. List of tuples
-# (source start file, target name, title,
-#  author, documentclass [howto, manual, or own class]).
-latex_documents = [
-    (master_doc, 'veerer.tex', u'veerer Documentation',
-     u'Mark Bell, Vincent Delecroix, Saul Schleimer', 'manual'),
-]
-
-
-# -- Options for manual page output ------------------------------------------
-
-# One entry per manual page. List of tuples
-# (source start file, name, description, authors, manual section).
-man_pages = [
-    (master_doc, 'veerer', u'veerer Documentation',
-     [author], 1)
-]
-
-
-# -- Options for Texinfo output ----------------------------------------------
-
-# Grouping the document tree into Texinfo files. List of tuples
-# (source start file, target name, title, author,
-#  dir menu entry, description, category)
-texinfo_documents = [
-    (master_doc, 'veerer', u'veerer Documentation',
-     author, 'veerer', 'One line description of project.',
-     'Miscellaneous'),
-]
-
-
-# -- Extension configuration -------------------------------------------------
