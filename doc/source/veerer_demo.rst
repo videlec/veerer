@@ -173,7 +173,9 @@ Core vs not core
     sage: print(S.is_core())
     True
     sage: print(S.forward_flippable_edges())
-    [0, 2, 3, 7, 8]
+    [3, 7, 8]
+    sage: print(S.backward_flippable_edges())
+    [0, 2]
 
 ::
 
@@ -181,7 +183,9 @@ Core vs not core
     sage: print(S.is_core())
     True
     sage: print(S.forward_flippable_edges())
-    [3, 7, 8]
+    [7, 8]
+    sage: print(S.backward_flippable_edges())
+    [3]
 
 ::
 
@@ -189,7 +193,9 @@ Core vs not core
     sage: print(S.is_core())
     True
     sage: print(S.forward_flippable_edges())
-    [3, 4, 7, 8]
+    [4, 7]
+    sage: print(S.backward_flippable_edges())
+    [3, 8]
 
 ::
 
@@ -197,7 +203,9 @@ Core vs not core
     sage: print(S.is_core())
     True
     sage: print(S.forward_flippable_edges())
-    [4, 7]
+    [7]
+    sage: print(S.backward_flippable_edges())
+    [4]
 
 ::
 
