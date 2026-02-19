@@ -375,13 +375,13 @@ class StrebelGraph(Constellation):
             sage: sg = StrebelGraph("(0,~0:1)")
             sage: sg.dimension()
             1
-            sage: sg.stratum().dimension()
+            sage: sg.stratum().dimension()  # optional - surface_dynamics
             1
 
             sage: sg = StrebelGraph("(0,1,2,3)(~1,~0:1,~3:2,~2:1)")
             sage: sg.dimension()
             4
-            sage: sg.stratum().dimension()
+            sage: sg.stratum().dimension()  # optional - surface_dynamics
             4
         """
         return self.num_edges()
