@@ -30,5 +30,6 @@ dependencies:
     - linkchecker  # optional: doc
     - sphinx_rtd_theme  # optional: doc
     - flipper  # optional: flipper
+    - sage-docbuild  # optional : doc
     # Use a version including https://github.com/flatsurf/sage-flatsurf/pull/269
     - git+https://github.com/flatsurf/sage-flatsurf.git  # optional: sage_flatsurf
