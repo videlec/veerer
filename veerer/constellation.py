@@ -1,15 +1,19 @@
 r"""
-Constellations (possibly with boundary data)
+Constellations
 
-Common base claas for class:`~veerer.triangulation.Triangulations` and
-:class:`~veerer.strebel_graph.StrebelGraph`
+A *constellation* is a graph cellularly embedded on an orientable
+surface. The main class in this file is
+:class:`~veerer.constellation.Constellation` which is the common base claas for
+:class:`~veerer.triangulation.Triangulation`,
+:class:`~veerer.veering_triangulation.VeeringTriangulation` and
+:class:`~veerer.strebel_graph.StrebelGraph`.
 """
 # ****************************************************************************
 #  This file is part of veerer
 #
 #       Copyright (C) 2018 Mark Bell
-#                     2018-2024 Vincent Delecroix
-#                     2024 Kai Fu
+#                     2018-2026 Vincent Delecroix
+#                     2024-2026 Kai Fu
 #                     2018 Saul Schleimer
 #
 #  This program is free software; you can redistribute it and/or
@@ -89,6 +93,61 @@ def check_relabelling(arg, ne):
 
 
 class Constellation:
+    r"""
+    Graph cellularly embedded in an oriented surface.
+
+    Such graph is encoded with the half-edge data structure: a vertex
+    permutation ``vp`` and a face permutation ``fp`` (the edge permutation is
+    implicit). Each cycle of ``vp`` and ``fp`` corresponds to a vertex and
+    a face respectively. More precisely, this class has three main attributes
+
+    * _ne  number of edges (an int)
+    * _fp  face permutation (an array)
+    * _vp  vertex permutation (an array)
+
+    Our conventions for the permutations are set out in the following figure::
+
+              ~b
+            ----->
+        w-----------*-----------v
+         \             <-----  /
+          \ \             b   / /
+           \ \ c             / /~a
+            \ \     F       / /
+             \ v           / v
+              *         ^ *
+             ^ \       / /
+              \ \   a / /
+             ~c\ \   / /
+                \ \   /
+                   \ /
+                    u
+
+    Here the face permutation sends a to b, b to c, and c to a. The
+    vertex permutation send a to ~c, b to ~a, and c to ~b. The (implicit) edge
+    permutation interchanges e and ~e for every edge; the edge e is folded if
+    and only if e = ~e.  Thus folded edges are fixed by the edge permutation.
+
+    The half-edges are encoded by integers and an edge in the edge permutation
+    is always a cycle `(2e, 2e+1)` for some non-negative integer `e`. A folded
+    edge is a cycle `(2e)` (in which case the integer `2e+1` is not coding
+    any half-edge).
+
+    The class implements a mutability flag by mean of a boolean attribute
+
+    * _mutable
+
+    When immutable the class has an associated hash value and could be used in
+    a set or as keys of dictionaries. The functions that modify the data
+    structure will raise an error when immutable.
+
+    Finally, the edges and half-edges could carry data that will be used in
+    the computation of the hash value and the canonical labelling. These
+    extra data are stored in
+
+    * _half_edges_data
+    * _edges_data
+    """
     __slots__ = ['_constellation_class',  # subclass of Constellation
                  '_mutable',  # mutability flag
                  '_ne',  # number of edges
@@ -165,6 +224,12 @@ class Constellation:
         pass
 
     def _check(self, error=RuntimeError):
+        r"""
+        Helper function to check the data structure.
+
+        By default a ``RuntimeError`` is raised but it could be changed by
+        providing an optional ``error`` argument.
+        """
         ne = self._ne
 
         if not (hasattr(self, '_vp') and hasattr(self, '_fp') and hasattr(self, '_half_edges_data') and hasattr(self, '_edges_data')):
@@ -197,10 +262,6 @@ class Constellation:
         for l in self._edges_data:
             if not isinstance(l, array) or l.typecode != 'i' or len(l) != ne:
                 raise error("each edges data must be an array of length the number of edges; got a {} of length {}".format(type(l).__name__, len(l)))
-
-    def _check_alloc(self, n):
-        if len(self._vp) < n or len(self._ep) < n or len(self._fp) < n:
-            raise TypeError("reallocation needed")
 
     def _realloc(self, n_max):
         if self._half_edges_data or self._edges_data:
@@ -306,6 +367,9 @@ class Constellation:
         self._set_data_pointers()
 
     def set_immutable(self):
+        r"""
+        Make this object immutable.
+        """
         self._mutable = False
 
     def __hash__(self):
@@ -405,6 +469,10 @@ class Constellation:
 
     def _check_half_edge(self, h):
         r"""
+        Helper function to convert ``h`` to a valid half-edge.
+
+        If the input is invalid, raises an appropriate error.
+
         TESTS::
 
             sage: from veerer import Triangulation
@@ -434,6 +502,10 @@ class Constellation:
 
     def _check_edge(self, e):
         r"""
+        Helper function to convert ``e`` to a valid edge.
+
+        If the input is invalid, raises an appropriate error.
+
         TESTS::
 
             sage: from veerer import Triangulation
@@ -460,7 +532,7 @@ class Constellation:
 
     def to_string(self):
         r"""
-        Serialize this triangulation as a string.
+        Serialize this constellation as a string.
 
         EXAMPLES::
 
@@ -1025,12 +1097,16 @@ class Constellation:
         warnings.warn("Constellation._norm is deprecated")
         return e ^ 1 if e % 2 else e
 
-    def _half_edge_string(self, e):
-        return '~%d' % (e // 2) if e % 2 else '%d' % (e // 2)
+    @staticmethod
+    def _half_edge_string(h):
+        r"""
+        Helper method to convert the half-edge ``h`` to a string.
+        """
+        return '~%d' % (h // 2) if h % 2 else '%d' % (h // 2)
 
     def edges(self):
         r"""
-        Return the list of edges as tuples of half-edges
+        Return the list of edges as orbits of half-edges.
 
         EXAMPLES::
 

@@ -197,10 +197,7 @@ def face_boundary_init(faces, boundary=None):
     return fp, boundary
 
 
-# NOTE: we don't really care that we have a triangulation here. When
-# there is no restriction on the cycle decomposition of _fp we got
-# a coding for any cell decomposition (with possibly folded edges).
-# flipping here still makes sense
+# NOTE: we don't really care that we have a triangulation to perform a flip
 #
 #  +                 +                 +               _
 #   \b             a/                   \            _/ /
@@ -210,17 +207,6 @@ def face_boundary_init(faces, boundary=None):
 #   /c             d\                   /__/            \
 #  +                 +                 +/
 #
-# and we have operations that consist in removing/adding edges.
-# For that purpose, it would be convenient to allow partial
-# permutations of {0, 1, ..., n-1}.
-#
-# TODO: implement: is_removable(), remove(), add()
-#
-# NOTE: Much of the above is already done in the flatsurf package
-# with a quite different encoding, see
-#
-#    https://github.com/flatsurf/sage-flatsurf
-
 
 # TODO: surface_dynamics compatible datastructure
 # {
@@ -229,46 +215,16 @@ def face_boundary_init(faces, boundary=None):
 #  _vp, _fp: array of size 2 _n + _m
 #  _boundary: bitset
 # }
-# boundary requirement: boundary is necessarily glued to a non-boundary
-# edges are 0, 1, ..., n+m-1 and half-edges are
-# 0, ~0, 1, ~1, ..., (n-1), ~(n-1), n, n+1, ..., n+m-1
 
 class Triangulation(Constellation):
     r"""
-    A triangulation of an oriented surface
+    A triangulation of an oriented surface.
 
-    with attributes:
-
-    * _n  number of half-edges (an int)
-    * _fp  face permutation (an array)
-    * _ep  edge permutation (an array)
-    * _vp  vertex permutation (an array)
-
-    Each of fp, ep, vp is a permutation of oriented half-edges (aka
-    "darts"), given as a function.  Our conventions for the
-    permutations are set out in the following figure::
-
-              ~b
-            ----->
-        w-----------*-----------v
-         \             <-----  /
-          \ \             b   / /
-           \ \ c             / /~a
-            \ \     F       / /
-             \ v           / v
-              *         ^ *
-             ^ \       / /
-              \ \   a / /
-             ~c\ \   / /
-                \ \   /
-                   \ /
-                    u
-
-    Here the face permutation sends a to b, b to c, and c to a.  The
-    vertex permutation send a to ~c, b to ~a, and c to ~b.  The edge
-    permutation interchanges e and ~e for every edge; the edge e is
-    folded if and only if e = ~e.  Thus folded edges are fixed by the
-    edge permutation.
+    This class inherits from :class:~`veerer.constellation.Constellation` and make
+    a distinction between internal faces (that are forced to be triangles) and
+    boundary faces. The distinction between internal and boundary faces is
+    made via an extra array storing an integer for each half-edge. A half-edge
+    belongs to an internal face if and only if its associated data is 0.
 
     EXAMPLES::
 
