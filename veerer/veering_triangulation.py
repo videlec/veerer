@@ -5153,6 +5153,43 @@ class VeeringTriangulation(Triangulation):
                 else:
                     self.flip_back(e, old_col)
 
+    def random_forward_delaunay_flip(self, repeat=1, backend=None):
+        r"""
+        Apply a sequence of forward Delaunay flips.
+
+        INPUT:
+
+        - ``repeat`` -- integer (default 1) -- if provided, make ``repeat`` flips instead
+
+        EXAMPLES::
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,1,3)(~0,~1,~7)(2,8,4)(~2,~8,~6)(~3,5,6)(~4,7,~5)", "BRRRBBBRR", mutable=True)
+            sage: vt.random_forward_delaunay_flip(10)
+            sage: vt  # random
+            VeeringTriangulation("(0,1,3)(~0,~1,~7)(2,~5,~6)(~2,5,4)(~3,6,~8)(~4,8,7)", "BRRRBRBRR")
+            sage: vt.is_delaunay()
+            True
+
+        An error is raised if the veering triangulation is not mutable::
+
+            sage: vt = VeeringTriangulation("(0,1,3)(~0,~1,~7)(2,8,4)(~2,~8,~6)(~3,5,6)(~4,7,~5)", "BRRRBBBRR")
+            sage: vt.random_forward_delaunay_flip()
+            Traceback (most recent call last):
+            ...
+            ValueError: immutable VeeringTriangulation; use a mutable copy instead
+        """
+        self._assert_mutable()
+
+        for _ in range(repeat):
+            edges, col = choice(self.delaunay_flips(backend=backend))
+            for e in edges:
+                self.flip(e, col)
+
+    # TODO: to obtain the horizontal matrix, one just has to multiply by -1 the columns
+    # corresponding to RED edges
     def constraints_matrix(self, slope=VERTICAL):
         r"""
         Return a matrix of constraints on x or y coordinates.
