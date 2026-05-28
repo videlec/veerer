@@ -52,7 +52,7 @@ from .misc import det2
 from .triangulation import face_boundary_init, Triangulation
 from .polyhedron import LinearExpressions, ConstraintSystem
 from .polyhedron.linear_expression import LinearConstraint
-from .polyhedron.linear_algebra import linear_form_project, vector_normalize, prime_decomposition, is_rank_one
+from .polyhedron.linear_algebra import linear_form_project, vector_normalize, prime_decomposition, is_rank_one, kernel
 
 cm = get_coercion_model()
 
@@ -969,7 +969,7 @@ class VeeringTriangulation(Triangulation):
         """
         from .linear_family import VeeringTriangulationLinearFamily
         ans = []
-        gens = self.constraints_matrix().right_kernel_matrix()
+        gens = self.generators_matrix(mutable=False)
         partition = DisjointSet(self._ne)
         for comp in self.connected_components():
             for i in range(1, len(comp)):
@@ -5192,7 +5192,34 @@ class VeeringTriangulation(Triangulation):
     # corresponding to RED edges
     def constraints_matrix(self, slope=VERTICAL):
         r"""
-        Return a matrix of constraints on x or y coordinates.
+        Return a matrix generating the constraints on coordinates.
+
+        These constraints are the linear equations satisfied by the
+        `x`-coordinates (if ``slope=VERTICAL`` which is the default)
+        or the `y`-coordinates (if ``slope=HORIZONTAL``).
+
+        There is no guarantee that the matrix is full rank.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation, HORIZONTAL
+            sage: vt = VeeringTriangulation("(0,6,3)(~0,~1,~4)(1,5,~6)(2,~3,~8)(~2,7,8)(4,~5,~7)", "RBRBBRRBB")
+            sage: C_vert = vt.constraints_matrix()
+            sage: C_vert
+            [-1  0  0 -1  0  0  1  0  0]
+            [-1  1  0  0 -1  0  0  0  0]
+            [ 0 -1  0  0  0 -1  1  0  0]
+            [ 0  0 -1  1  0  0  0  0 -1]
+            [ 0  0 -1  0  0  0  0  1 -1]
+            [ 0  0  0  0 -1 -1  0  1  0]
+            sage: C_horiz = vt.constraints_matrix(HORIZONTAL)
+            sage: C_horiz
+            [ 1  0  0 -1  0  0 -1  0  0]
+            [-1 -1  0  0  1  0  0  0  0]
+            [ 0 -1  0  0  0  1 -1  0  0]
+            [ 0  0 -1 -1  0  0  0  0  1]
+            [ 0  0 -1  0  0  0  0 -1  1]
+            [ 0  0  0  0  1 -1  0 -1  0]
         """
         if slope == VERTICAL:
             LAR = PURPLE
@@ -5272,14 +5299,19 @@ class VeeringTriangulation(Triangulation):
             [0 1 0]
             [0 0 1]
         """
-        subspace = self.constraints_matrix(slope).right_kernel_matrix()
+        constraints = self.constraints_matrix(slope)
+        generators = constraints.right_kernel_matrix()
         if not mutable:
-            return subspace
-        return subspace.__copy__()
+            return generators
+        return generators.__copy__()
 
+    # TODO: rename this method. These are NOT parallel cyliders but cylinders
+    # that can be simultaneously deformed to make a horizontal node within
+    # the Delaunay cell
     def parallel_cylinders(self, col=RED):
         r"""
-        Return the list of L-parallel cylinders and circumference ratio.
+        Return the list of cylinders that can be simultaneously deformed
+        without touching the remaining part of the surface.
 
         The output is a list of lists ``([l0, l1, ...]`` where each ``li``
         represents a L-parallel family of cylinders together with their

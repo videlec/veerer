@@ -44,6 +44,7 @@ from .constellation import Constellation
 from .permutation import perm_init, perm_cycle_string, perm_cycles, perm_check, perm_conjugate, perm_on_list, perm_on_edge_list, perm_relabel_on_edges
 from .polyhedron import LinearExpressions, ConstraintSystem
 from .polyhedron.linear_expression import LinearConstraint
+from .polyhedron.linear_algebra import kernel
 from .strebel_graph import StrebelGraph
 from .veering_triangulation import VeeringTriangulation
 
@@ -950,6 +951,7 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
             sage: f.rotate()
             sage: f
             VeeringTriangulationLinearFamily("(0,12,~11)(~0,~8,9)(1,13,~12)(~1,16,~15)(2,14,~13)(~2,~6,7)(3,15,~14)(~3,~17,6)(4,17,~16)(~4,~9,10)(5,~10,11)(~5,~7,8)", "BBBBBBRRRRRRRRRRRR", [(1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0), (0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 1, 2, 2, 1, 1, 1, 0, 0), (0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0), (0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1), (0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0), (0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)])
+
         TESTS::
 
             sage: from veerer import VeeringTriangulation
@@ -976,30 +978,16 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
             subspace = self._subspace
         elif slope == HORIZONTAL:
             subspace = self._horizontal_subspace()
-        for row in subspace.right_kernel_matrix():
+        for row in kernel(subspace):
             insert(sum(row[i] * x[i] for i in range(ambient_dim)) == 0)
 
     def _set_subspace_constraints_fast(self, cs, L, slope, shift):
         zero = L.base_ring().zero()
         if slope == VERTICAL:
-            subspace = self._subspace
-            # TODO: the integer matrix class performs a saturation which is
-            # extremely slow and useless in our situation
-            if subspace.base_ring() is ZZ:
-                ker = subspace._rational_kernel_flint().transpose()
-            else:
-                ker = subspace.right_kernel_matrix()
-            for row in ker:
+            for row in kernel(self._subspace):
                 cs.insert(LinearConstraint(op_EQ, L.element_class(L, row.dict(), zero)), check=False)
         elif slope == HORIZONTAL:
-            subspace = self._horizontal_subspace()
-            # TODO: the integer matrix class performs a saturation which is
-            # extremely slow and useless in our situation
-            if subspace.base_ring() is ZZ:
-                ker = subspace._rational_kernel_flint().transpose()
-            else:
-                ker = subspace.right_kernel_matrix()
-            for row in ker:
+            for row in kernel(self._horizontal_subspace()):
                 cs.insert(LinearConstraint(op_EQ, L.element_class(L, {key + shift: value for key, value in row.dict().items()}, zero)), check=False)
 
     def _check(self, error=ValueError):
@@ -1230,7 +1218,7 @@ class StrebelGraphLinearFamily(LinearFamily, StrebelGraph):
     def _set_subspace_constraints(self, insert, x):
         ambient_dim = self._subspace.ncols()
         subspace = self._subspace
-        for row in subspace.right_kernel_matrix():
+        for row in kernel(subspace):
             insert(sum(row[i] * x[i] for i in range(ambient_dim)) == 0)
 
     def cone(self, backend=None):

@@ -32,6 +32,7 @@ from sage.rings.rational_field import QQ
 from sage.sets.disjoint_set import DisjointSet
 from sage.rings.integer import GCD_list
 from sage.arith.functions import LCM_list
+from sage.matrix.special import identity_matrix
 
 
 def linear_form_project(equations, linear_form):
@@ -198,3 +199,14 @@ def is_rank_one(m, ratios=False):
                 return (False, None) if ratios else False
         coeffs.append(coeff)
     return (True, coeffs) if ratios else True
+
+
+def kernel(mat):
+    # TODO: the integer matrix class performs a saturation which is
+    # extremely slow and sometimes useless in our situation
+    if mat.nrows() == 0:
+        return identity_matrix(mat.base_ring(), mat.ncols())
+    elif mat.base_ring() is ZZ:
+        return mat._rational_kernel_flint().transpose()
+    else:
+        return mat.right_kernel_matrix()
