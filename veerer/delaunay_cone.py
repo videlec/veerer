@@ -1,10 +1,10 @@
 r"""
-Delaunay cone of veering triangulations and veering triangulation families.
+Delaunay and refined Delaunay cones of veering triangulations and veering triangulation families.
 """
 # ****************************************************************************
 #  This file is part of veerer
 #
-#       Copyright (C) 2024 Vincent Delecroix
+#       Copyright (C) 2024-2026 Vincent Delecroix
 #
 #  veerer is free software: you can redistribute it and/or modify it under the
 #  terms of the GNU General Public License version 3 as published by the Free
@@ -36,15 +36,19 @@ from .polyhedron.linear_expression import LinearExpressions, ConstraintSystem
 
 class DelaunayCone:
     r"""
-    The Delaunay cone of a veering triangulation.
+    The Delaunay cone or refined Delaunay cone of a veering triangulation.
 
     The cone is embedded in `R^{2 ne}` where `ne` is the number of edges of the
     underlying veering triangulation. The first ``ne`` coordinates indexed by
     ``0, 1, ..., ne-1`` are the horizontal or `x`-coordinates while the last
     ``ne`` coordinates index by ``ne, ne+1, ..., 2ne-1``.
 
-    This class is usually not constructed via its constructor but via the function
-    :meth:`~veerer.veering_triangulation.delaunay_cone`.
+    This class is usually not constructed via its constructor but via one of
+    the functions
+    - :meth:`~veerer.veering_triangulation.VeeringTriangulation.delaunay_cone`
+    -  :meth:`~veerer.veering_triangulation.VeeringTriangulation.delaunay_cone`
+
+    the :class:`~veerer.veering_triangulation.VeeringTriangulation` class.
 
     EXAMPLES::
 
@@ -121,14 +125,25 @@ class DelaunayCone:
         """
         nf = len(self.forward_delaunay_facets())
         nb = len(self.backward_delaunay_facets())
-        nx = len(self.x_vanishing_facets())
-        ny = len(self.y_vanishing_facets())
-        s = "{}-dimensional Delaunay cone made of\n".format(self.affine_dimension())
-        s += " {} forward-flip facet{}\n".format(nf, "s" if nf >= 2 else "")
-        s += " {} backward-flip facet{}\n".format(nb, "s" if nb >= 2 else "")
-        s += " {} x-degeneration facet{}\n".format(nx, "s" if nx >= 2 else "")
-        s += " {} y-degeneration facet{}".format(ny, "s" if ny >= 2 else "")
-        print(s)
+        nvx = len(self.x_vanishing_facets())
+        nvy = len(self.y_vanishing_facets())
+        nec = len(self.edge_critical_facets())
+        ntc = len(self.triangle_critical_facets())
+        s = [f"{self.affine_dimension()}-dimensional Delaunay cone made of"]
+        if nf:
+            s.append(" {} forward-flip facet{}".format(nf, "s" if nf >= 2 else ""))
+        if nb:
+            s.append(" {} backward-flip facet{}".format(nb, "s" if nb >= 2 else ""))
+        if nvx:
+            s.append(" {} x-degeneration facet{}".format(nvx, "s" if nvx >= 2 else ""))
+        if nvy:
+            s.append(" {} y-degeneration facet{}".format(nvy, "s" if nvy >= 2 else ""))
+        if nec:
+            s.append(" {} edge-critical facet{}".format(nec, "s" if nec >= 2 else ""))
+        if ntc:
+            s.append(" {} triangle-critical facet{}".format(ntc, "s" if ntc >= 2 else ""))
+
+        print("\n".join(s))
 
     def space_dimension(self):
         r"""
@@ -281,6 +296,9 @@ class DelaunayCone:
         r"""
         Return the vanishing face of the edge ``e``.
 
+        The *vanishing face* of ``e`` is the face of the Delaunay polytope
+        obtained by intersecting with `x_e=0` and `y_e=0`.
+
         EXAMPLES::
 
             sage: from veerer import VeeringTriangulation
@@ -334,12 +352,208 @@ class DelaunayCone:
             A 2-dimensional face of a 3-dimensional combinatorial polyhedron
         """
         # y[e] = x[a] + x[d]
-        if check and not self._vt.is_backward_flippable(e):
-            raise ValueError("non backward-flippable edge e={}".format(e))
+        if check:
+            e = self._vt._check_edge(e)
+            if not self._vt.is_backward_flippable(e):
+                raise ValueError("non backward-flippable edge e={}".format(e))
         ne = self._vt._ne
         CP = self.combinatorial_polyhedron()
         a, b, c, d = self._vt.square_about_half_edge(2 * e)
         Vrep = [i for i, r in enumerate(self.rays()) if r[ne + e] == r[a // 2] + r[d // 2]]
+        return CP.join_of_Vrep(*Vrep)
+
+    def x_dominant_edges(self):
+        r"""
+        Return the subset of edges on the triangulations that are x-dominant.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,~5,7)(~0,5,~3)(1,4,8)(~1,~6,~8)(2,3,~4)(~2,~7,6)", "RBRBBBBBR")
+            sage: C = vt.delaunay_cone(x_dominant_triangles=(0, 1), y_dominant_triangles=(2, 4))
+            sage: C.x_dominant_edges()
+            [5]
+        """
+        ne = self._vt.num_edges()
+        return [e for e in range(self._vt.num_edges()) if all(r[e] >= r[ne + e] for r in self.rays())]
+
+    def y_dominant_edges(self):
+        r"""
+        Return the subset of edges on the triangulations that are y-dominant.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,~5,7)(~0,5,~3)(1,4,8)(~1,~6,~8)(2,3,~4)(~2,~7,6)", "RBRBBBBBR")
+            sage: C = vt.delaunay_cone(x_dominant_triangles=(0, 1), y_dominant_triangles=(2, 4))
+            sage: C.y_dominant_edges()
+            [4, 6]
+        """
+        ne = self._vt.num_edges()
+        return [e for e in range(self._vt.num_edges()) if all(r[e] <= r[ne + e] for r in self.rays())]
+
+    def dominated_edges(self):
+        r"""
+        Return the subset of edges that are either x-dominant or y-dominant.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,~5,7)(~0,5,~3)(1,4,8)(~1,~6,~8)(2,3,~4)(~2,~7,6)", "RBRBBBBBR")
+            sage: C = vt.delaunay_cone(x_dominant_triangles=(0, 1), y_dominant_triangles=(2, 4))
+            sage: C.dominated_edges()
+            [4, 5, 6]
+        """
+        ne = self._vt.num_edges()
+        return [e for e in range(self._vt.num_edges()) if (all(r[e] <= r[ne + e] for r in self.rays()) or
+                                                           all(r[e] >= r[ne + e] for r in self.rays()))]
+
+    def x_dominant_triangles(self):
+        r"""
+        Return the subset of triangles on the triangulations that are x-dominant.
+
+        The output is a list of half-edges whose corresponding fp-orbit is a
+        x-dominant triangle.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,~5,7)(~0,5,~3)(1,4,8)(~1,~6,~8)(2,3,~4)(~2,~7,6)", "RBRBBBBBR")
+            sage: C = vt.delaunay_cone(x_dominant_triangles=(0, 1), y_dominant_triangles=(2, 4))
+            sage: C.x_dominant_triangles()
+            [0, 1]
+
+            sage: C = vt.delaunay_cone(x_dominant_triangles=(2,), y_dominant_triangles=(0, 4))
+            sage: C.x_dominant_triangles()
+            [2, 3]
+        """
+        ne = self._vt._ne
+        ans = []
+        for a, b, c in self._vt.triangles():
+            ex, ey = self._vt._triangle_diagonals(a)
+            # r[ex] is the x-max in the triangle
+            # r[ne + ey] is the y-max in the triangle
+            if all(r[ex] >= r[ne + ey] for r in self.rays()):
+                ans.append(a)
+        return ans
+
+    def y_dominant_triangles(self):
+        r"""
+        Return the subset of triangles on the triangulations that are y-dominant.
+
+        The output is a list of half-edges whose corresponding fp-orbit is a
+        y-dominant triangle.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,~5,7)(~0,5,~3)(1,4,8)(~1,~6,~8)(2,3,~4)(~2,~7,6)", "RBRBBBBBR")
+            sage: C = vt.delaunay_cone(x_dominant_triangles=(0, 1), y_dominant_triangles=(2, 4))
+            sage: C.y_dominant_triangles()
+            [2, 3, 4, 5]
+
+            sage: C = vt.delaunay_cone(x_dominant_triangles=(2,), y_dominant_triangles=(0, 4))
+            sage: C.y_dominant_triangles()
+            [0, 1, 4, 5]
+        """
+        ne = self._vt._ne
+        ans = []
+        for a, b, c in self._vt.triangles():
+            ex, ey = self._vt._triangle_diagonals(a)
+            # r[ex] is the x-max in the triangle
+            # r[ne + ey] is the y-max in the triangle
+            if all(r[ex] <= r[ne + ey] for r in self.rays()):
+                ans.append(a)
+        return ans
+
+    def dominated_triangles(self):
+        r"""
+        Return the subset of triangles that are either x-dominant or y-dominant.
+
+        The output is a list of half-edges whose corresponding fp-orbit is a
+        y-dominant triangle.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,~5,7)(~0,5,~3)(1,4,8)(~1,~6,~8)(2,3,~4)(~2,~7,6)", "RBRBBBBBR")
+            sage: C = vt.delaunay_cone(x_dominant_triangles=(0, 1), y_dominant_triangles=(2, 4))
+            sage: C.dominated_triangles()
+            [0, 1, 2, 3, 4, 5]
+
+            sage: C = vt.delaunay_cone(x_dominant_triangles=(2,), y_dominant_triangles=(0, 4))
+            sage: C.dominated_triangles()
+            [0, 1, 2, 3, 4, 5]
+        """
+        ne = self._vt._ne
+        ans = []
+        for a, b, c in self._vt.triangles():
+            ex, ey = self._vt._triangle_diagonals(a)
+            # r[ex] is the x-max in the triangle
+            # r[ne + ey] is the y-max in the triangle
+            if all(r[ex] <= r[ne + ey] for r in self.rays()) or all(r[ex] >= r[ne + ey] for r in self.rays()):
+                ans.append(a)
+        return ans
+
+    def edge_critical_face(self, e, check=True):
+        r"""
+        Return the edge-critical face of the edge ``e``.
+
+        The edge-critical face associated to ``e`` is the intersection of this
+        cone with the hyperplane ``x_e = y_e``. Note that it is not necessarily
+        a facet.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: C = vt.delaunay_cone(x_dominant_edges=[2])
+            sage: C.edge_critical_face(2)
+            A 2-dimensional face of a 3-dimensional combinatorial polyhedron
+            sage: C.edge_critical_face(1)
+            Traceback (most recent call last):
+            ...
+            ValueError: the edge e=1 is neither x-dominant nor y-dominant in this cone
+        """
+        # x[e] = y[e]
+        ne = self._vt._ne
+        if check:
+            e = self._vt._check_edge(e)
+            if not (all(r[e] >= r[ne + e] for r in self.rays()) or
+                    all(r[e] <= r[ne + e] for r in self.rays())):
+                raise ValueError(f"the edge e={e} is neither x-dominant nor y-dominant in this cone")
+
+        ne = self._vt._ne
+        CP = self.combinatorial_polyhedron()
+        Vrep = [i for i, r in enumerate(self.rays()) if r[e] == r[ne + e]]
+        return CP.join_of_Vrep(*Vrep)
+
+    def triangle_critical_face(self, h, check=True):
+        r"""
+        Return the triangle-critical face of the triangle containing ``h``.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,~5,~7)(~0,5,3)(1,7,6)(~1,~3,~4)(2,~8,4)(~2,8,~6)", "RBRBRBRBB")
+            sage: C = vt.delaunay_cone(x_dominant_edges=[0, 1, 2, 4, 6], y_dominant_edges=[3, 5, 7, 8], x_dominant_triangles=[2, 3, 4, 5], y_dominant_triangles=[0, 1])
+            sage: C.triangle_critical_face(0)
+            A 5-dimensional face of a 7-dimensional combinatorial polyhedron
+            sage: C.triangle_critical_face(2)
+            A 6-dimensional face of a 7-dimensional combinatorial polyhedron
+        """
+        ne = self._vt._ne
+        if check:
+            h = self._vt._check_half_edge(h)
+        ex, ey = self._vt._triangle_diagonals(h)
+        if check:
+            if not (all(r[ex] >= r[ne + ey] for r in self.rays()) or
+                    all(r[ex] <= r[ne + ey] for r in self.rays())):
+                raise ValueError("the triangle of h is neither x-dominant nor y-dominant in this cone")
+
+        CP = self.combinatorial_polyhedron()
+        Vrep = []
+        Vrep = [i for i, r in enumerate(self.rays()) if r[ex] == r[ne + ey]]
         return CP.join_of_Vrep(*Vrep)
 
     def _filter_facets(self, edges_and_faces):
@@ -410,6 +624,18 @@ class DelaunayCone:
         """
         return self._filter_facets((e, self.backward_delaunay_face(e)) for e in self._vt.backward_flippable_edges())
 
+    def edge_critical_facets(self):
+        r"""
+        Return the list of edge-critical facets as a list of pairs ``(face, edge)``.
+        """
+        return self._filter_facets((e, self.edge_critical_face(e)) for e in self.dominated_edges())
+
+    def triangle_critical_facets(self):
+        r"""
+        Return the list of triangle-critical facets as a list of pairs ``(face, triangle)``.
+        """
+        return self._filter_facets((h, self.triangle_critical_face(h)) for h in self.dominated_triangles())
+
     @cached_method
     def facets_kind_and_data(self):
         r"""
@@ -425,6 +651,9 @@ class DelaunayCone:
         (either vanishing edges for x-vanishing or y-vanishing edges or flipped
         edges for forward Delaunay or backward Delaunay).
 
+        For refined Delaunay cone, there are two additional kinds: ``'e'`` for
+        edge critical and ``'t'`` for triangle critical.
+
         EXAMPLES::
 
             sage: from veerer import VeeringTriangulation
@@ -432,6 +661,16 @@ class DelaunayCone:
             sage: C = vt.delaunay_cone()
             sage: C.facets_kind_and_data()
             (('f', 'y', 'y', 'x', 'x', 'b'), ((1,), (2,), (1,), (2,), (0,), (0,)))
+
+            sage: rdc = vt.refined_delaunay_cones()
+            sage: for C in rdc:
+            ....:     print(C.facets_kind_and_data())
+            (('x', 'f', 'y', 'e'), ((2,), (1,), (1,), (0,)))
+            (('e', 'f', 'y', 't', 'x'), ((2,), (1,), (1,), (0, 1), (0,)))
+            (('e', 't', 'e', 'x'), ((2,), (0, 1), (1,), (0,)))
+            (('e', 'y', 't', 'e'), ((0,), (1,), (0, 1), (2,)))
+            (('b', 't', 'y', 'e', 'x'), ((0,), (0, 1), (1,), (2,), (0,)))
+            (('b', 'e', 'y', 'x'), ((0,), (1,), (2,), (0,)))
         """
         kinds = [None] * len(self.facets())
         data = [[] for _ in range(len(self.facets()))]
@@ -456,6 +695,16 @@ class DelaunayCone:
             assert kinds[i] is None
             kinds[i] = 'b'
             data[i] = edges
+        for face, edges in self.edge_critical_facets():
+            i, = face.ambient_H_indices()
+            assert kinds[i] is None
+            kinds[i] = 'e'
+            data[i] = edges
+        for face, half_edges in self.triangle_critical_facets():
+            i, = face.ambient_H_indices()
+            assert kinds[i] is None
+            kinds[i] = 't'
+            data[i] = half_edges
 
         assert not any(v is None for v in kinds)
         return tuple(kinds), tuple(data)

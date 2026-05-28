@@ -3625,6 +3625,92 @@ class VeeringTriangulation(Triangulation):
             d //= 2
             insert(y[e] <= x[a] + x[d] - hw_bound)
 
+    def _set_edge_dominance_constraints(self, insert, x, y, x_dominant_edges, y_dominant_edges):
+        for e in x_dominant_edges:
+            insert(x[e] >= y[e])
+        for e in y_dominant_edges:
+            insert(x[e] <= y[e])
+
+    def _triangle_wedge_first(self, a):
+        r"""
+        Return the fp orbit of ``a`` starting by the wedge.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation, RED, BLUE
+
+            sage: fp = "(0,3,8)(~0,5,6)(~3,4,2)(~4,1,7)"
+            sage: cols = "BBBRRRRRR"
+            sage: vt = VeeringTriangulation(fp, cols)
+            sage: for h in vt.half_edges():
+            ....:     a, b, c = vt._triangle_wedge_first(h)
+            ....:     assert vt.next_in_face(a) == b
+            ....:     assert vt.next_in_face(b) == c
+            ....:     assert vt.next_in_face(c) == a
+            ....:     assert vt.half_edge_colour(a) == RED
+            ....:     assert vt.half_edge_colour(b) == BLUE
+        """
+        b = self._fp[a]
+        c = self._fp[b]
+        if self._colouring[a // 2] == RED:
+            if self._colouring[b // 2] == BLUE:
+                return (a, b, c)
+            else:
+                assert self._colouring[c // 2] == BLUE
+                return (b, c, a)
+        elif self._colouring[c // 2] == RED:
+            return (c, a, b)
+        else:
+            return (b, c, a)
+
+    def _triangle_diagonals(self, a):
+        r"""
+        return the half-edges that correspond to the vertical and horizontal
+        diagonals of the fp orbit of a.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation, VERTICAL, HORIZONTAL, RED, BLUE
+
+            sage: fp = "(0,3,8)(~0,5,6)(~3,4,2)(~4,1,7)"
+            sage: cols = "BBBRRRRRR"
+            sage: vt = VeeringTriangulation(fp, cols)
+            sage: for h in vt.half_edges():
+            ....:     ex, ey = vt._triangle_diagonals(h)
+            ....:     assert vt.edge_colour(ex) == vt.edge_colour(ey)
+
+        The significance is in the triangle equalities::
+
+            sage: vert_rays = vt.cone(VERTICAL).rays()
+            sage: horiz_rays = vt.cone(HORIZONTAL).rays()
+            sage: for h in vt.half_edges():
+            ....:     ex, ey = vt._triangle_diagonals(h)
+            ....:     assert all(r[ex] >= r[ey] for r in vert_rays)
+            ....:     assert all(r[ey] >= r[ex] for r in horiz_rays)
+        """
+        b = self._fp[a]
+        c = self._fp[b]
+        ea = a // 2
+        eb = b // 2
+        ec = c // 2
+        cola = self._colouring[ea]
+        colb = self._colouring[eb]
+        colc = self._colouring[ec]
+        if cola == colb:
+            return (ea, eb) if cola == BLUE else (eb, ea)
+        elif colb == colc:
+            return (eb, ec) if colb == BLUE else (ec, eb)
+        elif colc == cola:
+            return (ec, ea) if colc == BLUE else (ea, ec)
+
+    def _set_triangle_dominance_constraints(self, insert, x, y, x_dominant_triangles, y_dominant_triangles):
+        for h in x_dominant_triangles:
+            ex, ey = self._triangle_diagonals(h)
+            insert(x[ex] >= y[ey])
+        for h in y_dominant_triangles:
+            ex, ey = self._triangle_diagonals(h)
+            insert(x[ex] <= y[ey])
+
     def _set_balance_constraints(self, insert, x, slope, homogeneous):
         r"""
         Linear constraints for the balanced polytope.
@@ -3856,12 +3942,16 @@ class VeeringTriangulation(Triangulation):
         self._set_subspace_constraints_fast(cs, L, slope, 0)
         return cs.cone(backend, check=check)
 
-    def delaunay_cone(self, x_low_bound=0, y_low_bound=0, hw_bound=0, backend=None, check=True):
+    def delaunay_cone(self, x_low_bound=0, y_low_bound=0, hw_bound=0, x_dominant_edges=None, y_dominant_edges=None, x_dominant_triangles=None, y_dominant_triangles=None, backend=None, check=True):
         r"""
-        Return the geometric polytope of this veering triangulation.
+        Return the Delaunay cone or a refined Delaunay cone associated to this veering
+        triangulation or family
 
         The geometric polytope is the polytope of length and heights data that
-        corresponds to L-infinity Delaunay triangulations.
+        corresponds to L-infinity Delaunay triangulations. A refinement consists in
+        adding constraints of the following kinds:
+        - if ``e`` is a ``x``-dominant edge: ``x_e > y_e``
+        - if ``(a,b,c)`` is a ``x``-dominant triangle with ``a,b`` of the same colour: ``max(x_a,x_b) > max(y_a,y_b)``
 
         EXAMPLES::
 
@@ -3926,10 +4016,14 @@ class VeeringTriangulation(Triangulation):
         if x_low_bound or y_low_bound or hw_bound:
             raise NotImplementedError
 
-        try:
-            return self._delaunay_cone[backend]
-        except (AttributeError, KeyError):
-            pass
+        if (x_dominant_edges is None and
+            y_dominant_edges is None and
+            x_dominant_triangles is None and
+            y_dominant_triangles is None):
+            try:
+                return self._delaunay_cone[backend]
+            except (AttributeError, KeyError):
+                pass
 
         R = self.base_ring()
         L = LinearExpressions(R)
@@ -3947,13 +4041,134 @@ class VeeringTriangulation(Triangulation):
         self._set_subspace_constraints_fast(cs, L, HORIZONTAL, ne)
         from .delaunay_cone import DelaunayCone
         delaunay_cone = DelaunayCone(self.copy(mutable=False), cs.cone(backend, check=check))
+
+        # TODO: the following caching step creates a circular dependency as
+        # DelaunayCone holds a reference to vt
         if not self._mutable:
             try:
                 cache = self._delaunay_cone
             except AttributeError:
                 cache = self._delaunay_cone = {}
             self._delaunay_cone[backend] = delaunay_cone
-        return delaunay_cone
+
+        if (x_dominant_edges is None and
+            y_dominant_edges is None and
+            x_dominant_triangles is None and
+            y_dominant_triangles is None):
+            return delaunay_cone
+
+        x = [L.variable(e) for e in range(self.num_edges())]
+        y = [L.variable(ne + e) for e in range(self.num_edges())]
+        if x_dominant_edges is None:
+            x_dominant_edges = ()
+        if y_dominant_edges is None:
+            y_dominant_edges = ()
+        self._set_edge_dominance_constraints(cs.insert, x, y, x_dominant_edges, y_dominant_edges)
+        if x_dominant_triangles is None:
+            x_dominant_triangles = ()
+        if y_dominant_triangles is None:
+            y_dominant_triangles = ()
+        self._set_triangle_dominance_constraints(cs.insert, x, y, x_dominant_triangles, y_dominant_triangles)
+        return DelaunayCone(self.copy(mutable=False), cs.cone(backend, check=check))
+
+    def refined_delaunay_cones(self, backend=None, check=True):
+        r"""
+        Return the list of full dimensional refined Delaunay cones of this
+        veering triangulation or family.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,~4,7)(~0,6,~3)(1,~2,4)(~1,2,~6)(3,8,~5)(5,~7,~8)", "BRBRBBBRR")
+            sage: rdc = vt.refined_delaunay_cones()
+            sage: len(rdc)
+            126
+            sage: for D in rdc:
+            ....:     print(D.x_dominant_edges(), D.y_dominant_edges(), D.x_dominant_triangles(), D.y_dominant_triangles())
+            [0, 1, 2, 3, 7, 8] [4, 5, 6] [0, 1, 2, 3, 6, 10] []
+            [0, 1, 2, 3, 7, 8] [4, 5, 6] [0, 1, 6, 10] [2, 3]
+            [0, 1, 2, 3, 7, 8] [4, 5, 6] [2, 3, 6, 10] [0, 1]
+            [0, 1, 2, 3, 7, 8] [4, 5, 6] [6, 10] [0, 1, 2, 3]
+            [0, 1, 2, 5, 8] [3, 4, 6, 7] [0, 1, 2, 3, 6, 10] []
+            [0, 1, 2, 5, 8] [3, 4, 6, 7] [0, 1, 2, 3] [6, 10]
+            [0, 1, 2, 5, 8] [3, 4, 6, 7] [0, 1, 6, 10] [2, 3]
+            [0, 1, 2, 5, 8] [3, 4, 6, 7] [0, 1] [2, 3, 6, 10]
+            [0, 1, 2, 5, 8] [3, 4, 6, 7] [2, 3, 6, 10] [0, 1]
+            [0, 1, 2, 5, 8] [3, 4, 6, 7] [2, 3] [0, 1, 6, 10]
+            [0, 1, 2, 5, 8] [3, 4, 6, 7] [6, 10] [0, 1, 2, 3]
+            [0, 1, 2, 5, 8] [3, 4, 6, 7] [] [0, 1, 2, 3, 6, 10]
+            [0, 1, 2, 5] [3, 4, 6, 7, 8] [0, 1, 2, 3] [6, 10]
+            ...
+            [1] [0, 2, 3, 4, 5, 6, 7, 8] [] [0, 1, 2, 3, 6, 10]
+            [2, 3, 7, 8] [0, 1, 4, 5, 6] [2, 3, 6, 10] [0, 1]
+            [2, 3, 7, 8] [0, 1, 4, 5, 6] [6, 10] [0, 1, 2, 3]
+            [2, 5, 8] [0, 1, 3, 4, 6, 7] [2, 3, 6, 10] [0, 1]
+            [2, 5, 8] [0, 1, 3, 4, 6, 7] [2, 3] [0, 1, 6, 10]
+            [2, 5, 8] [0, 1, 3, 4, 6, 7] [6, 10] [0, 1, 2, 3]
+            [2, 5, 8] [0, 1, 3, 4, 6, 7] [] [0, 1, 2, 3, 6, 10]
+            [2, 5] [0, 1, 3, 4, 6, 7, 8] [2, 3] [0, 1, 6, 10]
+            [2, 5] [0, 1, 3, 4, 6, 7, 8] [] [0, 1, 2, 3, 6, 10]
+            [2, 8] [0, 1, 3, 4, 5, 6, 7] [2, 3, 6, 10] [0, 1]
+            [2, 8] [0, 1, 3, 4, 5, 6, 7] [2, 3] [0, 1, 6, 10]
+            [2, 8] [0, 1, 3, 4, 5, 6, 7] [6, 10] [0, 1, 2, 3]
+            [2, 8] [0, 1, 3, 4, 5, 6, 7] [] [0, 1, 2, 3, 6, 10]
+            [2] [0, 1, 3, 4, 5, 6, 7, 8] [2, 3] [0, 1, 6, 10]
+            [2] [0, 1, 3, 4, 5, 6, 7, 8] [] [0, 1, 2, 3, 6, 10]
+            [3, 7, 8] [0, 1, 2, 4, 5, 6] [6, 10] [0, 1, 2, 3]
+        """
+        R = self.base_ring()
+        L = LinearExpressions(R)
+        zero = R.zero()
+        one = R.one()
+        ne = self.num_edges()
+        cs = ConstraintSystem(2 * ne)
+        x = [L.variable(e) for e in range(ne)]
+        y = [L.variable(e) for e in range(ne, 2*ne)]
+
+        # non-negativity
+        for i in range(2 * ne):
+            cs.insert(LinearConstraint(op_GE, L.element_class(L, {i : one}, zero)), check=False)
+
+        self._set_delaunay_constraints_fast(cs, L)
+        self._set_subspace_constraints_fast(cs, L, VERTICAL, 0)
+        self._set_subspace_constraints_fast(cs, L, HORIZONTAL, ne)
+        D = cs.cone(backend, check=check)
+
+        dim = D.affine_dimension()
+
+        # ans is a list of quadruples x-dominated edge, y-dominated edge, x-dominated triangle, y-dominated triangle
+        ans = [cs.cone(backend, check=check)]
+        ans_new = []
+        # for each edge we try to set it x-dominant or y-dominant
+        for e in range(ne):
+            ans_new.clear()
+            for D in ans:
+                DD = D.add_constraint(x[e] >= y[e])
+                if DD.affine_dimension() == dim:
+                    ans_new.append(DD)
+
+                DD = D.add_constraint(x[e] <= y[e])
+                if DD.affine_dimension() == dim:
+                    ans_new.append(DD)
+
+            ans, ans_new = ans_new, ans
+
+        for h, _, _ in self.triangles():
+            ans_new.clear()
+            ex, ey = self._triangle_diagonals(h)
+            for D in ans:
+                DD = D.add_constraint(x[ex] >= y[ey])
+                if DD.affine_dimension() == dim:
+                    ans_new.append(DD)
+
+                DD = D.add_constraint(x[ex] <= y[ey])
+                if DD.affine_dimension() == dim:
+                    ans_new.append(DD)
+
+            ans, ans_new = ans_new, ans
+
+        from .delaunay_cone import DelaunayCone
+        return [DelaunayCone(self.copy(mutable=False), D) for D in ans]
 
     def geometric_polytope(self, *args, **kwds):
         r"""
