@@ -133,6 +133,23 @@ class Constellation:
         if check:
             self._check(ValueError)
 
+    def _assert_mutable(self):
+        r"""
+        Helper that raises a ``ValueError`` if this object is not mutable.
+
+        TESTS::
+
+            sage: from veerer import VeeringTriangulation
+            sage: T = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: T._assert_mutable()
+            Traceback (most recent call last):
+            ...
+            ValueError: immutable VeeringTriangulation; use a mutable copy instead
+            sage: T.copy(mutable=True)._assert_mutable()
+        """
+        if not self._mutable:
+            raise ValueError(f"immutable {type(self).__name__}; use a mutable copy instead")
+
     def _ep(self, h):
         r"""
         Return the image of ``h`` under the edge permutation.
@@ -1293,8 +1310,7 @@ class Constellation:
             sage: T1 == T2
             True
         """
-        if not self._mutable:
-            raise ValueError('immutable triangulation; use a mutable copy instead')
+        self._assert_mutable()
 
         if check:
             e = self._check_edge(e)
@@ -1360,7 +1376,7 @@ class Constellation:
             sage: T.relabel("(0,~1)")
             Traceback (most recent call last):
             ...
-            ValueError: immutable triangulation; use a mutable copy instead
+            ValueError: immutable Triangulation; use a mutable copy instead
 
         An example of a flip sequence which forms a loop after non-trivial relabelling::
 
@@ -1417,8 +1433,7 @@ class Constellation:
             ....:     T.relabel(r)
             ....:     T._check()
         """
-        if not self._mutable:
-            raise ValueError('immutable triangulation; use a mutable copy instead')
+        self._assert_mutable()
 
         if check:
             p = check_relabelling(p, self._ne)
@@ -1905,8 +1920,7 @@ class Constellation:
             Triangulation("(0,1,2)(~0,~2,3)(~1,4,5)(~3,6,7)(~4,8,~5)(~6,9,~7)(~8,10,11)(~9,~11,~10)")
             sage: T._check()
         """
-        if not self._mutable:
-            raise ValueError('immutable triangulation; use a mutable copy instead')
+        self._assert_mutable()
 
         r, fp_best, half_edges_data_best, edges_data_best = self.best_relabelling()
         self._fp = fp_best

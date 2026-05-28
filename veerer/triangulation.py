@@ -298,7 +298,7 @@ class Triangulation(Constellation):
         sage: T.flip(0)
         Traceback (most recent call last):
         ...
-        ValueError: immutable triangulation; use a mutable copy instead
+        ValueError: immutable Triangulation; use a mutable copy instead
 
     Non-connected surfaces are allowed::
 
@@ -1029,8 +1029,7 @@ class Triangulation(Constellation):
         # v/    c     |     v     c    \|
         # w---------->x     w---------->x
 
-        if not self._mutable:
-            raise ValueError('immutable triangulation; use a mutable copy instead')
+        self._assert_mutable()
 
         if check:
             e = self._check_edge(e)
@@ -1093,7 +1092,7 @@ class Triangulation(Constellation):
             sage: T.flip(0)
             Traceback (most recent call last):
             ...
-            ValueError: immutable triangulation; use a mutable copy instead
+            ValueError: immutable Triangulation; use a mutable copy instead
         """
         # Use the following for reference:
         # v<----------u     v<----------u
@@ -1110,8 +1109,7 @@ class Triangulation(Constellation):
         # v/    c     |     v     c    v|
         # w---------->x     w---------->x
 
-        if not self._mutable:
-            raise ValueError('immutable triangulation; use a mutable copy instead')
+        self._assert_mutable()
 
         if check:
             h = self._check_edge(e)
@@ -1171,7 +1169,7 @@ class Triangulation(Constellation):
             sage: T.conjugate()
             Traceback (most recent call last):
             ...
-            ValueError: immutable triangulation; use a mutable copy instead
+            ValueError: immutable Triangulation; use a mutable copy instead
         """
         # for reference
         #
@@ -1191,8 +1189,7 @@ class Triangulation(Constellation):
         #
         # (a, b, c)     -->  (C, B, A)
 
-        if not self._mutable:
-            raise ValueError('immutable triangulation; use a mutable copy instead')
+        self._assert_mutable()
 
         self._fp = perm_conjugate(perm_invert(self._fp), self.edge_permutation())
         self._vp = perm_invert(self._vp)

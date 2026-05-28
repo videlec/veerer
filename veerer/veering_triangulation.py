@@ -759,6 +759,21 @@ class VeeringTriangulation(Triangulation):
 
     @classmethod
     def from_face_edge_perms(self, colouring, fp, ep, vp=None, boundary=None, mutable=False, check=True):
+        r"""
+        Deprecated. Use :meth:`from_permutations` instead.
+
+        TESTS::
+
+            sage: from veerer import VeeringTriangulation, RED, BLUE
+            sage: from array import array
+            sage: from operator import xor
+            sage: fp = array('i', [2, 3, 4, 5, 0, 1])
+            sage: VeeringTriangulation.from_face_edge_perms([RED, RED, BLUE], fp, lambda i: xor(i, 1))
+            doctest:warning
+            ...
+            UserWarning: the method StrebelGraph.from_face_edge_perms is deprecated; use the classmethod from_permutations instead
+            VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+        """
         import warnings
         warnings.warn('the method StrebelGraph.from_face_edge_perms is deprecated; use the classmethod from_permutations instead')
 
@@ -775,7 +790,7 @@ class VeeringTriangulation(Triangulation):
             bdry = array('i', boundary)
         colouring = array('i', colouring)
 
-        return VeeringTriangulation.from_permutations(vp, ep, fp, (bdry, colouring), mutable=mutable, check=check)
+        return VeeringTriangulation.from_permutations(vp, fp, (bdry,), (colouring,), mutable=mutable, check=check)
 
     def forgot_forward_flippable_colour(self, folded=True):
         r"""
@@ -795,10 +810,9 @@ class VeeringTriangulation(Triangulation):
             sage: t.forgot_forward_flippable_colour()
             Traceback (most recent call last):
             ...
-            ValueError: immutable veering triangulation; use a mutable copy instead
+            ValueError: immutable VeeringTriangulation; use a mutable copy instead
         """
-        if not self._mutable:
-            raise ValueError('immutable veering triangulation; use a mutable copy instead')
+        self._assert_mutable()
 
         ep = self._ep
         for e in self.forward_flippable_edges(folded=folded):
@@ -832,10 +846,9 @@ class VeeringTriangulation(Triangulation):
             sage: t.forgot_backward_flippable_colour()
             Traceback (most recent call last):
             ...
-            ValueError: immutable veering triangulation; use a mutable copy instead
+            ValueError: immutable VeeringTriangulation; use a mutable copy instead
         """
-        if not self._mutable:
-            raise ValueError('immutable veering triangulation; use a mutable copy instead')
+        self._assert_mutable()
 
         ep = self._ep
         for e in self.backward_flippable_edges():
@@ -2044,8 +2057,7 @@ class VeeringTriangulation(Triangulation):
         r"""
         Set the colour of the edge ``e`` to ``col``.
         """
-        if not self._mutable:
-            raise ValueError('immutable veering triangulation; use a mutable copy instead')
+        self._assert_mutable()
 
         if check:
             e = self._check_edge(e)
@@ -2060,8 +2072,7 @@ class VeeringTriangulation(Triangulation):
         r"""
         Set random colours to the GREEN and PURPLE edges.
         """
-        if not self._mutable:
-            raise ValueError('immutable veering triangulation; use a mutable copy instead')
+        self._assert_mutable()
 
         ep = self._ep
         cols = [BLUE, RED]
@@ -2080,8 +2091,7 @@ class VeeringTriangulation(Triangulation):
 
         The colour ``col`` must be RED or BLUE.
         """
-        if not self._mutable:
-            raise ValueError('immutable veering triangulation; use a mutable copy instead')
+        self._assert_mutable()
 
         if col != RED and col != BLUE:
             raise ValueError("'col' must be RED or BLUE")
@@ -2144,8 +2154,8 @@ class VeeringTriangulation(Triangulation):
             sage: sorted(vt.backward_delaunay_flips())
             [((1,), 1), ((1,), 2), ((5, 6), 1), ((5, 6), 2)]
         """
-        if not self._mutable:
-            raise ValueError('immutable veering triangulation; use a mutable copy instead')
+        self._assert_mutable()
+
         for i, col in enumerate(self._colouring):
             if col == RED:
                 self._colouring[i] = BLUE
@@ -2177,10 +2187,9 @@ class VeeringTriangulation(Triangulation):
             sage: T.conjugate()
             Traceback (most recent call last):
             ...
-            ValueError: immutable veering triangulation; use a mutable copy instead
+            ValueError: immutable VeeringTriangulation; use a mutable copy instead
         """
-        if not self._mutable:
-            raise ValueError('immutable veering triangulation; use a mutable copy instead')
+        self._assert_mutable()
 
         Triangulation.conjugate(self)
         transp = {RED: BLUE, BLUE: RED, GREEN: GREEN, PURPLE: PURPLE}
@@ -2264,8 +2273,7 @@ class VeeringTriangulation(Triangulation):
             ....:     T._set_subspace_constraints(T._constraint_check, Gx.row(0), VERTICAL)
             ....:     T._set_subspace_constraints(T._constraint_check, Gx.row(1), VERTICAL)
         """
-        if not self._mutable:
-            raise ValueError('immutable veering triangulation; use a mutable copy instead')
+        self._assert_mutable()
 
         if check:
             if col != BLUE and col != RED and col != GREEN:
@@ -3190,8 +3198,7 @@ class VeeringTriangulation(Triangulation):
             [1 0 0 1 1 1 1]
             [0 1 1 1 1 1 0]
         """
-        if not self._mutable:
-            raise ValueError('immutable veering triangulation; use a mutable copy instead')
+        self._assert_mutable()
 
         if check:
             if col != BLUE and col != RED and col != PURPLE:
@@ -3682,7 +3689,19 @@ class VeeringTriangulation(Triangulation):
 
     def train_track_polytope(self, slope=VERTICAL, low_bound=0, backend=None):
         r"""
-        Deprecated method.
+        Deprecated. Use :meth:`cone` instead.
+
+        TESTS::
+
+            sage: from veerer import *
+            sage: T = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: T.train_track_polytope(VERTICAL)
+            doctest:warning
+            ...
+            UserWarning: train_track_polytope is deprecated; use cone instead
+            Cone of dimension 2 in ambient dimension 3 made of 2 facets (backend=ppl)
+            sage: T.cone(VERTICAL)
+            Cone of dimension 2 in ambient dimension 3 made of 2 facets (backend=ppl)
         """
         if low_bound:
             raise NotImplementedError
@@ -3937,6 +3956,29 @@ class VeeringTriangulation(Triangulation):
         return delaunay_cone
 
     def geometric_polytope(self, *args, **kwds):
+        r"""
+        Deprecated. Use :meth:`delaunay_cone` instead.
+
+        TESTS::
+
+            sage: from veerer import *
+            sage: T = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB")
+            sage: T.geometric_polytope().info()
+            doctest:warning
+            ...
+            UserWarning: geometric_polytope is deprecated; use delaunay_cone instead
+            4-dimensional Delaunay cone made of
+             1 forward-flip facet
+             1 backward-flip facet
+             2 x-degeneration facets
+             2 y-degeneration facets
+            sage: T.delaunay_cone().info()
+            4-dimensional Delaunay cone made of
+             1 forward-flip facet
+             1 backward-flip facet
+             2 x-degeneration facets
+             2 y-degeneration facets
+        """
         from warnings import warn
         warn('geometric_polytope is deprecated; use delaunay_cone instead')
         return self.delaunay_cone(*args, **kwds)
@@ -4016,11 +4058,25 @@ class VeeringTriangulation(Triangulation):
 
     def geometric_automaton(self, *args, **kwds):
         r"""
-        Deprecated method.
+        Deprecated. Use :meth:`delaunay_automaton` instead.
+
+        TESTS::
+
+            sage: from veerer import VeeringTriangulation
+            sage: fp = "(0,~7,6)(1,~8,~2)(2,~6,~3)(3,5,~4)(4,8,~5)(7,~1,~0)"
+            sage: cols = "RBRBRBBBB"
+            sage: vt = VeeringTriangulation(fp, cols)
+            sage: vt.geometric_automaton()
+            doctest:warning
+            ...
+            UserWarning: geometric_automaton is deprecated; use delaunay_automaton instead
+            Delaunay automaton with 54 states
+            sage: vt.delaunay_automaton()
+            Delaunay automaton with 54 states
         """
         from warnings import warn
         warn('geometric_automaton is deprecated; use delaunay_automaton instead')
-        return self.delaunay_automaton(self, *args, **kwds)
+        return self.delaunay_automaton(*args, **kwds)
 
     def delaunay_strebel_automaton(self, run=True, backward=None, verbosity=0, backend=None):
         r"""
@@ -4929,6 +4985,21 @@ class VeeringTriangulation(Triangulation):
         return ans
 
     def geometric_flips(self, *args, **kwds):
+        r"""
+        Deprecated. Use :meth:`delaunay_flips` instead.
+
+        TESTS::
+
+            sage: from veerer import *
+            sage: vt = VeeringTriangulation("(0,2,3)(1,4,~0)(5,6,~1)", "BRRBBBB")
+            sage: sorted(vt.geometric_flips())
+            doctest:warning
+            ...
+            UserWarning: the method geometric_flips is deprecated; use delaunay_flips instead
+            [((3,), 1), ((3,), 2), ((4,), 1), ((4,), 2), ((5,), 1), ((5,), 2)]
+            sage: sorted(vt.delaunay_flips())
+            [((3,), 1), ((3,), 2), ((4,), 1), ((4,), 2), ((5,), 1), ((5,), 2)]
+        """
         import warnings
         warnings.warn('the method geometric_flips is deprecated; use delaunay_flips instead')
 
@@ -5051,9 +5122,24 @@ class VeeringTriangulation(Triangulation):
         INPUT:
 
         - ``repeat`` - integer (default 1) - if provided make ``repeat`` flips instead of 1.
+
+        EXAMPLES::
+
+            sage: from veerer import VeeringTriangulation
+            sage: vt = VeeringTriangulation("(0,6,3)(~0,~1,~4)(1,5,~6)(2,~3,~8)(~2,7,8)(4,~5,~7)", "RBRBBRRBB", mutable=True)
+            sage: vt.random_forward_flip(10)
+            sage: vt  # random
+            VeeringTriangulation("(0,~8,7)(~0,8,~3)(1,~2,~6)(~1,2,4)(3,~5,6)(~4,~7,5)", "RBRRBRBRB")
+
+        An error is raised if the veering triangulation is not mutable::
+
+            sage: vt = VeeringTriangulation("(0,6,3)(~0,~1,~4)(1,5,~6)(2,~3,~8)(~2,7,8)(4,~5,~7)", "RBRBBRRBB")
+            sage: vt.random_forward_flip()
+            Traceback (most recent call last):
+            ...
+            ValueError: immutable VeeringTriangulation; use a mutable copy instead
         """
-        if not self._mutable:
-            raise ValueError('immutable veering triangulation; use a mutable copy instead')
+        self._assert_mutable()
 
         cols = [RED, BLUE]
         for _ in range(repeat):

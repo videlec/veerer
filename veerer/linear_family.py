@@ -781,9 +781,17 @@ class LinearFamily:
     def set_canonical_labels(self, mapping=False):
         r"""
         Set labels in a canonical way in its automorphism class.
+
+        TESTS::
+
+            sage: from veerer import VeeringTriangulation
+            sage: f = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RRB").as_linear_family()
+            sage: f.set_canonical_labels()
+            Traceback (most recent call last):
+            ...
+            ValueError: immutable VeeringTriangulationLinearFamily; use a mutable copy instead
         """
-        if not self._mutable:
-            raise ValueError('immutable triangulation; use a mutable copy instead')
+        self._assert_mutable()
 
         r, fp_best, half_edges_data_best, edges_data_best, subspace_best = self.best_relabelling()
         self._fp = fp_best
@@ -942,9 +950,17 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
             sage: f.rotate()
             sage: f
             VeeringTriangulationLinearFamily("(0,12,~11)(~0,~8,9)(1,13,~12)(~1,16,~15)(2,14,~13)(~2,~6,7)(3,15,~14)(~3,~17,6)(4,17,~16)(~4,~9,10)(5,~10,11)(~5,~7,8)", "BBBBBBRRRRRRRRRRRR", [(1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0), (0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 1, 2, 2, 1, 1, 1, 0, 0), (0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0), (0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1), (0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0), (0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)])
+        TESTS::
+
+            sage: from veerer import VeeringTriangulation
+            sage: fp = "(0,1,2)(~0,~4,~2)(3,4,5)(~3,~1,~5)"
+            sage: f = VeeringTriangulation(fp, "BRRBRR").as_linear_family()
+            sage: f.rotate()
+            Traceback (most recent call last):
+            ...
+            ValueError: immutable VeeringTriangulationLinearFamily; use a mutable copy instead
         """
-        if not self._mutable:
-            raise ValueError('immutable veering triangulation family; use a mutable copy instead')
+        self._assert_mutable()
 
         subspace = self._horizontal_subspace()
         subspace.echelonize()
@@ -1098,9 +1114,17 @@ class VeeringTriangulationLinearFamily(LinearFamily, VeeringTriangulation):
             False
             sage: while not X.is_delaunay():
             ....:     X.random_forward_flip()
+
+        TESTS::
+
+            sage: from veerer.linear_family import VeeringTriangulationLinearFamilies
+            sage: X = VeeringTriangulationLinearFamilies.prototype_H1_1(0, 4, 1, 0)
+            sage: X.random_forward_flip()
+            Traceback (most recent call last):
+            ...
+            ValueError: immutable VeeringTriangulationLinearFamily; use a mutable copy instead
         """
-        if not self._mutable:
-            raise ValueError('immutable veering triangulation family; use a mutable copy instead')
+        self._assert_mutable()
 
         cols = [RED, BLUE]
         for _ in range(repeat):

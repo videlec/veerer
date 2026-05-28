@@ -479,7 +479,7 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
             sage: fl.flip(1)
             Traceback (most recent call last):
             ...
-            ValueError: immutable flat veering triangulation; use a mutable copy instead
+            ValueError: immutable FlatVeeringTriangulation; use a mutable copy instead
 
             sage: fl = FlatVeeringTriangulation("(0, 1, 2)", (13, 21, 8), (8, 3, 5), mutable=True)
             sage: fl.flip(1)
@@ -487,8 +487,7 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
             FlatVeeringTriangulation("(0,2,1)", "RRB", (13, 5, 8), (8, 13, 5))
         """
         if check:
-            if not self._mutable:
-                raise ValueError("immutable flat veering triangulation; use a mutable copy instead")
+            self._assert_mutable()
 
             e = self._check_edge(e)
             if not self.is_forward_flippable(e):
@@ -556,10 +555,18 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
             sage: fl.flip_back(2)
             sage: fl
             FlatVeeringTriangulation("(0,1,2)(~0,3,4)(~1,5,6)", "BRRRRRB", (47, 27, 74, 22, 69, 61, 34), (51, 67, 16, 79, 28, 31, 36))
+
+        TESTS::
+
+            sage: from veerer import FlatVeeringTriangulation
+            sage: fl = FlatVeeringTriangulation("(0,1,4)(~0,3,2)(~1,5,6)", (2, 27, 20, 22, 25, 61, 34), (197, 67, 118, 79, 130, 31, 36))
+            sage: fl.flip_back(0)
+            Traceback (most recent call last):
+            ...
+            ValueError: immutable FlatVeeringTriangulation; use a mutable copy instead
         """
         if check:
-            if not self._mutable:
-                raise ValueError("immutable flat veering triangulation; use a mutable copy instead")
+            self._assert_mutable()
 
             e = self._check_edge(e)
             if not self.is_backward_flippable(e):
@@ -614,10 +621,19 @@ class FlatVeeringTriangulation(FlatStructure, VeeringTriangulation):
             sage: fl.xy_scaling(2, 1/3)
             sage: fl
             FlatVeeringTriangulation("(0,1,2)(~0,3,4)(~1,5,6)", "BRRRRRB", (94, 54, 148, 44, 138, 122, 68), (17, 67/3, 16/3, 79/3, 28/3, 31/3, 12))
+
+        TESTS::
+
+            sage: from veerer import FlatVeeringTriangulation
+            sage: fl = FlatVeeringTriangulation("(0,1,2)(3,4,~0)(5,6,~1)", (47, 27, 74, 22, 69, 61, 34), (51, 67, 16, 79, 28, 31, 36))
+            sage: fl.xy_scaling(2, 1)
+            Traceback (most recent call last):
+            ...
+            ValueError: immutable FlatVeeringTriangulation; use a mutable copy instead
         """
-        if not self._mutable:
-            raise ValueError("immutable flat veering triangulation; use a mutable copy instead")
+        self._assert_mutable()
 
         for i in range(self._ne):
             self._x[i] *= a
             self._y[i] *= b
+
